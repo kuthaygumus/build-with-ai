@@ -38,7 +38,7 @@ Build a system that answers questions from your own documents — accurately, wi
 
 ### Local Development
 ```bash
-git clone https://github.com/kgumus/build-with-ai.git
+git clone https://github.com/kuthaygumus/build-with-ai.git
 cd build-with-ai
 npm install
 npm run dev
@@ -91,4 +91,4 @@ MIT
 
 **Kuthay Gumus** — Senior Software Engineer
 
-[GitHub](https://github.com/kgumus)
+[GitHub](https://github.com/kuthaygumus)
