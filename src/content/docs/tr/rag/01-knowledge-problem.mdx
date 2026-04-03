@@ -18,7 +18,7 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 Tanımlardan önce, RAG'ın nasıl çalıştığını izleyelim.
 
 <PresenterNote>
-`03-e2e-rag.ipynb` notebook'unu Colab'da açın. İlk iki hücreyi çalıştırın: biri plain LLM'e soru sorar, diğeri RAG-powered sisteme aynı soruyu sorar. İki çıktıyı yan yana gösterin. Kontrastı izlemelerini sağlayın — henüz açıklamayın. Sorun: "İki cevap arasındaki fark ne? Neden biri kaynak gösteriyor, diğeri göstermiyor?"
+[03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'unu Colab'da açın. İlk iki hücreyi çalıştırın: biri plain LLM'e soru sorar, diğeri RAG-powered sisteme aynı soruyu sorar. İki çıktıyı yan yana gösterin. Kontrastı izlemelerini sağlayın — henüz açıklamayın. Sorun: "İki cevap arasındaki fark ne? Neden biri kaynak gösteriyor, diğeri göstermiyor?"
 </PresenterNote>
 
 Dün güncellenen bir şirket içi politika belgeniz var. Düz bir LLM'e sorun:
@@ -63,7 +63,7 @@ response = llm("What are the parameters for the FlightOffers v4 API?")
 ```
 
 <PresenterNote>
-`03-e2e-rag.ipynb` notebook'undaki hallucination demo hücresini çalıştırın. Var olmayan bir internal API hakkında soru sorun ve LLM'in güvenle uydurduğunu gösterin. Sorun: "Bunu production'a deploy eder misiniz?" Oda sessizleşir. Sonra RAG versiyonunu çalıştırın — aynı soru, gerçek dokümana dayalı cevap. Fark apaçık.
+[03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'undaki hallucination demo hücresini çalıştırın. Var olmayan bir internal API hakkında soru sorun ve LLM'in güvenle uydurduğunu gösterin. Sorun: "Bunu production'a deploy eder misiniz?" Oda sessizleşir. Sonra RAG versiyonunu çalıştırın — aynı soru, gerçek dokümana dayalı cevap. Fark apaçık.
 </PresenterNote>
 
 ### 2. Eskimiş Bilgi
@@ -166,7 +166,7 @@ Question: {question}"""
 ```
 
 <PresenterNote>
-`03-e2e-rag.ipynb` notebook'undaki RAG pseudocode hücresini gösterin. Satır satır geçin. Vurgulayın: LLM aynı, sihir 2. satırdaki similarity_search'te. Sorun: "similarity_search arka planda ne yapıyor sizce?" 1-2 tahmin alın. "İşte Module 2'de `01-embeddings-viz.ipynb` ile bunu derinlemesine öğreneceğiz."
+[03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'undaki RAG pseudocode hücresini gösterin. Satır satır geçin. Vurgulayın: LLM aynı, sihir 2. satırdaki similarity_search'te. Sorun: "similarity_search arka planda ne yapıyor sizce?" 1-2 tahmin alın. "İşte Module 2'de [01-embeddings-viz.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/01-embeddings-viz.ipynb) ile bunu derinlemesine öğreneceğiz."
 </PresenterNote>
 
 ## RAG vs Fine-Tuning
@@ -248,7 +248,7 @@ Bir seyahat teknolojisi şirketinin içinde zaten var olan verileri düşünün:
 </CardGrid>
 
 <PresenterNote>
-Sorun: "Bu use case'lerden hangisi takımınıza en çok zaman kazandırır?" 2-3 cevap alın. Bunlar eğitimin geri kalanı için zihinsel çapalar olacak. `03-e2e-rag.ipynb` notebook'unda bu use case'lerden birini end-to-end göstereceğimizi söyleyin.
+Sorun: "Bu use case'lerden hangisi takımınıza en çok zaman kazandırır?" 2-3 cevap alın. Bunlar eğitimin geri kalanı için zihinsel çapalar olacak. [03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'unda bu use case'lerden birini end-to-end göstereceğimizi söyleyin.
 </PresenterNote>
 
 ## İndeksleme Aşaması -- Sorgulardan Önce Ne Olur

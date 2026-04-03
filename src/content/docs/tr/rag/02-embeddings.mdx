@@ -18,7 +18,7 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 Herhangi bir tanım yapmadan önce, şunu izleyin.
 
 <PresenterNote>
-`01-embeddings-viz.ipynb` notebook'unu Colab'da açın. İlk 3 hücreyi çalıştırarak 8-10 travel cümlesini embed edin. t-SNE plot hücresini çalıştırın ve 2D görselleştirmeyi gösterin. Flight cümleleri bir arada, hotel cümleleri bir arada, billing bir arada. Matematiği henüz açıklamayın. Sadece anlamın geometriye dönüştüğünü görmelerini sağlayın. Sorun: "Bu kümelenmeyi model'a kim öğretti?"
+[01-embeddings-viz.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/01-embeddings-viz.ipynb) notebook'unu Colab'da açın. İlk 3 hücreyi çalıştırarak 8-10 travel cümlesini embed edin. t-SNE plot hücresini çalıştırın ve 2D görselleştirmeyi gösterin. Flight cümleleri bir arada, hotel cümleleri bir arada, billing bir arada. Matematiği henüz açıklamayın. Sadece anlamın geometriye dönüştüğünü görmelerini sağlayın. Sorun: "Bu kümelenmeyi model'a kim öğretti?"
 </PresenterNote>
 
 Seyahat hakkında sekiz cümle. Etiket yok. Kategori yok. Sadece bir modele beslenen metin.
@@ -76,7 +76,7 @@ Uçuş gecikmeleri hakkında iki cümle, 1536 boyutlu uzayda **birbirine yakın*
 </FlowDiagram>
 
 <PresenterNote>
-`01-embeddings-viz.ipynb` notebook'undaki cosine similarity matrisini gösterin. Sorun: "Bu neden keyword search'ten daha iyi?" Cevaplar alın. Punchline: "delayed flight" keyword araması "late arrival" yazan dokümanı bulamaz. `02-vector-search.ipynb` notebook'unda bunu canlı kanıtlayacağız — aynı sorgu, keyword vs semantic sonuçları yan yana.
+[01-embeddings-viz.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/01-embeddings-viz.ipynb) notebook'undaki cosine similarity matrisini gösterin. Sorun: "Bu neden keyword search'ten daha iyi?" Cevaplar alın. Punchline: "delayed flight" keyword araması "late arrival" yazan dokümanı bulamaz. [02-vector-search.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/02-vector-search.ipynb) notebook'unda bunu canlı kanıtlayacağız — aynı sorgu, keyword vs semantic sonuçları yan yana.
 </PresenterNote>
 
 ## Benzerlik Metrikleri
@@ -332,7 +332,7 @@ Bu notebook'ta şunları yapacaksınız:
 </Steps>
 
 <PresenterNote>
-`01-embeddings-viz.ipynb` notebook'unu canlı olarak adım adım geçin. "Aha anı" t-SNE plot çıktığında olur — flight cümleleri hotel cümlelerinden ayrı kümelenir. Sorun: "Model'a bu kategorileri biz mi söyledik?" Hayır. Dili anlayarak kendisi çıkardı. Sonra `02-vector-search.ipynb` notebook'una geçin ve ChromaDB ile semantic search yapın.
+[01-embeddings-viz.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/01-embeddings-viz.ipynb) notebook'unu canlı olarak adım adım geçin. "Aha anı" t-SNE plot çıktığında olur — flight cümleleri hotel cümlelerinden ayrı kümelenir. Sorun: "Model'a bu kategorileri biz mi söyledik?" Hayır. Dili anlayarak kendisi çıkardı. Sonra [02-vector-search.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/02-vector-search.ipynb) notebook'una geçin ve ChromaDB ile semantic search yapın.
 </PresenterNote>
 
 <ColabLink title="Uygulamalı: ChromaDB ile Semantik Arama Sistemi Oluşturun" notebook="/notebooks/rag/02-vector-search.ipynb" level="Basic" />

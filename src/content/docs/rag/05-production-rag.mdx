@@ -18,7 +18,7 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 Your RAG demo works great in a notebook. Then you deploy it.
 
 <PresenterNote>
-`07-capstone-production.ipynb` notebook'unu Colab'da açın. Sorun: "Kim bir demo deploy edip beklemediği şekilde başarısız olmasını izledi?" Eller kalkar. "Demo ile production arasındaki boşluk — bu modül onu kapatıyor." Notebook'taki 4 failure senaryosunu sırayla okuyun. Her birinden sonra durun. Bunlar gerçek, varsayımsal değil.
+[07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb) notebook'unu Colab'da açın. Sorun: "Kim bir demo deploy edip beklemediği şekilde başarısız olmasını izledi?" Eller kalkar. "Demo ile production arasındaki boşluk — bu modül onu kapatıyor." Notebook'taki 4 failure senaryosunu sırayla okuyun. Her birinden sonra durun. Bunlar gerçek, varsayımsal değil.
 </PresenterNote>
 
 A user asks a question that retrieves **conflicting documents** and gets a contradictory answer. The system retrieves 10 chunks but the answer comes from only 1 — the rest **dilute** the quality. Latency spikes to 8 seconds. And you have no idea **why** the system gave a wrong answer last Tuesday.
@@ -150,7 +150,7 @@ Action: Add re-ranking or reduce k.
 ```
 
 <PresenterNote>
-`07-capstone-production.ipynb` notebook'undaki RAGAS evaluation hücrelerini çalıştırın. Context Precision 0.65 = %35 gürültü. Sorun: "Module 4'ten hangi teknik bunu düzeltir?" Re-ranking. Notebook'ta cross-encoder ekleyin, tekrar çalıştırın ve precision'ın 0.85+'e çıktığını gösterin. Tekniğin işe yaradığının canlı kanıtı.
+[07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb) notebook'undaki RAGAS evaluation hücrelerini çalıştırın. Context Precision 0.65 = %35 gürültü. Sorun: "Module 4'ten hangi teknik bunu düzeltir?" Re-ranking. Notebook'ta cross-encoder ekleyin, tekrar çalıştırın ve precision'ın 0.85+'e çıktığını gösterin. Tekniğin işe yaradığının canlı kanıtı.
 </PresenterNote>
 
 <Aside type="tip">
@@ -377,7 +377,7 @@ def collect_feedback(query_id: str, helpful: bool, comment: str = ""):
 ```
 
 <PresenterNote>
-`07-capstone-production.ipynb` notebook'undaki monitoring ve feedback hücrelerini gösterin. Sorun: "RAG sistemindeki en pahalı bug nedir?" Kullanıcıların rapor etmediği yanlış cevaplar. Sisteme güvenmeyi bırakırlar. Notebook'taki feedback collection ve alert threshold'larını çalıştırın. "Kullanıcılarınız vazgeçmeden önce sistemin ne zaman başarısız olduğunu bilmeniz gerekir."
+[07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb) notebook'undaki monitoring ve feedback hücrelerini gösterin. Sorun: "RAG sistemindeki en pahalı bug nedir?" Kullanıcıların rapor etmediği yanlış cevaplar. Sisteme güvenmeyi bırakırlar. Notebook'taki feedback collection ve alert threshold'larını çalıştırın. "Kullanıcılarınız vazgeçmeden önce sistemin ne zaman başarısız olduğunu bilmeniz gerekir."
 </PresenterNote>
 
 ## Multi-Tenant Architecture
@@ -508,7 +508,7 @@ The Agentic RAG pattern from Module 4 is the bridge. An agent with tools that in
 </FlowDiagram>
 
 <PresenterNote>
-Kapanış anı. `07-capstone-production.ipynb` notebook'undaki son hücreyi çalıştırın — tüm tekniklerin birleştiği Agentic RAG demo'su. Agent Training Module 1'deki ilk demo'ya bağlayın: "O agent'ı hatırlıyor musunuz? Şimdi tüm dokümanlara, policy'lere ve tarihsel verilere RAG erişimi olduğunu düşünün. Sadece aksiyon almıyor — dayanaklı, kaynaklı bilgiyle aksiyon alıyor." Durun. Sindirmelerini sağlayın.
+Kapanış anı. [07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb) notebook'undaki son hücreyi çalıştırın — tüm tekniklerin birleştiği Agentic RAG demo'su. Agent Training Module 1'deki ilk demo'ya bağlayın: "O agent'ı hatırlıyor musunuz? Şimdi tüm dokümanlara, policy'lere ve tarihsel verilere RAG erişimi olduğunu düşünün. Sadece aksiyon almıyor — dayanaklı, kaynaklı bilgiyle aksiyon alıyor." Durun. Sindirmelerini sağlayın.
 </PresenterNote>
 
 <KeyInsight>

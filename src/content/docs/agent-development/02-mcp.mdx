@@ -22,7 +22,7 @@ Without a standard: **5 x 8 = 40 custom integrations.** Each with its own auth, 
 This is the **N x M problem**, and it's the same trap the hardware industry fell into before USB.
 
 <PresenterNote>
-Matematiği tahtaya yazın: 3 AI tool x 5 sistem = 15 entegrasyon. Sorun: "6. sistemi eklediğinizde ne olur?" (3 tane daha, toplam 18). Sonra `01-mcp-server.ipynb` notebook'unu Colab'da açın, ilk hücreyi gösterin. "Bu notebook'ta tek bir MCP server yazıp tüm AI client'lara bağlayacağız — N+M yaklaşımı."
+Matematiği tahtaya yazın: 3 AI tool x 5 sistem = 15 entegrasyon. Sorun: "6. sistemi eklediğinizde ne olur?" (3 tane daha, toplam 18). Sonra [01-mcp-server.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/01-mcp-server.ipynb) notebook'unu Colab'da açın, ilk hücreyi gösterin. "Bu notebook'ta tek bir MCP server yazıp tüm AI client'lara bağlayacağız — N+M yaklaşımı."
 </PresenterNote>
 
 <FlowDiagram title="Before MCP: The N x M Nightmare">
@@ -123,7 +123,7 @@ MCP isn't a single connection. It's a layered system with clear separation of co
 Why three layers instead of two? **Security.** The host controls what the AI can access. The client provides isolation — a misbehaving server can't poison others. The server is sandboxed, exposing only what it's designed to expose.
 
 <PresenterNote>
-`01-mcp-server.ipynb` notebook'unda Host/Client/Server yapısını gösteren hücreyi açın. Tahtaya 3 katmanı çizin: bir host içinde 3 client, her biri farklı server'a bağlı. Sorun: "LLM'i doğrudan tool'lara bağlasak ne olur?" Cevaba yönlendirin: güvenlik, izolasyon, yaşam döngüsü yönetimi.
+[01-mcp-server.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/01-mcp-server.ipynb) notebook'unda Host/Client/Server yapısını gösteren hücreyi açın. Tahtaya 3 katmanı çizin: bir host içinde 3 client, her biri farklı server'a bağlı. Sorun: "LLM'i doğrudan tool'lara bağlasak ne olur?" Cevaba yönlendirin: güvenlik, izolasyon, yaşam döngüsü yönetimi.
 </PresenterNote>
 
 ## Transport: How Messages Move
@@ -296,7 +296,7 @@ You're probably already using MCP without realizing it.
 Now the AI assistant in your editor can query your database and interact with GitHub — through a standardized protocol. Swap the GitHub server for GitLab? The client code doesn't change.
 
 <PresenterNote>
-`01-mcp-server.ipynb` notebook'unda tool tanımlama ve test hücrelerini çalıştırın (ilk 4 hücre). flight search tool'unu çağırın ve JSON-RPC response'unu gösterin. Sorun: "Bu server'a yeni bir tool eklemek için ne yapmanız gerekir?" Cevap: sadece yeni bir `@server.tool()` fonksiyonu yazmak.
+[01-mcp-server.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/01-mcp-server.ipynb) notebook'unda tool tanımlama ve test hücrelerini çalıştırın (ilk 4 hücre). flight search tool'unu çağırın ve JSON-RPC response'unu gösterin. Sorun: "Bu server'a yeni bir tool eklemek için ne yapmanız gerekir?" Cevap: sadece yeni bir `@server.tool()` fonksiyonu yazmak.
 </PresenterNote>
 
 ## Hands-On: Building an MCP Server
@@ -438,7 +438,7 @@ MCP is the **connectivity layer**. It sits between the agent brain (LLM + framew
 In Module 3, you'll use LangChain to call tools. In Module 4, you'll use LangGraph to orchestrate complex flows. MCP is what standardizes the tool interface across all of these — the wiring between brain and hands.
 
 <PresenterNote>
-`01-mcp-server.ipynb` notebook'undaki tools/resources/prompts bölümlerini sırayla gösterin. Sorun: "Üç primitive'den — tools, resources, prompts — hangisini takımınız en çok kullanır?" 2-3 cevap alın. "Peki resource olarak ne expose ederdiniz?" Yönlendirin: flight schedules, fare rules, route maps gibi read-only data.
+[01-mcp-server.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/01-mcp-server.ipynb) notebook'undaki tools/resources/prompts bölümlerini sırayla gösterin. Sorun: "Üç primitive'den — tools, resources, prompts — hangisini takımınız en çok kullanır?" 2-3 cevap alın. "Peki resource olarak ne expose ederdiniz?" Yönlendirin: flight schedules, fare rules, route maps gibi read-only data.
 </PresenterNote>
 
 <DeepDive title="Advanced: Security and OAuth 2.1">

@@ -29,7 +29,7 @@ LangChain is a **framework** for building LLM applications. That word — framew
 Why does this distinction matter? Because LangChain gives you opinions. It defines how prompts connect to models, how models connect to parsers, how memory flows through chains. You don't reinvent the plumbing — you plug in your logic.
 
 <PresenterNote>
-`02-first-chain.ipynb` notebook'unu Colab'da açın. İlk hücredeki import'ları gösterin. Sorun: "Kaçınız Django veya React kullandınız?" "Django'da HTTP server, URL router yazmadınız — framework verdi. LangChain de LLM uygulamaları için aynı şey." Notebook'taki ilk chain tanımını göstererek `prompt | model | parser` yapısını açıklayın.
+[02-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/02-first-chain.ipynb) notebook'unu Colab'da açın. İlk hücredeki import'ları gösterin. Sorun: "Kaçınız Django veya React kullandınız?" "Django'da HTTP server, URL router yazmadınız — framework verdi. LangChain de LLM uygulamaları için aynı şey." Notebook'taki ilk chain tanımını göstererek `prompt | model | parser` yapısını açıklayın.
 </PresenterNote>
 
 ### The Ecosystem (2026)
@@ -237,7 +237,7 @@ result = chain.invoke({"question": "What airlines fly CDG to NRT nonstop?"})
 ```
 
 <PresenterNote>
-`02-first-chain.ipynb` notebook'unda LCEL chain hücresini çalıştırın. Adım adım gösterin: "Dict prompt'a girer, template messages'a dönüşür. Messages model'a girer, AIMessage döner. AIMessage parser'a girer, text çıkar." Her adımın çıktısını ayrı ayrı gösterin. Sorun: "Bu pipeline'a yeni bir adım eklemek istesek ne yaparız?"
+[02-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/02-first-chain.ipynb) notebook'unda LCEL chain hücresini çalıştırın. Adım adım gösterin: "Dict prompt'a girer, template messages'a dönüşür. Messages model'a girer, AIMessage döner. AIMessage parser'a girer, text çıkar." Her adımın çıktısını ayrı ayrı gösterin. Sorun: "Bu pipeline'a yeni bir adım eklemek istesek ne yaparız?"
 </PresenterNote>
 
 ### Why the Pipe Matters
@@ -360,7 +360,7 @@ full_chain = (
 </FlowDiagram>
 
 <PresenterNote>
-`02-first-chain.ipynb` notebook'undaki multi-step chain hücrelerini sırayla çalıştırın. Önce analiz çıktısını, sonra SMS çıktısını gösterin. Sorun: "Bu chain'den sonra başka hangi adımları ekleyebiliriz? SMS'i uluslararası yolcular için otomatik çevirmek?" `03-langchain-memory.ipynb` notebook'unda memory ile bu chain'in nasıl genişlediğini preview olarak gösterin.
+[02-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/02-first-chain.ipynb) notebook'undaki multi-step chain hücrelerini sırayla çalıştırın. Önce analiz çıktısını, sonra SMS çıktısını gösterin. Sorun: "Bu chain'den sonra başka hangi adımları ekleyebiliriz? SMS'i uluslararası yolcular için otomatik çevirmek?" [03-langchain-memory.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/03-langchain-memory.ipynb) notebook'unda memory ile bu chain'in nasıl genişlediğini preview olarak gösterin.
 </PresenterNote>
 
 ## Memory: Conversational Context
@@ -486,7 +486,7 @@ This is a critical question. Not every LLM application needs a framework.
 </Tabs>
 
 <PresenterNote>
-`03-langchain-memory.ipynb` notebook'unu açın ve memory'li conversation hücrelerini gösterin. İki mesaj gönderin, chain'in önceki context'i hatırladığını kanıtlayın. Sorun: "LangChain ekibi bile basit şeyler için LangChain gerekmediğini söylüyor. Framework ne zaman karşılığını verir?" Cevap: composability, model swap, ve Module 4'te yapacağımız graph'lar.
+[03-langchain-memory.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/03-langchain-memory.ipynb) notebook'unu açın ve memory'li conversation hücrelerini gösterin. İki mesaj gönderin, chain'in önceki context'i hatırladığını kanıtlayın. Sorun: "LangChain ekibi bile basit şeyler için LangChain gerekmediğini söylüyor. Framework ne zaman karşılığını verir?" Cevap: composability, model swap, ve Module 4'te yapacağımız graph'lar.
 </PresenterNote>
 
 <DeepDive title="Advanced: Custom Runnables, Parallel Execution, and Callbacks">

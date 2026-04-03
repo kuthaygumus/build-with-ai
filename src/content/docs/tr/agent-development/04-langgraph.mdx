@@ -46,7 +46,7 @@ Karar noktasından sonra akış bölünmeli: hafif aksamalar otomatik çözülü
 **LangGraph** bunların hepsini agent'ınızı bir **graf** olarak modelleyerek çözer — düğümler iş yapar, kenarlar akışı kontrol eder.
 
 <PresenterNote>
-`04-basic-graph.ipynb` notebook'unu Colab'da açın ama henüz çalıştırmayın. Sorun: "Takımınızda bir karar içeren bir workflow düşünün — 'yolcu premium ise X yap, değilse Y yap' gibi. Bunu Module 3'teki chain ile yapabilir misiniz?" Cevap: temiz bir şekilde hayır. "İşte graph'lara neden ihtiyacımız var — şimdi notebook'ta görelim."
+[04-basic-graph.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/04-basic-graph.ipynb) notebook'unu Colab'da açın ama henüz çalıştırmayın. Sorun: "Takımınızda bir karar içeren bir workflow düşünün — 'yolcu premium ise X yap, değilse Y yap' gibi. Bunu Module 3'teki chain ile yapabilir misiniz?" Cevap: temiz bir şekilde hayır. "İşte graph'lara neden ihtiyacımız var — şimdi notebook'ta görelim."
 </PresenterNote>
 
 <KeyInsight>
@@ -265,7 +265,7 @@ Image(graph.get_graph().draw_mermaid_png())
 ```
 
 <PresenterNote>
-`04-basic-graph.ipynb` notebook'undaki Mermaid visualization hücresini çalıştırın. Graph yapısının koddan otomatik oluştuğunu gösterin. Sonra bir node ekleyin, bir edge değiştirin ve tekrar render edin. Visualization'ın kodla her zaman senkron olduğunu kanıtlayın. Sorun: "Bu graph'a yeni bir node eklesek akış nasıl değişir?"
+[04-basic-graph.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/04-basic-graph.ipynb) notebook'undaki Mermaid visualization hücresini çalıştırın. Graph yapısının koddan otomatik oluştuğunu gösterin. Sonra bir node ekleyin, bir edge değiştirin ve tekrar render edin. Visualization'ın kodla her zaman senkron olduğunu kanıtlayın. Sorun: "Bu graph'a yeni bir node eklesek akış nasıl değişir?"
 </PresenterNote>
 
 ## Koşullu Yönlendirme: Karar Grafı
@@ -447,7 +447,7 @@ result = await graph.ainvoke(None, config)
 </KeyInsight>
 
 <PresenterNote>
-`05-conditional-graph.ipynb` notebook'undaki human-in-the-loop hücrelerini açın. Sorun: "Takımınız booking değiştiren bir agent'ı insan onayı olmadan deploy eder mi?" Çoğu hayır der. Interrupt pattern'ını notebook'ta çalıştırın — graph'ın nasıl durduğunu, state'i sakladığını ve onay sonrası devam ettiğini gösterin. "İşte production pattern'ı bu."
+[05-conditional-graph.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/05-conditional-graph.ipynb) notebook'undaki human-in-the-loop hücrelerini açın. Sorun: "Takımınız booking değiştiren bir agent'ı insan onayı olmadan deploy eder mi?" Çoğu hayır der. Interrupt pattern'ını notebook'ta çalıştırın — graph'ın nasıl durduğunu, state'i sakladığını ve onay sonrası devam ettiğini gösterin. "İşte production pattern'ı bu."
 </PresenterNote>
 
 ## Çoklu Agent İş Birliği

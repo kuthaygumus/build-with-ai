@@ -18,7 +18,7 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 Modül 3'teki pipeline'ınız çalışıyor. Ta ki çalışmadığı ana kadar. Gelişmiş teknikleri öğrenmeden önce, basit RAG'ın **tam olarak nasıl** başarısız olduğunu görelim -- çünkü her başarısızlık modunun belirli bir çözümü vardır.
 
 <PresenterNote>
-`04-hyde-comparison.ipynb` notebook'unu Colab'da açın. İlk 3 hücreyi çalıştırarak basic RAG pipeline'ı kurun. Sonra 3 sorgu çalıştırın: bir casual dil sorgusu, doğru dokümanın düşük sıralandığı bir sorgu, birden fazla doküman gerektiren bir sorgu. Başarısızlıkları görmelerini sağlayın. Sorun: "Bu 3 farklı başarısızlığın ortak noktası ne?" Her birinin spesifik bir fix'i var.
+[04-hyde-comparison.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/04-hyde-comparison.ipynb) notebook'unu Colab'da açın. İlk 3 hücreyi çalıştırarak basic RAG pipeline'ı kurun. Sonra 3 sorgu çalıştırın: bir casual dil sorgusu, doğru dokümanın düşük sıralandığı bir sorgu, birden fazla doküman gerektiren bir sorgu. Başarısızlıkları görmelerini sağlayın. Sorun: "Bu 3 farklı başarısızlığın ortak noktası ne?" Her birinin spesifik bir fix'i var.
 </PresenterNote>
 
 ### Başarısızlık 1: Sorgu-Belge Uyumsuzluğu
@@ -171,7 +171,7 @@ results = vector_store.similarity_search_by_vector(hyde_embedding, k=5)
 Bu neden işe yarar: varsayımsal belge gerçek belgelerle **aynı sözcük dağarcığını** kullanır. "PNR expired" ifadesi, "PNR retrieval returns 404" ile "booking not showing up"tan çok daha iyi eşleşir.
 
 <PresenterNote>
-`04-hyde-comparison.ipynb` notebook'undaki HyDE karşılaştırma hücrelerini çalıştırın. Similarity score'ları yan yana gösterin: direkt soru = 0.65, HyDE = 0.89. Rakamlar argümanı yapar. Sorun: "Bu ekstra LLM call'ın maliyeti ne?" Yaklaşık 1 cent ve 1-2 saniye. Çoğu use case için değer. Sonra `05-reranking.ipynb` notebook'una geçeceğimizi söyleyin.
+[04-hyde-comparison.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/04-hyde-comparison.ipynb) notebook'undaki HyDE karşılaştırma hücrelerini çalıştırın. Similarity score'ları yan yana gösterin: direkt soru = 0.65, HyDE = 0.89. Rakamlar argümanı yapar. Sorun: "Bu ekstra LLM call'ın maliyeti ne?" Yaklaşık 1 cent ve 1-2 saniye. Çoğu use case için değer. Sonra [05-reranking.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/05-reranking.ipynb) notebook'una geçeceğimizi söyleyin.
 </PresenterNote>
 
 ### Multi-Query
@@ -466,7 +466,7 @@ print(f"Answer: {result['answer']}")
 ```
 
 <PresenterNote>
-`05-reranking.ipynb` notebook'undaki re-ranking hücrelerini çalıştırarak before/after karşılaştırmasını gösterin. Sonra agentic RAG konseptini açıklamak için 3 farklı sorgu deneyin: "Merhaba" (retrieve etmemeli), "Flight API auth nasıl?" (bir kez retrieve), "Tüm API'lerin auth yöntemlerini karşılaştır" (birden fazla retrieve). Sorun: "Agent her sorguda retrieve yapmalı mı? Neden olmasın?"
+[05-reranking.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/05-reranking.ipynb) notebook'undaki re-ranking hücrelerini çalıştırarak before/after karşılaştırmasını gösterin. Sonra agentic RAG konseptini açıklamak için 3 farklı sorgu deneyin: "Merhaba" (retrieve etmemeli), "Flight API auth nasıl?" (bir kez retrieve), "Tüm API'lerin auth yöntemlerini karşılaştır" (birden fazla retrieve). Sorun: "Agent her sorguda retrieve yapmalı mı? Neden olmasın?"
 </PresenterNote>
 
 ## Uygulamalı Alıştırmalar
