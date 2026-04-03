@@ -1,0 +1,340 @@
+---
+title: "Module 1: Why Agents?"
+description: "What agents actually are, why they matter, and what separates them from everything that came before."
+---
+
+import DeepDive from '../../../components/DeepDive.astro';
+import ColabLink from '../../../components/ColabLink.astro';
+import ModuleHeader from '../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../components/PresenterNote.astro';
+import KeyInsight from '../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="40 min" day={1} goal="Understand what an agent is, how it differs from a chatbot, and why this is the paradigm shift." />
+
+## Demo First
+
+Before definitions, let's watch an agent work.
+
+<PresenterNote>
+`02-first-chain.ipynb` notebook'unu Colab'da açın. İlk chain'i çalıştırarak bir LLM'in tool call yaparak nasıl aksiyon aldığını gösterin. Çıktıyı ekranda bırakın, 10 saniye sessizce izlemelerini sağlayın. Sonra sorun: "Bu chain'de kaç adım var ve her adımda ne oluyor?"
+</PresenterNote>
+
+A bug report drops in Slack:
+
+> "The booking confirmation email isn't showing the passenger's meal preference for flights to Tokyo."
+
+Nobody assigns it. Nobody triages it. An agent picks it up:
+
+1. Reads the message, extracts the core issue
+2. Searches the codebase — finds `MealPreferenceService.cs`, line 142
+3. Identifies the bug: APAC route filter excludes Tokyo
+4. Creates a Jira ticket: `BUG: Meal pref missing for TYO routes [P2]`
+5. Posts back to Slack with the root cause and a suggested fix
+
+Total time: 14 seconds. No human touched it.
+
+**That's an agent.** Not a chatbot answering questions — a system that perceives, reasons, acts, and completes a goal autonomously.
+
+<KeyInsight>
+An agent is software that uses an LLM to decide **what to do next**, then actually **does it**. The LLM is the brain. The tools are the hands.
+</KeyInsight>
+
+## Chatbot vs Agent
+
+This distinction matters because it changes what you can build.
+
+| | Chatbot | Agent |
+|---|---|---|
+| **Interaction** | You ask, it answers | You set a goal, it works toward it |
+| **Actions** | Generates text only | Calls APIs, reads files, writes data |
+| **Memory** | Forgets between turns | Remembers context, learns from results |
+| **Control flow** | Human drives every step | Agent decides next steps autonomously |
+| **Example** | "What's the weather?" | "Rebook all passengers from the cancelled CDG flight" |
+
+<PresenterNote>
+Burada durun. Sorun: "Kaçınız ChatGPT veya Claude kullandınız?" Eller kalkar. "O bir chatbot. Siz sorarsınız, o cevaplar. Şimdi düşünün — ticket açabilse, veritabanı sorgulayabilse, email gönderebilse. İşte bugün yaptığımız sıçrama bu." `02-first-chain.ipynb` notebook'undaki chatbot vs chain karşılaştırmasını gösterin.
+</PresenterNote>
+
+The difference is one word: **agency**. The ability to decide what to do, do it, observe the result, and keep going.
+
+```
+Chatbot:  Human → Question → LLM → Answer → done.
+
+Agent:    Human → Goal → LLM → [calls API] → [reads result] → [decides next step]
+          → [calls another API] → [evaluates] → ... → Goal achieved.
+```
+
+## Agent Anatomy
+
+Every agent — regardless of framework, language, or vendor — runs the same loop:
+
+<FlowDiagram title="The Agent Loop">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">👁</span>
+      <span class="node-label">Perceive</span>
+      <span class="node-desc">Input arrives: message, event, trigger</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">Reason</span>
+      <span class="node-desc">LLM decides what to do next</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">⚡</span>
+      <span class="node-label">Act</span>
+      <span class="node-desc">Call tool, API, database</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">💾</span>
+      <span class="node-label">Remember</span>
+      <span class="node-desc">Store result, update state</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow animated" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">↩ loop until goal is reached or agent gives up</div>
+  </div>
+</FlowDiagram>
+
+This is the mental model that carries through the entire training:
+
+- **Perceive**: The agent gets input — a user message, a webhook, a cron trigger, a file change. It parses what happened.
+- **Reason**: The LLM evaluates the situation. What's the goal? What tools do I have? What should I do next? This is the intelligence.
+- **Act**: The agent executes — calls an API, queries a DB, writes a file, sends a notification. It touches the real world.
+- **Remember**: The agent stores what happened. Conversation history, tool results, decisions made. This is what enables multi-step reasoning.
+
+Then it loops. Perceive the result of the action, reason about what's next, act again. Until done.
+
+<PresenterNote>
+Tahtaya dört kutuyu çizin: Perceive, Reason, Act, Remember. Ok ve döngüyü gösterin. `02-first-chain.ipynb` notebook'undaki chain çıktısını referans verin. Sorun: "Chain demo'sunda 'perceive' adımı hangisiydi? 'Act' hangisiydi?" Cevapları notebook çıktısındaki adımlarla eşleştirin.
+</PresenterNote>
+
+## How We Got Here
+
+Four eras. Each one solved a limitation of the previous:
+
+<Tabs>
+  <TabItem label="Rules (1970s–2000s)">
+    ```python
+    # You write every decision by hand
+    if passenger.status == "delayed" and passenger.tier == "gold":
+        rebook_to_next_available()
+        send_lounge_voucher()
+    ```
+    
+    Works perfectly... for the 50 cases you thought of. Case 51 crashes. 1000 rules become unmaintainable. Can't handle anything you didn't explicitly code.
+
+    **Limitation**: Doesn't scale. Can't handle novelty.
+  </TabItem>
+
+  <TabItem label="ML (2010s)">
+    ```python
+    # Learns patterns from historical data
+    model = RandomForestClassifier()
+    model.fit(past_rebookings, outcomes)
+    action = model.predict(new_situation)
+    ```
+    
+    Learns from data, handles complexity. But: one model per task. No reasoning. Can't explain why. Can't handle tasks it wasn't trained on.
+
+    **Limitation**: Narrow. One model = one task. No reasoning.
+  </TabItem>
+
+  <TabItem label="LLMs (2023)">
+    ```python
+    # Understands language, reasons about situations
+    response = llm.chat("Passenger on delayed flight, Gold member, 
+                         business class to Tokyo. What should we do?")
+    ```
+    
+    General-purpose reasoning. Understands context, handles ambiguity, explains decisions. But: it can only generate text. It can't actually *do* anything.
+
+    **Limitation**: Smart but powerless. Text in, text out.
+  </TabItem>
+
+  <TabItem label="Agents (2024+)">
+    ```python
+    # LLM + tools + memory + autonomy
+    agent = Agent(
+        llm=claude,
+        tools=[flight_api, booking_system, crm, email],
+        memory=ConversationMemory()
+    )
+    agent.run("Handle rebooking for cancelled AF1234")
+    ```
+    
+    Reasons AND acts. Plans multi-step workflows. Uses tools. Adapts to novel situations. This is where we are now.
+
+    **The breakthrough**: Give the LLM hands.
+  </TabItem>
+</Tabs>
+
+<KeyInsight>
+Each era solved one limitation: rules couldn't scale, ML couldn't reason, LLMs couldn't act. Agents combine reasoning + action. That's the leap.
+</KeyInsight>
+
+## Real Use Cases
+
+Grounding this in your world — travel and aviation:
+
+### Disruption Management
+
+When a flight cancels, today it's hours of manual coordination across teams. An agent orchestrates the entire flow:
+
+<FlowDiagram title="Disruption Agent Flow">
+  <div class="flow-row">
+    <div class="flow-node danger">
+      <span class="node-icon">🚨</span>
+      <span class="node-label">Disruption</span>
+      <span class="node-desc">Flight cancelled</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📋</span>
+      <span class="node-label">Manifest</span>
+      <span class="node-desc">Pull affected PAX</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Options</span>
+      <span class="node-desc">Find alternatives</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Rebook</span>
+      <span class="node-desc">Apply rules, notify PAX</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+The pattern is always the same: **agent does the heavy lifting, human approves the edge cases.**
+
+| Use Case | Agent Handles | Human Handles |
+|---|---|---|
+| Fare filing audit | Scans rules, flags inconsistencies | Reviews flagged items |
+| Customer complaint | Classifies, drafts response | Approves, handles escalation |
+| Schedule optimization | Analyzes demand, proposes changes | Validates, approves |
+| API documentation | Reads code changes, updates docs | Reviews accuracy |
+
+<Aside type="caution">
+This is not about replacing people. It's about amplifying them. The agent handles volume and routine. The human handles judgment and exceptions.
+</Aside>
+
+<PresenterNote>
+Sorun: "Takımınızın günlük işlerinde, tahmin edilebilir bir pattern izleyen ama birden fazla sistem gerektirdiği için çok uzun süren bir task düşünün." 2-3 cevap alın. Bunlar onların agent fırsatları. Sonra `02-first-chain.ipynb` notebook'undaki chain yapısının bu tür problemleri nasıl çözdüğünü bağlayın.
+</PresenterNote>
+
+## The Complexity Spectrum
+
+Agents aren't one-size-fits-all. There's a progression:
+
+<FlowDiagram title="Agent Complexity Spectrum">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔧</span>
+      <span class="node-label">Tool Call</span>
+      <span class="node-desc">Single action</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔗</span>
+      <span class="node-label">Chain</span>
+      <span class="node-desc">Step 1 → Step 2 → Step 3</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔀</span>
+      <span class="node-label">Router</span>
+      <span class="node-desc">If X then A, else B</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🤝</span>
+      <span class="node-label">Multi-Agent</span>
+      <span class="node-desc">Team of specialists</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+We'll build all four in this training. Module 3 covers chains, Module 4 covers routers and multi-agent. By the end of Day 2, you'll be at the right end of this spectrum.
+
+<DeepDive title="The ReAct Pattern — How Agents Actually Think">
+
+**ReAct** (Reasoning + Acting) is the core pattern behind modern agents. The LLM alternates between thinking and doing:
+
+```
+Question: Average delay for AF flights CDG→NRT this month?
+
+Thought 1: I need flight data for this route and month.
+Action 1: query_flights(carrier="AF", origin="CDG", dest="NRT", month="2025-03")
+Observation 1: [28 flights returned with delay data]
+
+Thought 2: Now calculate the average delay.
+Action 2: calculate(sum(delays) / count(flights))  
+Observation 2: 23.4 minutes
+
+Thought 3: Is this above or below normal? Let me check.
+Action 3: get_baseline(route="CDG-NRT", season="fall")
+Observation 3: Seasonal average: 18.2 minutes
+
+Answer: 23.4 min average, 28.6% above seasonal norm of 18.2 min.
+```
+
+Why this matters:
+- **Transparent**: You can audit every reasoning step
+- **Grounded**: Actions provide real data, reducing hallucination  
+- **Controllable**: You can intervene if the reasoning goes off track
+
+This is exactly what LangChain and LangGraph implement under the hood — you'll see this pattern in Modules 3 and 4.
+
+</DeepDive>
+
+<DeepDive title="Tool Use — How LLMs Call Functions">
+
+Modern LLMs don't just generate text — they generate structured **tool calls**:
+
+```json
+{
+    "tool": "search_flights",
+    "arguments": {
+        "origin": "CDG",
+        "destination": "NRT", 
+        "date": "2025-03-15"
+    }
+}
+```
+
+The agent framework:
+1. Sends user message + tool descriptions to LLM
+2. LLM outputs a tool call (or a direct response)
+3. Framework executes the tool
+4. Result goes back to LLM
+5. LLM decides: respond, or call another tool?
+
+This is a native capability in Claude, GPT-4, and Gemini. The frameworks we'll learn provide the orchestration layer.
+
+</DeepDive>
+
+## What to Take Away
+
+Three things:
+
+1. **Agent = LLM + tools + memory + loop.** The LLM reasons, the tools act, the memory persists, the loop continues until the goal is met.
+
+2. **Human-in-the-loop is the production pattern.** Full autonomy sounds cool but is rarely the goal. Agents handle volume; humans handle judgment.
+
+3. **We're going from left to right on the spectrum.** Single tool call → chain → router → multi-agent. By Day 2, you'll build the full thing.
+
+## Next Up
+
+The first practical question: how does an agent actually connect to tools? Every AI vendor has their own way. It's a mess. MCP fixes that. **Module 2: MCP — The USB-C of AI**.
+
+<ColabLink title="Exercise: Explore an Agent in Action" notebook="/notebooks/agent-dev/02-first-chain.ipynb" level="Basic" />
+<ColabLink title="Challenge: Design an Agent for Your Team" notebook="/notebooks/agent-dev/06-multi-agent.ipynb" level="Challenge" />

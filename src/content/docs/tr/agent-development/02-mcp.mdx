@@ -1,0 +1,509 @@
+---
+title: "Modül 2: MCP — AI'ın USB-C'si"
+description: "Model Context Protocol, N x M entegrasyon kabusunu ortadan kaldırır. Tek bir standart. Her AI istemcisi her araçla konuşur."
+---
+
+import DeepDive from '../../../../components/DeepDive.astro';
+import ColabLink from '../../../../components/ColabLink.astro';
+import ModuleHeader from '../../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../../components/PresenterNote.astro';
+import KeyInsight from '../../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="60 min" day={1} goal="AI araç entegrasyonunda protokol standardizasyonunu anlayın ve ilk MCP sunucunuzu geliştirin." />
+
+## Entegrasyon Patlaması
+
+5 AI uygulamanız var — Claude, ChatGPT, Cursor, kendi uygulamanız, bir CI botu. Bunların 8 araca ulaşması gerekiyor — Jira, GitHub, Slack, PostgreSQL, Confluence, S3, e-posta, bir uçuş API'si.
+
+Bir standart olmadan: **5 x 8 = 40 özel entegrasyon.** Her birinin kendi kimlik doğrulaması, veri formatı, hata yönetimi, dokümantasyonu ve bakımı var. Yeni bir araç mı eklediniz? Beş entegrasyon daha. Yeni bir AI istemcisi mi? Sekiz tane daha.
+
+Bu **N x M problemi** ve donanım endüstrisinin USB'den önce düştüğü aynı tuzak.
+
+<PresenterNote>
+Matematiği tahtaya yazın: 3 AI tool x 5 sistem = 15 entegrasyon. Sorun: "6. sistemi eklediğinizde ne olur?" (3 tane daha, toplam 18). Sonra `01-mcp-server.ipynb` notebook'unu Colab'da açın, ilk hücreyi gösterin. "Bu notebook'ta tek bir MCP server yazıp tüm AI client'lara bağlayacağız — N+M yaklaşımı."
+</PresenterNote>
+
+<FlowDiagram title="MCP Öncesi: N x M Kabusu">
+  <div class="flow-row">
+    <div class="flow-node danger">
+      <span class="node-icon">🤖</span>
+      <span class="node-label">5 AI İstemcisi</span>
+      <span class="node-desc">Claude, GPT, Cursor, özel, CI</span>
+    </div>
+    <div class="flow-arrow animated">✕</div>
+    <div class="flow-node danger">
+      <span class="node-icon">🔧</span>
+      <span class="node-label">8 Araç</span>
+      <span class="node-desc">Jira, GitHub, Slack, DB...</span>
+    </div>
+    <div class="flow-arrow animated">=</div>
+    <div class="flow-node danger">
+      <span class="node-icon">💥</span>
+      <span class="node-label">40 Entegrasyon</span>
+      <span class="node-desc">Her biri özel olarak geliştirilmiş ve bakımı yapılıyor</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<FlowDiagram title="MCP Sonrası: N + M">
+  <div class="flow-row">
+    <div class="flow-node success">
+      <span class="node-icon">🤖</span>
+      <span class="node-label">5 AI İstemcisi</span>
+      <span class="node-desc">Her biri MCP'yi bir kez uygular</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔌</span>
+      <span class="node-label">MCP</span>
+      <span class="node-desc">Tek standart protokol</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">🔧</span>
+      <span class="node-label">8 Araç</span>
+      <span class="node-desc">Her biri MCP'yi bir kez uygular</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">5 + 8 = 13 uygulama, 40 değil</div>
+  </div>
+</FlowDiagram>
+
+USB öncesi dünyayı hatırlıyor musunuz? Yazıcılar paralel port istiyordu. Fareler seri port istiyordu. Klavyeler PS/2 istiyordu. Kameralar FireWire istiyordu. Her cihazın kendi bağlantısı vardı. Her bilgisayarın her porta ihtiyacı vardı.
+
+USB bunu bitirdi. Tek standart. Her şey çalışır.
+
+**MCP, AI için USB-C'dir.** Tek protokol ve herhangi bir AI istemcisi herhangi bir araç sunucusuyla konuşabilir.
+
+<KeyInsight>
+MCP, 40 özel entegrasyonu 13'e düşürür. Aracınızı bir kez geliştirin — Claude, GPT, Cursor ve protokolü konuşan her gelecek AI istemcisiyle çalışır. İstemcinizi bir kez geliştirin — her araçla çalışır.
+</KeyInsight>
+
+<Aside type="tip">
+MCP, Anthropic tarafından oluşturuldu ve 2024'ün sonlarında açık kaynak yapıldı. Claude Desktop, Claude Code, Cursor, VS Code (GitHub Copilot), Zed, Windsurf ve birçok diğer uygulama tarafından zaten benimsenmiş durumda. Endüstri standardı haline geliyor.
+</Aside>
+
+## Mimari: Üç Katman
+
+MCP tek bir bağlantı değil. Net sorumluluk ayrımına sahip katmanlı bir sistem — ve bu ayrım güvenlik için önemli.
+
+<FlowDiagram title="MCP Mimarisi">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🏠</span>
+      <span class="node-label">Host</span>
+      <span class="node-desc">Claude Desktop, Cursor, uygulamanız</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📡</span>
+      <span class="node-label">Client</span>
+      <span class="node-desc">Bir sunucuya 1:1 bağlantı</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">⚡</span>
+      <span class="node-label">Server</span>
+      <span class="node-desc">Harici bir aracı sarar</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<Steps>
+1. **Host** — Kullanıcının etkileşimde olduğu uygulama. Güvenliği, kullanıcı onayını yönetir ve istemcileri başlatır. Claude Desktop, Cursor veya kendi agent uygulamanızı düşünün.
+
+2. **Client** — Host'un içinde yaşar. Her istemci tek bir MCP sunucusuna 1:1 bağlantı sürdürür. Bir sunucu çökerse, diğerleri çalışmaya devam eder. Tasarım gereği izolasyon.
+
+3. **Server** — Protokol üzerinden yetenekleri (araçlar, kaynaklar, prompt'lar) sunar. Harici bir sistemi — veritabanı, API, dosya sistemi — sarar ve AI'a standart bir şekilde erişilebilir kılar.
+</Steps>
+
+Neden iki yerine üç katman? **Güvenlik.** Host, AI'ın neye erişebileceğini kontrol eder. Client izolasyon sağlar — kötü davranan bir sunucu diğerlerini zehirleyemez. Server sandbox'lanmıştır, yalnızca sunmak üzere tasarlandığı şeyleri sunar.
+
+<PresenterNote>
+`01-mcp-server.ipynb` notebook'unda Host/Client/Server yapısını gösteren hücreyi açın. Tahtaya 3 katmanı çizin: bir host içinde 3 client, her biri farklı server'a bağlı. Sorun: "LLM'i doğrudan tool'lara bağlasak ne olur?" Cevaba yönlendirin: güvenlik, izolasyon, yaşam döngüsü yönetimi.
+</PresenterNote>
+
+## Transport: Mesajlar Nasıl Taşınır
+
+MCP transport-agnostiktir — mesajlar nasıl iletilirse iletilsin JSON-RPC 2.0 kullanır. İki ana seçenek:
+
+<Tabs>
+  <TabItem label="stdio (Yerel)">
+    Sunucu, host'un bir **alt süreci** olarak çalışır. İletişim stdin/stdout üzerinden. Host onu başlatır, onunla konuşur, işi bitince sonlandırır.
+
+    ```json
+    {
+      "mcpServers": {
+        "flight-data": {
+          "command": "python",
+          "args": ["flight_mcp_server.py"],
+          "env": {
+            "API_KEY": "your-key-here"
+          }
+        }
+      }
+    }
+    ```
+
+    **En uygun**: Yerel geliştirme, CLI araçları, kişisel otomasyon. Sıfır ağ yükü.
+  </TabItem>
+
+  <TabItem label="Streamable HTTP (Uzak)">
+    Sunucu bir **web servisi** olarak çalışır. İstekler için HTTP, isteğe bağlı streaming için SSE. Yük dengeleyiciler, proxy'ler, standart kimlik doğrulama ile çalışır.
+
+    ```json
+    {
+      "mcpServers": {
+        "flight-data": {
+          "url": "https://mcp.internal.example.com/flights",
+          "headers": {
+            "Authorization": "Bearer ${FLIGHT_API_TOKEN}"
+          }
+        }
+      }
+    }
+    ```
+
+    **En uygun**: Üretim dağıtımları, paylaşılan altyapı, ekip çapında araçlar. Bu, eski HTTP+SSE yaklaşımının yerini alan daha yeni transport'tur (2025).
+  </TabItem>
+</Tabs>
+
+<Aside type="note">
+Streamable HTTP, üretim için önerilen transport'tur. Yeniden bağlantıyı yönetir, hem istek-yanıt hem de streaming'i destekler ve mevcut HTTP altyapısıyla entegre olur.
+</Aside>
+
+## Üç Temel Yapı Taşı
+
+Her MCP sunucusu yeteneklerini tam olarak üç tür üzerinden sunar:
+
+<FlowDiagram title="MCP Temel Yapı Taşları">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔧</span>
+      <span class="node-label">Araçlar (Tools)</span>
+      <span class="node-desc">AI fonksiyon çağırır</span>
+    </div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📄</span>
+      <span class="node-label">Kaynaklar (Resources)</span>
+      <span class="node-desc">AI veri okur</span>
+    </div>
+    <div class="flow-node secondary">
+      <span class="node-icon">💬</span>
+      <span class="node-label">Prompt'lar</span>
+      <span class="node-desc">Yeniden kullanılabilir şablonlar</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+### Araçlar (Tools) — Model Kontrollü
+
+Araçlar, AI'ın çağırmaya karar verdiği fonksiyonlardır. En yaygın yapı taşıdır ve zamanınızın %90'ında kullanacağınız şeydir.
+
+```python
+from mcp.server import Server
+
+server = Server("travel-flights")
+
+@server.tool()
+async def search_flights(
+    origin: str,
+    destination: str,
+    date: str,
+    passengers: int = 1
+) -> str:
+    """Search available flights between two airports on a given date.
+    
+    Args:
+        origin: IATA airport code (e.g., 'CDG')
+        destination: IATA airport code (e.g., 'NRT')
+        date: Travel date in YYYY-MM-DD format
+        passengers: Number of passengers (default: 1)
+    
+    Returns:
+        Available flights with prices and schedules
+    """
+    results = await flight_api.search(origin, destination, date, passengers)
+    return format_flight_results(results)
+```
+
+AI modeli araç adını, açıklamasını ve parametre şemasını görür — sonra ne zaman ve nasıl çağıracağına karar verir. Docstring kritiktir: aracınız için AI'ın kullanım kılavuzudur.
+
+### Kaynaklar (Resources) — Uygulama Kontrollü
+
+Kaynaklar, AI'ın erişebildiği salt okunur verilerdir. GET endpoint'leri gibi düşünün — host'un dahil etmeye karar verdiği bağlam.
+
+```python
+@server.resource("flights://status/{flight_number}")
+async def get_flight_status(flight_number: str) -> str:
+    """Get real-time status of a specific flight."""
+    status = await flight_api.get_status(flight_number)
+    return json.dumps(status, indent=2)
+```
+
+Kaynaklar URI şablonları kullanır. AI nelerin mevcut olduğuna göz atar ve harekete geçmeden önce ihtiyaç duyduğunu okur.
+
+### Prompt'lar — Kullanıcı Kontrollü
+
+Prompt'lar, sunucunun sağladığı yeniden kullanılabilir şablonlardır. Kullanıcı bunları bir menüden seçer — AI'ın alan-spesifik görevlere nasıl yaklaşacağını standartlaştırır.
+
+```python
+@server.prompt()
+async def disruption_analysis(flight_number: str) -> str:
+    """Analyze a flight disruption and suggest rebooking options."""
+    return f"""Analyze the disruption for flight {flight_number}.
+
+Steps:
+1. Check current flight status
+2. Identify affected passengers
+3. Search for alternative flights
+4. Rank alternatives by: passenger tier, connection feasibility, cost
+5. Generate a rebooking recommendation report"""
+```
+
+<KeyInsight>
+**Araçlar** = model kontrollü (AI çağırmaya karar verir). **Kaynaklar** = uygulama kontrollü (host dahil etmeye karar verir). **Prompt'lar** = kullanıcı kontrollü (kullanıcı seçer). Üç yapı taşı, üç kontrol düzlemi.
+</KeyInsight>
+
+## MCP Pratikte
+
+Muhtemelen farkında olmadan zaten MCP kullanıyorsunuz.
+
+**Claude Code**, dosya sistemi işlemleri, bash yürütme ve web getirme için yerleşik MCP sunucularına sahiptir. Claude Code bir dosya okuduğunda veya bir komut çalıştırdığında — bu MCP'dir.
+
+**Cursor ve VS Code** MCP sunucularını destekler. Yaygın bir kurulum:
+
+```json
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": { "DATABASE_URL": "postgresql://localhost:5432/mydb" }
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" }
+    }
+  }
+}
+```
+
+Artık editörünüzdeki AI asistanı veritabanınızı sorgulayabiliyor ve GitHub ile etkileşime girebiliyor — standart bir protokol aracılığıyla. GitHub sunucusunu GitLab ile değiştirin? İstemci kodu değişmez.
+
+<PresenterNote>
+`01-mcp-server.ipynb` notebook'unda tool tanımlama ve test hücrelerini çalıştırın (ilk 4 hücre). flight search tool'unu çağırın ve JSON-RPC response'unu gösterin. Sorun: "Bu server'a yeni bir tool eklemek için ne yapmanız gerekir?" Cevap: sadece yeni bir `@server.tool()` fonksiyonu yazmak.
+</PresenterNote>
+
+## Uygulamalı: MCP Sunucusu Geliştirme
+
+Sıfırdan bir uçuş bilgi sunucusu geliştirelim. Bu, Flight API'lerini herhangi bir AI istemcisine sunmak için geliştireceğiniz türde bir sunucu.
+
+<ColabLink title="Alıştırma: İlk MCP Sunucunuzu Geliştirin" notebook="/notebooks/agent-dev/01-mcp-server.ipynb" level="Basic" />
+
+```python
+# flight_mcp_server.py
+import json
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+
+server = Server("travel-flight-tools")
+
+# Simulated flight data (in production, this calls a real API)
+FLIGHTS_DB = {
+    "AF1234": {
+        "carrier": "Air France", "origin": "CDG", "destination": "NRT",
+        "departure": "2026-09-15T10:30:00", "arrival": "2026-09-16T05:45:00",
+        "status": "on_time", "aircraft": "A350-900", "passengers": 287
+    },
+    "AF5678": {
+        "carrier": "Air France", "origin": "CDG", "destination": "JFK",
+        "departure": "2026-09-15T14:00:00", "arrival": "2026-09-15T16:30:00",
+        "status": "delayed", "delay_minutes": 45,
+        "aircraft": "B777-300ER", "passengers": 342
+    }
+}
+
+@server.tool()
+async def get_flight_status(flight_number: str) -> str:
+    """Get the current status of a flight by its flight number.
+
+    Args:
+        flight_number: The flight number (e.g., 'AF1234')
+
+    Returns:
+        Flight status including departure, arrival, and delay info
+    """
+    flight = FLIGHTS_DB.get(flight_number.upper())
+    if not flight:
+        return f"Flight {flight_number} not found."
+
+    status_info = {
+        "flight": flight_number.upper(),
+        "carrier": flight["carrier"],
+        "route": f"{flight['origin']} → {flight['destination']}",
+        "status": flight["status"],
+        "departure": flight["departure"],
+        "arrival": flight["arrival"],
+    }
+    if flight.get("delay_minutes"):
+        status_info["delay_minutes"] = flight["delay_minutes"]
+
+    return json.dumps(status_info, indent=2)
+
+@server.tool()
+async def list_flights(origin: str = "", destination: str = "") -> str:
+    """List available flights, optionally filtered by origin/destination.
+
+    Args:
+        origin: Filter by origin airport IATA code (optional)
+        destination: Filter by destination airport IATA code (optional)
+    """
+    results = []
+    for fn, data in FLIGHTS_DB.items():
+        if origin and data["origin"] != origin.upper():
+            continue
+        if destination and data["destination"] != destination.upper():
+            continue
+        results.append({
+            "flight_number": fn,
+            "route": f"{data['origin']} → {data['destination']}",
+            "departure": data["departure"],
+            "status": data["status"]
+        })
+
+    if not results:
+        return "No flights found matching the criteria."
+    return json.dumps(results, indent=2)
+
+async def main():
+    async with stdio_server() as (read_stream, write_stream):
+        await server.run(read_stream, write_stream)
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
+```
+
+### Sunucunuzu Test Etme
+
+MCP sunucularını MCP Inspector ile test edebilirsiniz — kayıtlı araçları görmenizi, test girdileriyle çağırmanızı ve JSON-RPC mesajlarını incelemenizi sağlayan bir web arayüzü:
+
+```bash
+# Install and run the inspector
+npx @modelcontextprotocol/inspector
+
+# Or test with the MCP CLI
+mcp dev flight_mcp_server.py
+```
+
+<ColabLink title="Challenge: Sunucunuza Kaynaklar ve Prompt'lar Ekleyin" notebook="/notebooks/agent-dev/01-mcp-server.ipynb" level="Challenge" />
+
+## MCP'nin Yığındaki Yeri
+
+MCP, **bağlantı katmanıdır**. Agent beyni (LLM + framework) ile dış dünya arasında yer alır. Üstündeki her şey düşünür. Altındaki her şey harekete geçer.
+
+<FlowDiagram title="Agent Yığınında MCP">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">👤</span>
+      <span class="node-label">Uygulamanız</span>
+      <span class="node-desc">Frontend, API, bot</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">Agent</span>
+      <span class="node-desc">LangGraph + LLM</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">🔌</span>
+      <span class="node-label">MCP Katmanı</span>
+      <span class="node-desc">Standart bağlantı</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🌐</span>
+      <span class="node-label">Dış Dünya</span>
+      <span class="node-desc">API'ler, DB'ler, servisler</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+Modül 3'te araçları çağırmak için LangChain kullanacaksınız. Modül 4'te karmaşık akışları orkestre etmek için LangGraph kullanacaksınız. MCP, tüm bunlar arasında araç arayüzünü standartlaştıran şeydir — beyin ile eller arasındaki kablolama.
+
+<PresenterNote>
+`01-mcp-server.ipynb` notebook'undaki tools/resources/prompts bölümlerini sırayla gösterin. Sorun: "Üç primitive'den — tools, resources, prompts — hangisini takımınız en çok kullanır?" 2-3 cevap alın. "Peki resource olarak ne expose ederdiniz?" Yönlendirin: flight schedules, fare rules, route maps gibi read-only data.
+</PresenterNote>
+
+<DeepDive title="İleri Düzey: Güvenlik ve OAuth 2.1">
+
+### Güvenlik Değerlendirmeleri
+
+MCP yeni bir saldırı yüzeyi oluşturur. Üç savunma katmanı:
+
+**1. Araç Onayı** — Host, yürütmeden önce kullanıcıya hangi aracın hangi argümanlarla çağrıldığını gösterir:
+
+```
+AI wants to call: delete_booking(booking_id="ABC123")
+[Allow] [Deny] [Allow All for this session]
+```
+
+**2. Kapsamlı İzinler** — Sunucular en az yetki erişimi uygular. Salt okunur bir sunucu asla yazamaz:
+
+```python
+@server.tool()
+async def search_flights(origin: str, destination: str) -> str:
+    """Read-only search — no modifications allowed."""
+    pass
+```
+
+**3. Girdi Doğrulama** — Araç girdilerine körü körüne güvenmeyin. Bunlar LLM'den gelir ve LLM prompt injection ile manipüle edilebilir:
+
+```python
+@server.tool()
+async def query_database(sql_query: str) -> str:
+    """Execute a read-only SQL query."""
+    if not sql_query.strip().upper().startswith("SELECT"):
+        return "Error: Only SELECT queries are allowed."
+    
+    async with read_only_pool.acquire() as conn:
+        result = await conn.fetch(sql_query)
+    return json.dumps(result)
+```
+
+### Uzak Sunucular İçin OAuth 2.1
+
+Üretim Streamable HTTP sunucuları, OAuth 2.1 aracılığıyla mevcut kimlik sağlayıcılarla (Active Directory, Okta) entegre olur. İstemci, yetkilendirme sunucusundan bir erişim token'ı alır, ardından MCP isteklerinde Bearer token olarak ekler. Bu, kurumsal güvenlik politikalarının protokol düzeyinde uygulanmasını sağlar.
+
+</DeepDive>
+
+## Temel Çıkarımlar
+
+<CardGrid>
+  <Card title="N+M, N x M değil" icon="seti:config">
+    MCP entegrasyon patlamasını ortadan kaldırır. Tek standart protokol. Bir kez geliştirin, her yere bağlanın.
+  </Card>
+  <Card title="Host → Client → Server" icon="list-format">
+    Net güvenlik sınırlarına sahip üç katmanlı mimari. Tasarım gereği izolasyon.
+  </Card>
+  <Card title="Üç yapı taşı" icon="puzzle">
+    Araçlar (AI fonksiyon çağırır), Kaynaklar (AI veri okur), Prompt'lar (yeniden kullanılabilir şablonlar). Üç kontrol düzlemi.
+  </Card>
+  <Card title="Zaten yaygın" icon="approve-check-circle">
+    Claude, Cursor, VS Code ve düzinelerce araç zaten MCP konuşuyor. Bu bir bahis değil — bir standart.
+  </Card>
+</CardGrid>
+
+<KeyInsight>
+MCP, agent yığınının bağlantı katmanıdır. Bir kez öğrenin, her şeyi bağlayın. Protokol kimlik doğrulama, transport ve keşfi yönetir — siz aracınızın gerçekte ne yaptığına odaklanın.
+</KeyInsight>
+
+## Sırada
+
+Agent'ların araçlara nasıl bağlandığını biliyorsunuz. Şimdi zeka katmanını geliştirelim. **Modül 3: LangChain Temelleri** — LLM çağrılarını gerçekten faydalı iş yapan chain'lere nasıl birleştireceğinizi öğreneceksiniz.

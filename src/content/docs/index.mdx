@@ -1,0 +1,132 @@
+---
+title: AI Training Series
+description: A two-part hands-on workshop on Agent Development and RAG. Build real AI systems, not slide decks.
+template: splash
+hero:
+  title: |
+    Build AI Systems
+    That Actually Work
+  tagline: A hands-on engineering workshop. You write code from minute one. You leave with working systems you built yourself.
+  actions:
+    - text: Start with Agents
+      link: /agent-development/01-why-agents/
+      icon: right-arrow
+    - text: Jump to RAG
+      link: /rag/01-knowledge-problem/
+      variant: minimal
+---
+
+import { Card, CardGrid, Steps, Aside } from '@astrojs/starlight/components';
+
+## What This Is
+
+A **two-part workshop** where you build real AI systems from scratch. Not a lecture. Not a demo you watch. You write code, break things, fix them, and walk away with working systems you understand inside out.
+
+<CardGrid>
+  <Card title="Part 1: Agent Development" icon="rocket">
+    **Duration: 2 Days**
+
+    Build an autonomous agent that reasons, makes decisions, calls tools, and completes tasks without human intervention.
+
+    By the end: a working multi-step agent with MCP tool integration, conditional logic, and human-in-the-loop approval.
+  </Card>
+  <Card title="Part 2: RAG" icon="open-book">
+    **Duration: 2 Days**
+
+    Build a system that answers questions from your own documents — accurately, with citations, at production quality.
+
+    By the end: a RAG pipeline with advanced retrieval, re-ranking, evaluation metrics, and a caching layer.
+  </Card>
+</CardGrid>
+
+## Who This Is For
+
+You're a developer. Maybe you've used ChatGPT. Maybe you haven't touched AI at all. Doesn't matter. Everything is explained from scratch, but we move fast and go deep.
+
+- **New to AI?** Follow the main path. Every concept is built up from zero with real code.
+- **Already familiar?** Look for the **Deep Dive** sections and tackle the **Challenge** exercises.
+- **Senior/Architect?** The production patterns, security considerations, and architectural decisions are where you'll get the most value.
+
+## How It Works
+
+Each part takes 2 days. Here's the rhythm:
+
+<Steps>
+1. **See it work** — Every module opens with the finished result. You see what you're building before writing a single line.
+
+2. **Understand why** — Short, focused explanation. No filler. Exactly what you need to build it yourself.
+
+3. **Build it yourself** — Open the Colab notebook, run the code, modify it, break it, understand it. This is where learning happens.
+
+4. **Push further** — Challenge exercises for those who want to go deeper. No hand-holding — just a goal and some hints.
+</Steps>
+
+### The Tools
+
+| Tool | What It Does | Why |
+|------|-------------|-----|
+| **This site** | Theory, diagrams, architecture, reference | Navigate during the workshop, revisit later at your own pace |
+| **Google Colab** | Run Python code in your browser | Zero setup. Click a link, start coding immediately |
+
+<Aside type="tip">
+You don't need to install anything on your machine. Every exercise runs in Google Colab — just a browser and a Google account.
+</Aside>
+
+## What You'll Build
+
+### Part 1: Agents
+
+| Day | You Start With | You End With |
+|-----|---------------|-------------|
+| **Day 1** | "What's an agent?" | A working LangChain pipeline with memory and structured output |
+| **Day 2** | A chain that runs linearly | A LangGraph agent with conditional routing, tool use, and human approval |
+
+### Part 2: RAG
+
+| Day | You Start With | You End With |
+|-----|---------------|-------------|
+| **Day 1** | "What's an embedding?" | A full RAG pipeline: PDF in, accurate answers out, with citations |
+| **Day 2** | A naive pipeline that sometimes fails | Production RAG with HyDE, re-ranking, and evaluation metrics |
+
+## The Arc
+
+These aren't two separate workshops. They're one story:
+
+<CardGrid>
+  <Card title="Part 1: What can AI do?" icon="rocket">
+    Build agents that **reason and act** autonomously. By the end: "This is powerful, but it only knows what it was trained on."
+  </Card>
+  <Card title="Part 2: What can AI know?" icon="open-book">
+    Give agents access to **your data**. By the end: combine both into **Agentic RAG** — an agent that decides when to search, what to search, and generates cited answers.
+  </Card>
+</CardGrid>
+
+## Before You Start
+
+You need:
+- A Google account (for Colab)
+- Basic Python knowledge (variables, functions, loops — that's it)
+- Curiosity
+
+You don't need:
+- Any AI/ML experience
+- GPU access
+- Local Python installation
+- Prior knowledge of LangChain, embeddings, or vector databases
+
+## Quick Links
+
+<CardGrid>
+  <Card title="Agent Dev — Day 1" icon="right-arrow">
+    [Why Agents?](/agent-development/01-why-agents/) | [MCP](/agent-development/02-mcp/) | [LangChain](/agent-development/03-langchain/)
+  </Card>
+  <Card title="Agent Dev — Day 2" icon="right-arrow">
+    [LangGraph](/agent-development/04-langgraph/) | [Integration](/agent-development/05-integration/)
+  </Card>
+  <Card title="RAG — Day 1" icon="right-arrow">
+    [Knowledge Problem](/rag/01-knowledge-problem/) | [Embeddings](/rag/02-embeddings/) | [Pipeline](/rag/03-rag-pipeline/)
+  </Card>
+  <Card title="RAG — Day 2" icon="right-arrow">
+    [Advanced RAG](/rag/04-advanced-rag/) | [Production](/rag/05-production-rag/)
+  </Card>
+</CardGrid>

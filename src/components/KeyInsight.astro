@@ -1,0 +1,11 @@
+---
+interface Props {
+  label?: string;
+}
+const { label = 'Key Insight' } = Astro.props;
+---
+
+<div class="key-insight">
+  <span class="insight-label">{label}</span>
+  <slot />
+</div>

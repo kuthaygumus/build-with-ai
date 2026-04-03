@@ -1,0 +1,352 @@
+---
+title: "Module 1: The Knowledge Problem"
+description: "Why LLMs fail at enterprise knowledge, what RAG actually solves, and when to use it over fine-tuning."
+---
+
+import DeepDive from '../../../components/DeepDive.astro';
+import ColabLink from '../../../components/ColabLink.astro';
+import ModuleHeader from '../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../components/PresenterNote.astro';
+import KeyInsight from '../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="40 min" day={1} goal="Understand why RAG exists, what it solves, and when to choose it over fine-tuning." />
+
+## Demo First
+
+Before definitions, let's watch RAG work.
+
+<PresenterNote>
+`03-e2e-rag.ipynb` notebook'unu Colab'da açın. İlk iki hücreyi çalıştırın: biri plain LLM'e soru sorar, diğeri RAG-powered sisteme aynı soruyu sorar. İki çıktıyı yan yana gösterin. Kontrastı izlemelerini sağlayın — henüz açıklamayın. Sorun: "İki cevap arasındaki fark ne? Neden biri kaynak gösteriyor, diğeri göstermiyor?"
+</PresenterNote>
+
+You have an internal company policy document updated yesterday. Ask a plain LLM:
+
+```text
+Q: What is the company's remote work policy for contractors?
+A: I don't have specific information about your company's internal policies...
+```
+
+Now ask the same question to a system with RAG:
+
+```text
+Q: What is the company's remote work policy for contractors?
+A: According to the Contractor Policy (v3.2),
+   contractors may work remotely up to 3 days per week, subject to
+   manager approval and compliance with local labor regulations.
+   [Source: contractor-policy-v3.2.pdf, page 14]
+```
+
+Same model. Same question. The difference: one has access to your documents. The other doesn't.
+
+**That's RAG.** Not a smarter model — a smarter architecture.
+
+<KeyInsight>
+RAG gives LLMs access to knowledge they were never trained on. The model doesn't change. The input does.
+</KeyInsight>
+
+## Why LLMs Fail at Enterprise Knowledge
+
+LLMs have three fundamental blind spots. Each one is a blocker for enterprise use. RAG addresses all three.
+
+### 1. Hallucination
+
+LLMs don't "know" things. They predict the next token. When training data is sparse on a topic, they fill the gap with plausible-sounding fiction.
+
+```python
+# Ask about a specific Flight API version
+response = llm("What are the parameters for the FlightOffers v4 API?")
+# The LLM will confidently describe parameters that don't exist,
+# mixing real v2 params with invented ones.
+# It doesn't know the difference. It can't.
+```
+
+<PresenterNote>
+`03-e2e-rag.ipynb` notebook'undaki hallucination demo hücresini çalıştırın. Var olmayan bir internal API hakkında soru sorun ve LLM'in güvenle uydurduğunu gösterin. Sorun: "Bunu production'a deploy eder misiniz?" Oda sessizleşir. Sonra RAG versiyonunu çalıştırın — aynı soru, gerçek dokümana dayalı cevap. Fark apaçık.
+</PresenterNote>
+
+### 2. Stale Knowledge
+
+Every model has a training cutoff. The world keeps moving. The model doesn't.
+
+Your internal docs change daily. Retraining costs GPU-weeks and six figures. That's not a workflow — that's a crisis.
+
+### 3. Zero Access to Private Data
+
+LLMs are trained on the public internet. They have **zero knowledge** of your internal wikis, customer contracts, GDS documentation, incident reports, or architecture decisions.
+
+This isn't a model quality problem. GPT-5 won't fix it. Claude 4 won't fix it. **It's an architecture problem.** RAG is the architecture solution.
+
+<FlowDiagram title="The Three Blind Spots">
+  <div class="flow-row">
+    <div class="flow-node danger">
+      <span class="node-icon">🎭</span>
+      <span class="node-label">Hallucination</span>
+      <span class="node-desc">Invents plausible fiction</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node danger">
+      <span class="node-icon">📅</span>
+      <span class="node-label">Stale Knowledge</span>
+      <span class="node-desc">Training cutoff is months old</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node danger">
+      <span class="node-icon">🔒</span>
+      <span class="node-label">No Private Data</span>
+      <span class="node-desc">Can't see your documents</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow animated" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">↓ RAG solves all three</div>
+  </div>
+  <div class="flow-row" style="justify-content: center;">
+    <div class="flow-node success">
+      <span class="node-icon">📚</span>
+      <span class="node-label">RAG</span>
+      <span class="node-desc">Ground answers in real documents</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+## What Is RAG — In 30 Seconds
+
+**Retrieval-Augmented Generation.** Instead of relying on what the model "remembers" from training, you retrieve relevant documents and inject them into the prompt.
+
+The model reads your docs, then answers. Every time. Fresh data. Cited sources.
+
+<FlowDiagram title="The RAG Flow">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Question</span>
+      <span class="node-desc">User asks something</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Retrieve</span>
+      <span class="node-desc">Find relevant chunks</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📄</span>
+      <span class="node-label">Augment</span>
+      <span class="node-desc">Inject docs into prompt</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Generate</span>
+      <span class="node-desc">Grounded answer + citations</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+The key insight: **the LLM never sees your entire knowledge base.** It sees only the few most relevant chunks, injected alongside the question.
+
+```python
+# RAG in 10 lines of pseudocode
+def rag_answer(question: str) -> str:
+    # 1. Find relevant documents
+    relevant_docs = vector_store.similarity_search(question, k=5)
+
+    # 2. Build prompt with context
+    context = "\n\n".join([doc.page_content for doc in relevant_docs])
+    prompt = f"""Answer based ONLY on this context. If unsure, say so.
+
+Context:
+{context}
+
+Question: {question}"""
+
+    # 3. Generate grounded answer
+    return llm.invoke(prompt)
+```
+
+<PresenterNote>
+`03-e2e-rag.ipynb` notebook'undaki RAG pseudocode hücresini gösterin. Satır satır geçin. Vurgulayın: LLM aynı, sihir 2. satırdaki similarity_search'te. Sorun: "similarity_search arka planda ne yapıyor sizce?" 1-2 tahmin alın. "İşte Module 2'de `01-embeddings-viz.ipynb` ile bunu derinlemesine öğreneceğiz."
+</PresenterNote>
+
+## RAG vs Fine-Tuning
+
+This is the question everyone asks. Here's the decision:
+
+| | RAG | Fine-Tuning |
+|---|---|---|
+| **Purpose** | Model needs to **know** something | Model needs to **behave** differently |
+| **Data freshness** | Real-time (re-index anytime) | Stale (requires retraining) |
+| **Source attribution** | Built-in (you know which doc) | Not possible |
+| **Cost** | Low (embedding + storage) | High (GPU hours) |
+| **Hallucination control** | Strong (grounded in sources) | Weak (still generates freely) |
+| **Best for** | Knowledge retrieval, Q&A, search | Tone, format, domain language |
+
+<KeyInsight>
+Use RAG when you need the model to **know** something. Use fine-tuning when you need the model to **behave** differently. In production, you often use both.
+</KeyInsight>
+
+<FlowDiagram title="When to Use What">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Need specific docs?</span>
+      <span class="node-desc">Policies, APIs, contracts</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">📚</span>
+      <span class="node-label">RAG</span>
+      <span class="node-desc">Retrieve and ground</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Need different tone?</span>
+      <span class="node-desc">Style, format, domain jargon</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">🎯</span>
+      <span class="node-label">Fine-Tuning</span>
+      <span class="node-desc">Train behavior into model</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Neither?</span>
+      <span class="node-desc">General capability is enough</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">💬</span>
+      <span class="node-label">Prompt Engineering</span>
+      <span class="node-desc">Just write a better prompt</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+## Real Use Cases — Your World
+
+Think about the data that already exists inside a travel technology company:
+
+<CardGrid>
+  <Card title="GDS Documentation" icon="document">
+    Thousands of pages of Cryptic commands, API specs, integration guides. Developers searching through them daily. RAG makes them queryable in natural language.
+  </Card>
+  <Card title="Customer Support" icon="comment">
+    Support agents get AI-suggested answers grounded in product docs, troubleshooting guides, and past ticket resolutions. Faster resolution, fewer escalations.
+  </Card>
+  <Card title="Incident Post-Mortems" icon="warning">
+    Past outages, root causes, remediation steps. When something breaks at 3 AM, the on-call engineer asks: "Has this happened before?" RAG finds the answer.
+  </Card>
+  <Card title="Internal Wikis" icon="open-book">
+    Engineering standards, architecture decisions, onboarding docs. New hires ask questions, RAG answers from the wiki — with page references.
+  </Card>
+</CardGrid>
+
+<PresenterNote>
+Sorun: "Bu use case'lerden hangisi takımınıza en çok zaman kazandırır?" 2-3 cevap alın. Bunlar eğitimin geri kalanı için zihinsel çapalar olacak. `03-e2e-rag.ipynb` notebook'unda bu use case'lerden birini end-to-end göstereceğimizi söyleyin.
+</PresenterNote>
+
+## The Indexing Phase — What Happens Before Queries
+
+Before RAG can answer anything, you prepare your knowledge base. This happens offline, once:
+
+<FlowDiagram title="Offline Indexing Pipeline">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📄</span>
+      <span class="node-label">Load</span>
+      <span class="node-desc">PDF, web, markdown, API</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">✂️</span>
+      <span class="node-label">Chunk</span>
+      <span class="node-desc">Split into focused passages</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧮</span>
+      <span class="node-label">Embed</span>
+      <span class="node-desc">Convert text to vectors</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">💾</span>
+      <span class="node-label">Store</span>
+      <span class="node-desc">Save in vector database</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+```python
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
+from langchain_chroma import Chroma
+
+# 1. Load
+docs = PyPDFLoader("flight-api-guide.pdf").load()
+
+# 2. Chunk
+chunks = RecursiveCharacterTextSplitter(
+    chunk_size=1000, chunk_overlap=200
+).split_documents(docs)
+
+# 3. Embed + Store
+vector_store = Chroma.from_documents(
+    documents=chunks,
+    embedding=OpenAIEmbeddings(model="text-embedding-3-small"),
+    persist_directory="./chroma_db"
+)
+
+print(f"Indexed {len(chunks)} chunks from {len(docs)} pages")
+```
+
+We'll dive deep into each step in the coming modules. For now, remember the flow: **Load, Chunk, Embed, Store.**
+
+## What's Coming
+
+This module gave you the **why**. The rest gives you the **how**:
+
+| Module | Topic | What You Build |
+|--------|-------|----------------|
+| 2 | Embeddings & Vector World | Embed text, search semantically, visualize meaning |
+| 3 | The RAG Pipeline | Complete end-to-end RAG system from scratch |
+| 4 | Advanced RAG | HyDE, re-ranking, agentic RAG |
+| 5 | Production RAG | Evaluation, scaling, monitoring, grand finale |
+
+<DeepDive title="The Academic Origins of RAG">
+
+RAG was introduced in the 2020 paper **"Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks"** by Patrick Lewis et al. at Facebook AI Research.
+
+The key contribution: combine a pre-trained seq2seq model (BART) with a dense retriever (DPR), trained end-to-end. The retriever and generator jointly optimize what to retrieve and how to generate.
+
+Modern RAG has diverged significantly. Today's systems use frozen LLMs (no end-to-end training), vector databases instead of FAISS, and prompt engineering instead of fine-tuned generators. The term "RAG" has evolved from a specific architecture to a **design pattern** — any system that retrieves external knowledge to augment generation.
+
+**Key papers in the RAG lineage:**
+1. **DPR** (Karpukhin et al., 2020) — Dense Passage Retrieval
+2. **RAG** (Lewis et al., 2020) — The original paper
+3. **RETRO** (Borgeaud et al., 2022) — Retrieval-enhanced transformers at scale
+4. **Self-RAG** (Asai et al., 2023) — LLM decides when to retrieve
+5. **CRAG** (Yan et al., 2024) — Corrective RAG with retrieval evaluation
+
+</DeepDive>
+
+## What to Take Away
+
+Three things:
+
+1. **LLMs have three blind spots** — hallucination, stale knowledge, no private data. RAG fixes all three, not by changing the model, but by changing the input.
+
+2. **RAG = retrieve, then generate.** Find the relevant documents, inject them into the prompt, let the model answer from evidence. Simple concept, powerful results.
+
+3. **RAG vs fine-tuning is not a competition.** RAG is for knowledge. Fine-tuning is for behavior. Know which problem you're solving.
+
+## Next Up
+
+The first practical question: how does "similarity_search" actually work? How do you turn text into numbers that capture meaning? **Module 2: Embeddings & The Vector World.**

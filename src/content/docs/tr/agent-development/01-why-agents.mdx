@@ -1,0 +1,340 @@
+---
+title: "Modül 1: Neden Agent?"
+description: "Agent'lar gerçekte nedir, neden önemlidir ve onları öncekilerden ayıran şey ne."
+---
+
+import DeepDive from '../../../../components/DeepDive.astro';
+import ColabLink from '../../../../components/ColabLink.astro';
+import ModuleHeader from '../../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../../components/PresenterNote.astro';
+import KeyInsight from '../../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="40 min" day={1} goal="Agent'ın ne olduğunu, chatbot'tan farkını ve bunun neden bir paradigma değişimi olduğunu anlayın." />
+
+## Önce Demo
+
+Tanımlardan önce, bir agent'ın nasıl çalıştığını izleyelim.
+
+<PresenterNote>
+`02-first-chain.ipynb` notebook'unu Colab'da açın. İlk chain'i çalıştırarak bir LLM'in tool call yaparak nasıl aksiyon aldığını gösterin. Çıktıyı ekranda bırakın, 10 saniye sessizce izlemelerini sağlayın. Sonra sorun: "Bu chain'de kaç adım var ve her adımda ne oluyor?"
+</PresenterNote>
+
+Slack'e bir hata raporu düşer:
+
+> "Rezervasyon onay e-postası, Tokyo uçuşları için yolcunun yemek tercihini göstermiyor."
+
+Kimse atamaz. Kimse önceliklendirir. Bir agent devreye girer:
+
+1. Mesajı okur, temel sorunu çıkarır
+2. Kod tabanını arar — `MealPreferenceService.cs`, satır 142'yi bulur
+3. Hatayı tespit eder: APAC rota filtresi Tokyo'yu hariç tutuyor
+4. Jira ticket'ı oluşturur: `BUG: Meal pref missing for TYO routes [P2]`
+5. Slack'e kök neden ve önerilen düzeltmeyle geri döner
+
+Toplam süre: 14 saniye. Hiçbir insan dokunmadı.
+
+**İşte bu bir agent.** Soruları yanıtlayan bir chatbot değil — algılayan, düşünen, harekete geçen ve bir hedefe otonom olarak ulaşan bir sistem.
+
+<KeyInsight>
+Agent, **sırada ne yapacağına** karar vermek için bir LLM kullanan ve sonra bunu gerçekten **yapan** yazılımdır. LLM beyindir. Araçlar ellerdir.
+</KeyInsight>
+
+## Chatbot ve Agent Karşılaştırması
+
+Bu ayrım önemlidir çünkü neler geliştirebileceğinizi değiştirir.
+
+| | Chatbot | Agent |
+|---|---|---|
+| **Etkileşim** | Siz sorarsınız, o yanıtlar | Siz bir hedef belirlersiniz, o hedefe doğru çalışır |
+| **Eylemler** | Yalnızca metin üretir | API çağırır, dosya okur, veri yazar |
+| **Bellek** | Turlar arasında unutur | Bağlamı hatırlar, sonuçlardan öğrenir |
+| **Kontrol akışı** | İnsan her adımı yönlendirir | Agent sonraki adımlara otonom karar verir |
+| **Örnek** | "Hava nasıl?" | "İptal edilen CDG uçuşundaki tüm yolcuları yeniden rezerve et" |
+
+<PresenterNote>
+Burada durun. Sorun: "Kaçınız ChatGPT veya Claude kullandınız?" Eller kalkar. "O bir chatbot. Siz sorarsınız, o cevaplar. Şimdi düşünün — ticket açabilse, veritabanı sorgulayabilse, email gönderebilse. İşte bugün yaptığımız sıçrama bu." `02-first-chain.ipynb` notebook'undaki chatbot vs chain karşılaştırmasını gösterin.
+</PresenterNote>
+
+Fark tek bir kelime: **agency** (özerklik). Ne yapacağına karar verebilme, yapabilme, sonucu gözlemleyebilme ve devam edebilme yeteneği.
+
+```
+Chatbot:  İnsan → Soru → LLM → Yanıt → bitti.
+
+Agent:    İnsan → Hedef → LLM → [API çağırır] → [sonucu okur] → [sonraki adıma karar verir]
+          → [başka API çağırır] → [değerlendirir] → ... → Hedefe ulaşıldı.
+```
+
+## Agent Anatomisi
+
+Her agent — framework, dil veya sağlayıcı fark etmeksizin — aynı döngüyü çalıştırır:
+
+<FlowDiagram title="Agent Döngüsü">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">👁</span>
+      <span class="node-label">Algıla</span>
+      <span class="node-desc">Girdi gelir: mesaj, olay, tetikleyici</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">Düşün</span>
+      <span class="node-desc">LLM sırada ne yapacağına karar verir</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">⚡</span>
+      <span class="node-label">Harekete Geç</span>
+      <span class="node-desc">Araç, API, veritabanı çağır</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">💾</span>
+      <span class="node-label">Hatırla</span>
+      <span class="node-desc">Sonucu kaydet, durumu güncelle</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow animated" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">↩ hedefe ulaşılana veya agent vazgeçene kadar döngü</div>
+  </div>
+</FlowDiagram>
+
+Bu, tüm eğitim boyunca sizi taşıyacak zihinsel model:
+
+- **Algıla**: Agent girdi alır — bir kullanıcı mesajı, bir webhook, bir cron tetikleyicisi, bir dosya değişikliği. Ne olduğunu ayrıştırır.
+- **Düşün**: LLM durumu değerlendirir. Hedef ne? Hangi araçlarım var? Sırada ne yapmalıyım? İşte zeka burada.
+- **Harekete Geç**: Agent yürütür — API çağırır, veritabanı sorgular, dosya yazar, bildirim gönderir. Gerçek dünyaya dokunur.
+- **Hatırla**: Agent ne olduğunu kaydeder. Konuşma geçmişi, araç sonuçları, alınan kararlar. Çok adımlı akıl yürütmeyi mümkün kılan budur.
+
+Sonra döngü tekrarlar. Eylemin sonucunu algıla, sıradaki hakkında düşün, tekrar harekete geç. Tamamlanana kadar.
+
+<PresenterNote>
+Tahtaya dört kutuyu çizin: Perceive, Reason, Act, Remember. Ok ve döngüyü gösterin. `02-first-chain.ipynb` notebook'undaki chain çıktısını referans verin. Sorun: "Chain demo'sunda 'perceive' adımı hangisiydi? 'Act' hangisiydi?" Cevapları notebook çıktısındaki adımlarla eşleştirin.
+</PresenterNote>
+
+## Buraya Nasıl Geldik?
+
+Dört dönem. Her biri öncekinin bir sınırlamasını çözdü:
+
+<Tabs>
+  <TabItem label="Kurallar (1970-2000)">
+    ```python
+    # You write every decision by hand
+    if passenger.status == "delayed" and passenger.tier == "gold":
+        rebook_to_next_available()
+        send_lounge_voucher()
+    ```
+    
+    Mükemmel çalışır... düşündüğünüz 50 durum için. 51. durum çöker. 1000 kural bakım yapılamaz hale gelir. Açıkça kodlamadığınız hiçbir şeyi işleyemez.
+
+    **Sınırlama**: Ölçeklenmez. Yenilikle başa çıkamaz.
+  </TabItem>
+
+  <TabItem label="ML (2010'lar)">
+    ```python
+    # Learns patterns from historical data
+    model = RandomForestClassifier()
+    model.fit(past_rebookings, outcomes)
+    action = model.predict(new_situation)
+    ```
+    
+    Veriden öğrenir, karmaşıklıkla başa çıkar. Ama: görev başına bir model. Akıl yürütme yok. Nedenini açıklayamaz. Eğitilmediği görevleri işleyemez.
+
+    **Sınırlama**: Dar kapsamlı. Bir model = bir görev. Akıl yürütme yok.
+  </TabItem>
+
+  <TabItem label="LLM'ler (2023)">
+    ```python
+    # Understands language, reasons about situations
+    response = llm.chat("Passenger on delayed flight, Gold member, 
+                         business class to Tokyo. What should we do?")
+    ```
+    
+    Genel amaçlı akıl yürütme. Bağlamı anlar, belirsizlikle başa çıkar, kararları açıklar. Ama: sadece metin üretebilir. Aslında hiçbir şey *yapamaz*.
+
+    **Sınırlama**: Akıllı ama güçsüz. Metin girer, metin çıkar.
+  </TabItem>
+
+  <TabItem label="Agent'lar (2024+)">
+    ```python
+    # LLM + tools + memory + autonomy
+    agent = Agent(
+        llm=claude,
+        tools=[flight_api, booking_system, crm, email],
+        memory=ConversationMemory()
+    )
+    agent.run("Handle rebooking for cancelled AF1234")
+    ```
+    
+    Hem düşünür HEM harekete geçer. Çok adımlı iş akışları planlar. Araçları kullanır. Yeni durumlara uyum sağlar. Şu an buradayız.
+
+    **Atılım**: LLM'e eller verin.
+  </TabItem>
+</Tabs>
+
+<KeyInsight>
+Her dönem bir sınırlamayı çözdü: kurallar ölçeklenemedi, ML akıl yürütemedi, LLM'ler harekete geçemedi. Agent'lar akıl yürütme + eylem'i birleştirir. Sıçrama budur.
+</KeyInsight>
+
+## Gerçek Kullanım Senaryoları
+
+Bunu sizin dünyanıza bağlayalım — seyahat ve havacılık:
+
+### Aksama Yönetimi
+
+Bir uçuş iptal olduğunda, bugün ekipler arasında saatlerce manuel koordinasyon gerekiyor. Bir agent tüm akışı orkestre eder:
+
+<FlowDiagram title="Aksama Agent Akışı">
+  <div class="flow-row">
+    <div class="flow-node danger">
+      <span class="node-icon">🚨</span>
+      <span class="node-label">Aksama</span>
+      <span class="node-desc">Uçuş iptal edildi</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📋</span>
+      <span class="node-label">Manifest</span>
+      <span class="node-desc">Etkilenen yolcuları çek</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Seçenekler</span>
+      <span class="node-desc">Alternatifleri bul</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Yeniden Rezerve Et</span>
+      <span class="node-desc">Kuralları uygula, yolcuları bilgilendir</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+Kalıp her zaman aynı: **agent ağır işi yapar, insan uç vakaları onaylar.**
+
+| Kullanım Senaryosu | Agent'ın İşlediği | İnsanın İşlediği |
+|---|---|---|
+| Ücret dosyalama denetimi | Kuralları tarar, tutarsızlıkları işaretler | İşaretlenen öğeleri inceler |
+| Müşteri şikayeti | Sınıflandırır, yanıt taslağı hazırlar | Onaylar, eskalasyonu yönetir |
+| Sefer optimizasyonu | Talebi analiz eder, değişiklik önerir | Doğrular, onaylar |
+| API dokümantasyonu | Kod değişikliklerini okur, dokümanları günceller | Doğruluğu inceler |
+
+<Aside type="caution">
+Bu insanları değiştirmekle ilgili değil. Onları güçlendirmekle ilgili. Agent hacmi ve rutini üstlenir. İnsan muhakeme ve istisnaları üstlenir.
+</Aside>
+
+<PresenterNote>
+Sorun: "Takımınızın günlük işlerinde, tahmin edilebilir bir pattern izleyen ama birden fazla sistem gerektirdiği için çok uzun süren bir task düşünün." 2-3 cevap alın. Bunlar onların agent fırsatları. Sonra `02-first-chain.ipynb` notebook'undaki chain yapısının bu tür problemleri nasıl çözdüğünü bağlayın.
+</PresenterNote>
+
+## Karmaşıklık Spektrumu
+
+Agent'lar herkese uyan tek kalıp değil. Bir ilerleme var:
+
+<FlowDiagram title="Agent Karmaşıklık Spektrumu">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔧</span>
+      <span class="node-label">Araç Çağrısı</span>
+      <span class="node-desc">Tek eylem</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔗</span>
+      <span class="node-label">Chain</span>
+      <span class="node-desc">Adım 1 → Adım 2 → Adım 3</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔀</span>
+      <span class="node-label">Router</span>
+      <span class="node-desc">Eğer X ise A, değilse B</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🤝</span>
+      <span class="node-label">Çoklu Agent</span>
+      <span class="node-desc">Uzmanlardan oluşan ekip</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+Bu eğitimde dördünü de geliştireceksiniz. Modül 3 chain'leri, Modül 4 router ve çoklu agent'ı kapsar. 2. Günün sonunda bu spektrumun en sağında olacaksınız.
+
+<DeepDive title="ReAct Kalıbı — Agent'lar Gerçekte Nasıl Düşünür">
+
+**ReAct** (Reasoning + Acting — Akıl Yürütme + Eylem), modern agent'ların arkasındaki temel kalıptır. LLM düşünme ve yapma arasında gider gelir:
+
+```
+Question: Average delay for AF flights CDG→NRT this month?
+
+Thought 1: I need flight data for this route and month.
+Action 1: query_flights(carrier="AF", origin="CDG", dest="NRT", month="2026-09")
+Observation 1: [28 flights returned with delay data]
+
+Thought 2: Now calculate the average delay.
+Action 2: calculate(sum(delays) / count(flights))  
+Observation 2: 23.4 minutes
+
+Thought 3: Is this above or below normal? Let me check.
+Action 3: get_baseline(route="CDG-NRT", season="fall")
+Observation 3: Seasonal average: 18.2 minutes
+
+Answer: 23.4 min average, 28.6% above seasonal norm of 18.2 min.
+```
+
+Bu neden önemli:
+- **Şeffaf**: Her akıl yürütme adımını denetleyebilirsiniz
+- **Temelli**: Eylemler gerçek veri sağlar, halüsinasyonu azaltır  
+- **Kontrol edilebilir**: Akıl yürütme raydan çıkarsa müdahale edebilirsiniz
+
+Bu tam olarak LangChain ve LangGraph'ın arka planda uyguladığı şeydir — bu kalıbı Modül 3 ve 4'te göreceksiniz.
+
+</DeepDive>
+
+<DeepDive title="Araç Kullanımı — LLM'ler Fonksiyonları Nasıl Çağırır">
+
+Modern LLM'ler sadece metin üretmez — yapılandırılmış **araç çağrıları** üretir:
+
+```json
+{
+    "tool": "search_flights",
+    "arguments": {
+        "origin": "CDG",
+        "destination": "NRT", 
+        "date": "2026-09-15"
+    }
+}
+```
+
+Agent framework'ü:
+1. Kullanıcı mesajı + araç tanımlarını LLM'e gönderir
+2. LLM bir araç çağrısı (veya doğrudan yanıt) çıktılar
+3. Framework aracı yürütür
+4. Sonuç LLM'e geri gider
+5. LLM karar verir: yanıtla mı, yoksa başka bir araç çağır mı?
+
+Bu, Claude, GPT-4 ve Gemini'de doğal bir yetenektir. Öğreneceğimiz framework'ler orkestrasyon katmanını sağlar.
+
+</DeepDive>
+
+## Çıkarımlar
+
+Üç şey:
+
+1. **Agent = LLM + araçlar + bellek + döngü.** LLM düşünür, araçlar harekete geçer, bellek kalıcıdır, döngü hedefe ulaşılana kadar devam eder.
+
+2. **İnsan-döngüde üretim kalıbıdır.** Tam özerklik kulağa havalı gelir ama nadiren hedeftir. Agent'lar hacmi üstlenir; insanlar muhakemeyi üstlenir.
+
+3. **Spektrumda soldan sağa ilerliyoruz.** Tek araç çağrısı → chain → router → çoklu agent. 2. Günün sonunda tam halini geliştireceksiniz.
+
+## Sırada
+
+İlk pratik soru: bir agent araçlara gerçekte nasıl bağlanır? Her AI sağlayıcısının kendine göre bir yolu var. Karmakarışık. MCP bunu düzeltiyor. **Modül 2: MCP — AI'ın USB-C'si**.
+
+<ColabLink title="Alıştırma: Bir Agent'ı İş Başında Keşfedin" notebook="/notebooks/agent-dev/02-first-chain.ipynb" level="Basic" />
+<ColabLink title="Challenge: Ekibiniz İçin Bir Agent Tasarlayın" notebook="/notebooks/agent-dev/06-multi-agent.ipynb" level="Challenge" />

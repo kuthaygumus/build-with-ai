@@ -1,0 +1,132 @@
+---
+title: AI Eğitim Serisi
+description: Agent Geliştirme ve RAG üzerine iki bölümlük uygulamalı eğitim. Gerçek sistemler geliştirin, sunum dosyaları değil.
+template: splash
+hero:
+  title: |
+    Gerçekten Çalışan
+    AI Sistemleri Geliştirin
+  tagline: Mühendisler için uygulamalı eğitim serisi. Slayt yok. Teori yığını yok. İlk dakikadan itibaren kod yazıyorsunuz.
+  actions:
+    - text: Agent'larla Başlayın
+      link: /tr/agent-development/01-why-agents/
+      icon: right-arrow
+    - text: RAG'a Geçin
+      link: /tr/rag/01-knowledge-problem/
+      variant: minimal
+---
+
+import { Card, CardGrid, Steps, Aside } from '@astrojs/starlight/components';
+
+## Bu Eğitim Ne?
+
+Bu, sıfırdan gerçek AI sistemleri geliştireceğiniz **iki bölümlük bir eğitim serisi**. Ders değil. İzleyeceğiniz bir demo değil. Kod yazacak, bir şeyleri bozacak, düzeltecek ve sonunda nasıl çalıştığını anladığınız çalışan sistemlerle ayrılacaksınız.
+
+<CardGrid>
+  <Card title="Bölüm 1: Agent Geliştirme" icon="rocket">
+    **Süre: 2 Gün**
+
+    Akıl yürüten, karar veren, araçları çağıran ve insan müdahalesi olmadan görevleri tamamlayan otonom bir agent geliştireceksiniz.
+
+    Sonunda: MCP araç entegrasyonu, koşullu mantık ve insan onay mekanizması içeren çalışan bir çok adımlı agent.
+  </Card>
+  <Card title="Bölüm 2: RAG" icon="open-book">
+    **Süre: 2 Gün**
+
+    Kendi dokümanlarınızdan soruları doğru şekilde, kaynak göstererek ve prodüksiyon kalitesinde yanıtlayan bir sistem geliştireceksiniz.
+
+    Sonunda: Gelişmiş retrieval, re-ranking, değerlendirme metrikleri ve önbellekleme katmanı içeren bir RAG pipeline.
+  </Card>
+</CardGrid>
+
+## Kimler İçin?
+
+Siz bir yazılımcısınız. Belki ChatGPT kullanmışsınızdır. Belki AI'a hiç dokunmamışsınızdır. Fark etmez. Her şey sıfırdan anlatılıyor, ama hızlı ilerliyoruz ve derinlere dalıyoruz.
+
+- **AI'da yeni misiniz?** Ana yolu takip edin. Her kavram gerçek kodla sıfırdan anlatılır.
+- **Zaten aşina mısınız?** **Derinlemesine** bölümlerine ve **Challenge** alıştırmalarına göz atın.
+- **Senior/Architect mısınız?** Prodüksiyon kalıpları, güvenlik değerlendirmeleri ve mimari kararlar en çok fayda sağlayacağınız yerler.
+
+## Nasıl İşliyor?
+
+Her bölüm 2 gün sürer. İşte ritim:
+
+<Steps>
+1. **Çalıştığını görün** — Her modül, bitmiş ürünün çalışan haliyle başlar. Tek satır yazmadan önce sonucu görürsünüz.
+
+2. **Nedenini anlayın** — Kısa, odaklı açıklama. Dolgu yok. Kendiniz yapabilmeniz için tam olarak ihtiyacınız olanı anlatıyoruz.
+
+3. **Kendiniz geliştirin** — Colab notebook'unu açın, kodu çalıştırın, değiştirin, bozun, anlayın. Öğrenme aslında burada gerçekleşir.
+
+4. **Daha ileri gidin** — Daha derine inmek isteyenler için Challenge alıştırmaları. Yönlendirme yok — sadece bir hedef ve birkaç ipucu.
+</Steps>
+
+### Araçlar
+
+| Araç | Ne Yapar | Neden |
+|------|---------|------|
+| **Bu site** | Teori, diyagramlar, mimari, referans | Eğitim sırasında gezinin, sonra tekrar bakın |
+| **Google Colab** | Tarayıcınızda Python kodu çalıştırın | Sıfır kurulum. Bir bağlantıya tıklayın, kodlamaya başlayın |
+
+<Aside type="tip">
+Bilgisayarınıza hiçbir şey kurmanıza gerek yok. Her alıştırma Google Colab'da çalışır — sadece bir tarayıcı ve bir Google hesabı yeterli.
+</Aside>
+
+## Ne Geliştireceksiniz?
+
+### Bölüm 1: Agent'lar
+
+| Gün | Başlangıç Noktanız | Bitiş Noktanız |
+|-----|-------------------|----------------|
+| **1. Gün** | "Agent nedir?" | Bellek ve yapılandırılmış çıktı içeren çalışan bir LangChain pipeline |
+| **2. Gün** | Doğrusal çalışan bir chain | Koşullu yönlendirme, araç kullanımı ve insan onayı içeren bir LangGraph agent |
+
+### Bölüm 2: RAG
+
+| Gün | Başlangıç Noktanız | Bitiş Noktanız |
+|-----|-------------------|----------------|
+| **1. Gün** | "Embedding nedir?" | Tam bir RAG pipeline: PDF girer, doğru yanıtlar çıkar, kaynaklarıyla birlikte |
+| **2. Gün** | Bazen hata yapan basit bir pipeline | HyDE, re-ranking ve değerlendirme metrikleriyle prodüksiyon kalitesinde RAG |
+
+## Hikayenin Bütünü
+
+Bunlar iki ayrı atölye değil. Tek bir hikaye:
+
+<CardGrid>
+  <Card title="Bölüm 1: AI ne yapabilir?" icon="rocket">
+    Otonom olarak **düşünen ve harekete geçen** agent'lar geliştirin. Sonunda: "Bu çok güçlü, ama sadece eğitildiği şeyleri biliyor."
+  </Card>
+  <Card title="Bölüm 2: AI ne bilebilir?" icon="open-book">
+    Agent'lara **sizin verilerinize** erişim verin. Sonunda: İkisini birleştirip **Agentic RAG** oluşturun — ne zaman arama yapacağına, neyi arayacağına karar veren ve kaynaklı yanıtlar üreten bir agent.
+  </Card>
+</CardGrid>
+
+## Başlamadan Önce
+
+İhtiyacınız olan:
+- Bir Google hesabı (Colab için)
+- Temel Python bilgisi (değişkenler, fonksiyonlar, döngüler — bu kadar)
+- Merak
+
+İhtiyacınız olmayan:
+- AI/ML deneyimi
+- GPU erişimi
+- Yerel Python kurulumu
+- LangChain, embedding veya vektör veritabanları hakkında ön bilgi
+
+## Hızlı Bağlantılar
+
+<CardGrid>
+  <Card title="Agent Geliştirme — 1. Gün" icon="right-arrow">
+    [Neden Agent?](/tr/agent-development/01-why-agents/) | [MCP](/tr/agent-development/02-mcp/) | [LangChain](/tr/agent-development/03-langchain/)
+  </Card>
+  <Card title="Agent Geliştirme — 2. Gün" icon="right-arrow">
+    [LangGraph](/tr/agent-development/04-langgraph/) | [Entegrasyon](/tr/agent-development/05-integration/)
+  </Card>
+  <Card title="RAG — 1. Gün" icon="right-arrow">
+    [Bilgi Problemi](/tr/rag/01-knowledge-problem/) | [Embedding'ler](/tr/rag/02-embeddings/) | [Pipeline](/tr/rag/03-rag-pipeline/)
+  </Card>
+  <Card title="RAG — 2. Gün" icon="right-arrow">
+    [Gelişmiş RAG](/tr/rag/04-advanced-rag/) | [Prodüksiyon](/tr/rag/05-production-rag/)
+  </Card>
+</CardGrid>

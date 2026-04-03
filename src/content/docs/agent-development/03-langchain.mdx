@@ -1,0 +1,580 @@
+---
+title: "Module 3: LangChain Fundamentals"
+description: "Build functional chains with LangChain — from chat models and prompt templates to memory and the LCEL pipe operator."
+---
+
+import DeepDive from '../../../components/DeepDive.astro';
+import ColabLink from '../../../components/ColabLink.astro';
+import ModuleHeader from '../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../components/PresenterNote.astro';
+import KeyInsight from '../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="75 min" day={1} goal="Build functional chains with LangChain — prompts, models, parsers, memory, all composed with LCEL pipes." />
+
+## What LangChain Actually Is
+
+LangChain is a **framework** for building LLM applications. That word — framework — matters. It's not a library you call. It's an architecture that calls your code.
+
+<CardGrid>
+  <Card title="Library" icon="seti:json">
+    A collection of functions you call. You control the flow. Example: `requests`, `numpy`.
+  </Card>
+  <Card title="Framework" icon="setting">
+    An architecture that calls your code. It controls the flow, you fill in the pieces. Example: Django, React, LangChain.
+  </Card>
+</CardGrid>
+
+Why does this distinction matter? Because LangChain gives you opinions. It defines how prompts connect to models, how models connect to parsers, how memory flows through chains. You don't reinvent the plumbing — you plug in your logic.
+
+<PresenterNote>
+`02-first-chain.ipynb` notebook'unu Colab'da açın. İlk hücredeki import'ları gösterin. Sorun: "Kaçınız Django veya React kullandınız?" "Django'da HTTP server, URL router yazmadınız — framework verdi. LangChain de LLM uygulamaları için aynı şey." Notebook'taki ilk chain tanımını göstererek `prompt | model | parser` yapısını açıklayın.
+</PresenterNote>
+
+### The Ecosystem (2026)
+
+<FlowDiagram title="LangChain Ecosystem">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🧱</span>
+      <span class="node-label">langchain-core</span>
+      <span class="node-desc">Base abstractions, LCEL</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔗</span>
+      <span class="node-label">langchain</span>
+      <span class="node-desc">Chains, agents, retrieval</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🌐</span>
+      <span class="node-label">langchain-community</span>
+      <span class="node-desc">Third-party integrations</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">📊</span>
+      <span class="node-label">langgraph</span>
+      <span class="node-desc">Stateful agent graphs (Module 4)</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">langsmith</span>
+      <span class="node-desc">Observability and evaluation</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📦</span>
+      <span class="node-label">Provider packages</span>
+      <span class="node-desc">langchain-anthropic, langchain-openai</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<Aside type="caution">
+LangChain has evolved dramatically since 2023. Older tutorials use deprecated APIs — `LLMChain`, `ConversationChain`, `initialize_agent`. If you see those in online examples, they're legacy patterns. This training uses the current API surface (langchain-core 0.3+).
+</Aside>
+
+## Core Building Blocks
+
+### Chat Models
+
+The entry point. LangChain gives you a unified interface across providers — Claude, GPT, Gemini, local models. Same API, different brain.
+
+```python
+from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
+
+# Same interface, different provider
+claude = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
+gpt = ChatOpenAI(model="gpt-4o", temperature=0)
+
+# This works identically with either model
+response = claude.invoke("What is the IATA code for Tokyo Narita?")
+print(response.content)  # "NRT"
+```
+
+The key benefit: **swap models without changing application logic.** Your chain works with Claude today, GPT tomorrow, a local model next week. Zero code changes.
+
+### Messages
+
+LLMs work with structured messages, not raw strings. Four types:
+
+```python
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+
+messages = [
+    SystemMessage(content="You are a travel industry expert."),
+    HumanMessage(content="Explain the difference between GDS and NDC."),
+]
+
+response = claude.invoke(messages)
+```
+
+| Message Type | Role | Purpose |
+|---|---|---|
+| `SystemMessage` | system | Sets behavior, personality, constraints |
+| `HumanMessage` | user | User's input |
+| `AIMessage` | assistant | Model's response |
+| `ToolMessage` | tool | Result of a tool call |
+
+### Prompt Templates
+
+Hardcoding prompts is like hardcoding SQL. It works until it doesn't. Templates give you structure, reuse, and composability.
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+analysis_prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are an airline operations analyst. Be concise and data-driven."),
+    ("human", """Analyze the following flight disruption:
+
+Flight: {flight_number}
+Route: {origin} → {destination}
+Delay: {delay_minutes} minutes
+Affected passengers: {passenger_count}
+
+Provide:
+1. Severity classification (minor/moderate/severe/critical)
+2. Recommended immediate actions
+3. Estimated cost impact"""),
+])
+
+# Variables are filled at runtime
+formatted = analysis_prompt.invoke({
+    "flight_number": "AF1234",
+    "origin": "CDG",
+    "destination": "NRT",
+    "delay_minutes": 180,
+    "passenger_count": 287
+})
+```
+
+### Output Parsers
+
+LLMs return text. Your application needs structured data. Parsers bridge the gap.
+
+```python
+from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
+from pydantic import BaseModel, Field
+
+# Simple: extract the text content
+str_parser = StrOutputParser()
+
+# Structured: parse into a Pydantic model
+class FlightAnalysis(BaseModel):
+    severity: str = Field(description="minor, moderate, severe, or critical")
+    actions: list[str] = Field(description="List of recommended actions")
+    estimated_cost_eur: float = Field(description="Estimated cost impact in EUR")
+
+json_parser = JsonOutputParser(pydantic_object=FlightAnalysis)
+```
+
+<Aside type="tip">
+Modern LangChain supports `model.with_structured_output(FlightAnalysis)` — this uses native tool calling under the hood and is more reliable than asking the model to output JSON and parsing it yourself.
+</Aside>
+
+## LCEL: The Pipe Operator
+
+**LangChain Expression Language** is how you compose building blocks into chains. If you've used Unix pipes, you already know the concept.
+
+```bash
+# Unix pipes
+cat log.txt | grep ERROR | wc -l
+```
+
+```python
+# LCEL pipes — same concept, different domain
+chain = prompt | model | parser
+```
+
+The `|` operator connects **Runnables** — objects with `.invoke()`, `.stream()`, `.batch()`, and `.ainvoke()` methods. Every LangChain component is a Runnable.
+
+<FlowDiagram title="LCEL Chain: Data Flows Left to Right">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📝</span>
+      <span class="node-label">Prompt</span>
+      <span class="node-desc">Template + variables → messages</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">Model</span>
+      <span class="node-desc">Messages → AIMessage</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📊</span>
+      <span class="node-label">Parser</span>
+      <span class="node-desc">AIMessage → structured data</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+```python
+from langchain_anthropic import ChatAnthropic
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful travel assistant."),
+    ("human", "{question}")
+])
+
+model = ChatAnthropic(model="claude-sonnet-4-20250514")
+parser = StrOutputParser()
+
+# Compose with pipes
+chain = prompt | model | parser
+
+# Invoke — data flows through the entire chain
+result = chain.invoke({"question": "What airlines fly CDG to NRT nonstop?"})
+```
+
+<PresenterNote>
+`02-first-chain.ipynb` notebook'unda LCEL chain hücresini çalıştırın. Adım adım gösterin: "Dict prompt'a girer, template messages'a dönüşür. Messages model'a girer, AIMessage döner. AIMessage parser'a girer, text çıkar." Her adımın çıktısını ayrı ayrı gösterin. Sorun: "Bu pipeline'a yeni bir adım eklemek istesek ne yaparız?"
+</PresenterNote>
+
+### Why the Pipe Matters
+
+The pipe operator isn't syntactic sugar. Every LCEL chain automatically gets:
+
+| Feature | What You Get For Free |
+|---|---|
+| **Streaming** | `chain.stream(input)` — tokens flow through the whole chain |
+| **Async** | `await chain.ainvoke(input)` — non-blocking execution |
+| **Batching** | `chain.batch([input1, input2])` — parallel execution |
+| **Retries** | `chain.with_retry(stop_after_attempt=3)` — automatic retry |
+| **Fallbacks** | `chain.with_fallback(backup_chain)` — graceful degradation |
+| **Tracing** | Every step traced in LangSmith automatically |
+
+You write `prompt | model | parser`. You get streaming, async, batching, retries, fallbacks, and tracing. That's the framework earning its keep.
+
+<KeyInsight>
+LCEL isn't just a pretty syntax. It's a runtime contract. Every chain you build with pipes automatically gets streaming, async, batching, retries, and observability — for free.
+</KeyInsight>
+
+<ColabLink title="Exercise: Build Your First Chain" notebook="/notebooks/agent-dev/02-first-chain.ipynb" level="Basic" />
+
+## Hands-On: Disruption Analysis Chain
+
+Let's build something real — a chain that analyzes flight disruptions and generates passenger communications.
+
+```python
+from langchain_anthropic import ChatAnthropic
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+# Step 1: Disruption analysis prompt
+disruption_prompt = ChatPromptTemplate.from_messages([
+    ("system", """You are an airline operations analyst. 
+Analyze flight disruptions concisely. Always include:
+- Severity level
+- Passenger impact summary  
+- Top 3 recommended actions
+Format your response with clear headers."""),
+    ("human", """Flight {flight} on route {route} is experiencing a {delay_min}-minute delay.
+There are {pax} passengers on board, including {premium_pax} premium passengers.
+Reason for delay: {reason}
+
+Analyze this disruption."""),
+])
+
+model = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
+
+# Step 2: Compose the chain
+disruption_chain = disruption_prompt | model | StrOutputParser()
+
+# Step 3: Run it
+result = disruption_chain.invoke({
+    "flight": "AF1234",
+    "route": "CDG → NRT",
+    "delay_min": 180,
+    "pax": 287,
+    "premium_pax": 42,
+    "reason": "Technical issue — hydraulic system check required"
+})
+```
+
+### Chaining Multiple Steps
+
+Real applications need multi-step workflows. LCEL makes this natural:
+
+```python
+from langchain_core.runnables import RunnablePassthrough
+
+# Chain 1: Analyze the disruption
+analyze_chain = disruption_prompt | model | StrOutputParser()
+
+# Chain 2: Generate passenger SMS from the analysis
+comms_prompt = ChatPromptTemplate.from_messages([
+    ("system", "You write empathetic, professional passenger communications for airlines."),
+    ("human", """Based on this disruption analysis:
+
+{analysis}
+
+Write a brief SMS notification for affected passengers. 
+Keep it under 160 characters. Include flight number and new estimated time."""),
+])
+
+comms_chain = comms_prompt | model | StrOutputParser()
+
+# Combined: analyze THEN generate communication
+full_chain = (
+    {"analysis": analyze_chain, "original_input": RunnablePassthrough()}
+    | comms_chain
+)
+```
+
+<FlowDiagram title="Multi-Step Chain">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📥</span>
+      <span class="node-label">Flight Data</span>
+      <span class="node-desc">Disruption details</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Analyze</span>
+      <span class="node-desc">Severity, impact, actions</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">✉️</span>
+      <span class="node-label">Generate SMS</span>
+      <span class="node-desc">Passenger notification</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">📤</span>
+      <span class="node-label">Output</span>
+      <span class="node-desc">Ready-to-send message</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<PresenterNote>
+`02-first-chain.ipynb` notebook'undaki multi-step chain hücrelerini sırayla çalıştırın. Önce analiz çıktısını, sonra SMS çıktısını gösterin. Sorun: "Bu chain'den sonra başka hangi adımları ekleyebiliriz? SMS'i uluslararası yolcular için otomatik çevirmek?" `03-langchain-memory.ipynb` notebook'unda memory ile bu chain'in nasıl genişlediğini preview olarak gösterin.
+</PresenterNote>
+
+## Memory: Conversational Context
+
+Chains are stateless by default. Every invocation is independent — the chain forgets everything between calls. Memory changes that.
+
+```python
+from langchain_core.chat_history import InMemoryChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
+
+# Base chain (no memory)
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful flight booking assistant."),
+    ("placeholder", "{history}"),
+    ("human", "{input}"),
+])
+
+chain = prompt | model | StrOutputParser()
+
+# Add memory
+message_store = {}
+
+def get_session_history(session_id: str):
+    if session_id not in message_store:
+        message_store[session_id] = InMemoryChatMessageHistory()
+    return message_store[session_id]
+
+chain_with_memory = RunnableWithMessageHistory(
+    chain,
+    get_session_history,
+    input_messages_key="input",
+    history_messages_key="history",
+)
+
+# Conversation — the chain remembers
+config = {"configurable": {"session_id": "user_123"}}
+
+r1 = chain_with_memory.invoke(
+    {"input": "I need a flight from Paris to Tokyo on September 15th"},
+    config=config
+)
+
+# It knows we're talking about CDG→NRT on Sep 15
+r2 = chain_with_memory.invoke(
+    {"input": "Make it business class, and I prefer morning departures"},
+    config=config
+)
+```
+
+<ColabLink title="Exercise: Build a Conversational Chain with Memory" notebook="/notebooks/agent-dev/03-langchain-memory.ipynb" level="Basic" />
+
+### Memory Strategies
+
+Not all conversations are the same. Choose your strategy based on conversation length and cost sensitivity:
+
+| Strategy | How It Works | Best For |
+|---|---|---|
+| **Buffer** | Stores all messages verbatim | Short conversations (under 20 turns) |
+| **Window** | Keeps last N messages | Longer conversations with recent context |
+| **Summary** | LLM summarizes old messages | Very long conversations, cost-sensitive |
+| **Token Buffer** | Keeps messages within a token limit | Production with predictable costs |
+
+```python
+# Summary memory approach — when conversations get long
+from langchain_core.messages import SystemMessage
+
+def summarize_if_needed(messages, max_messages=20):
+    if len(messages) <= max_messages:
+        return messages
+
+    old_messages = messages[:-10]
+    recent_messages = messages[-10:]
+
+    summary = model.invoke([
+        SystemMessage(content="Summarize this conversation concisely:"),
+        *old_messages
+    ])
+
+    return [
+        SystemMessage(content=f"Previous conversation summary: {summary.content}"),
+        *recent_messages
+    ]
+```
+
+<KeyInsight>
+Memory is opt-in, not default. Chains are stateless. You add `RunnableWithMessageHistory` when you need conversation continuity. Choose your memory strategy based on conversation length and cost — buffer for short, summary for long.
+</KeyInsight>
+
+## When to Skip LangChain
+
+This is a critical question. Not every LLM application needs a framework.
+
+<Tabs>
+  <TabItem label="Use LangChain When">
+    - You need to **swap models** (Claude ↔ GPT ↔ local)
+    - You're building **multi-step chains** with reusable components
+    - You want **observability** out of the box (LangSmith)
+    - You need **memory** and **conversation management**
+    - Your app will grow in complexity
+    - Multiple people work on LLM features
+
+    LangChain's value scales with application complexity. Simple today, complex tomorrow? Start with the framework.
+  </TabItem>
+  <TabItem label="Skip LangChain When">
+    - You're making **simple API calls** to one model
+    - You want **full control** over every HTTP request
+    - The abstraction adds more complexity than it removes
+    - You're building a **throwaway prototype**
+
+    ```python
+    # Sometimes this is all you need:
+    import anthropic
+    
+    client = anthropic.Anthropic()
+    response = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "What is IATA code for Paris CDG?"}]
+    )
+    print(response.content[0].text)
+    ```
+  </TabItem>
+</Tabs>
+
+<PresenterNote>
+`03-langchain-memory.ipynb` notebook'unu açın ve memory'li conversation hücrelerini gösterin. İki mesaj gönderin, chain'in önceki context'i hatırladığını kanıtlayın. Sorun: "LangChain ekibi bile basit şeyler için LangChain gerekmediğini söylüyor. Framework ne zaman karşılığını verir?" Cevap: composability, model swap, ve Module 4'te yapacağımız graph'lar.
+</PresenterNote>
+
+<DeepDive title="Advanced: Custom Runnables, Parallel Execution, and Callbacks">
+
+### Custom Runnables
+
+Any function can become a pipe-compatible component:
+
+```python
+from langchain_core.runnables import RunnableLambda
+
+def enrich_with_flight_data(input_dict: dict) -> dict:
+    """Look up additional flight data and add it to the context."""
+    flight_number = input_dict.get("flight_number")
+    flight_data = flight_api.get_details(flight_number)
+    return {**input_dict, "flight_data": flight_data}
+
+enrichment_step = RunnableLambda(enrich_with_flight_data)
+
+# Use in a chain — enrichment runs before the prompt
+chain = enrichment_step | prompt | model | parser
+```
+
+### RunnableParallel — Concurrent Execution
+
+Run multiple chains simultaneously and combine results:
+
+```python
+from langchain_core.runnables import RunnableParallel
+
+parallel_chain = RunnableParallel(
+    analysis=disruption_analysis_chain,
+    sentiment=passenger_sentiment_chain,
+    cost_estimate=cost_estimation_chain,
+)
+
+# All three run concurrently — massive latency reduction
+results = parallel_chain.invoke({"flight": "AF1234", "delay": 180})
+# results = {"analysis": "...", "sentiment": "...", "cost_estimate": "..."}
+```
+
+### Callbacks for Observability
+
+Hook into every step of the chain for monitoring:
+
+```python
+from langchain_core.callbacks import BaseCallbackHandler
+
+class CostTracker(BaseCallbackHandler):
+    def __init__(self):
+        self.total_tokens = 0
+        self.total_cost = 0.0
+
+    def on_llm_end(self, response, **kwargs):
+        usage = response.llm_output.get("usage", {})
+        input_tokens = usage.get("input_tokens", 0)
+        output_tokens = usage.get("output_tokens", 0)
+        self.total_tokens += input_tokens + output_tokens
+        self.total_cost += (input_tokens * 0.003 + output_tokens * 0.015) / 1000
+
+tracker = CostTracker()
+result = chain.invoke(input_data, config={"callbacks": [tracker]})
+print(f"Tokens: {tracker.total_tokens}, Cost: ${tracker.total_cost:.4f}")
+```
+
+</DeepDive>
+
+## Key Takeaways
+
+<CardGrid>
+  <Card title="Framework, not library" icon="setting">
+    LangChain provides architecture and conventions. It controls the flow — you fill in the logic.
+  </Card>
+  <Card title="LCEL pipes compose" icon="right-arrow">
+    `prompt | model | parser` — components snap together. Every chain gets streaming, async, and tracing for free.
+  </Card>
+  <Card title="Memory is opt-in" icon="document">
+    Chains are stateless by default. Add `RunnableWithMessageHistory` when you need conversation continuity.
+  </Card>
+  <Card title="Know when to skip it" icon="warning">
+    Simple API calls don't need a framework. LangChain's value grows with complexity.
+  </Card>
+</CardGrid>
+
+## Next Up
+
+You've built linear chains — data flows in one direction. But what happens when step 3 should go to step 4A or 4B depending on the result? When you need loops, branching, human approval?
+
+That's where the pipe operator hits its limits. **Module 4: LangGraph** picks up exactly where chains leave off.
+
+<ColabLink title="Challenge: Build a Multi-Step Analysis Chain" notebook="/notebooks/agent-dev/03-langchain-memory.ipynb" level="Challenge" />

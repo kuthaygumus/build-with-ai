@@ -1,0 +1,642 @@
+---
+title: "Modül 4: LangGraph — Durumlu Agent'lar"
+description: "LangGraph'ın graf tabanlı mimarisiyle karar verme, durum yönetimi ve insan-döngüde kontrol içeren agent'lar geliştirin."
+---
+
+import DeepDive from '../../../../components/DeepDive.astro';
+import ColabLink from '../../../../components/ColabLink.astro';
+import ModuleHeader from '../../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../../components/PresenterNote.astro';
+import KeyInsight from '../../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="90 min" day={2} goal="Karar verme, durum yönetimi, insan-döngüde kontrol ve çoklu agent iş birliği içeren agent'lar geliştirin." />
+
+## Chain'ler Neden Yetmiyor
+
+Modül 3'te chain'ler geliştirdiniz — doğrusal diziler. Veri tek yönde akar. "Bu aksamayı analiz et" için işe yarar. "Bu aksamayı yönet" için tamamen yetersizdir.
+
+Neden? Çünkü yönetmek **kararlar** gerektirir.
+
+<FlowDiagram title="Problem: Chain'ler Karar Veremez">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📥</span>
+      <span class="node-label">Girdi</span>
+      <span class="node-desc">Aksama gelir</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Analiz</span>
+      <span class="node-desc">Ciddiyeti belirle</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Karar</span>
+      <span class="node-desc">Ciddi mi? Hafif mi? Kritik mi?</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+Karar noktasından sonra akış bölünmeli: hafif aksamalar otomatik çözülür, ciddi olanlar operasyona eskalasyona gider, kritik olanlar acil durum protokolünü tetikler. Doğrusal bir chain dallanamaz. Döngüleyemez. İlerlemeden önce insan onayını bekleyemez. Durumun geri kalanını korurken belirli bir adımı yeniden deneyemez.
+
+**LangGraph** bunların hepsini agent'ınızı bir **graf** olarak modelleyerek çözer — düğümler iş yapar, kenarlar akışı kontrol eder.
+
+<PresenterNote>
+`04-basic-graph.ipynb` notebook'unu Colab'da açın ama henüz çalıştırmayın. Sorun: "Takımınızda bir karar içeren bir workflow düşünün — 'yolcu premium ise X yap, değilse Y yap' gibi. Bunu Module 3'teki chain ile yapabilir misiniz?" Cevap: temiz bir şekilde hayır. "İşte graph'lara neden ihtiyacımız var — şimdi notebook'ta görelim."
+</PresenterNote>
+
+<KeyInsight>
+Chain'ler düz çizgilerdir. Gerçek iş akışlarında çatallar, döngüler ve kontrol noktaları vardır. LangGraph size hepsini modelleyecek graf yapısını verir — her adımda kalıcı durumla birlikte.
+</KeyInsight>
+
+## Dört Yapı Taşı
+
+LangGraph'ta tam olarak dört kavram var. Geri kalan her şey bunlardan türetilir.
+
+### 1. Durum (State) — Paylaşılan Bellek
+
+Durum, grafınız boyunca akan tipli veridir. Her düğüm onu okuyabilir ve yazabilir.
+
+```python
+from typing import Annotated
+from typing_extensions import TypedDict
+from langgraph.graph.message import add_messages
+
+class FlightDisruptionState(TypedDict):
+    messages: Annotated[list, add_messages]  # Accumulates conversation history
+    flight_number: str
+    delay_minutes: int
+    severity: str                # Set by the analysis node
+    affected_passengers: list    # Set by the data retrieval node
+    rebooking_plan: str          # Set by the planning node
+    human_approved: bool         # Set by the human-in-the-loop step
+```
+
+<Aside type="note">
+`Annotated[list, add_messages]` kalıbı kilit noktadır. `add_messages` bir **reducer**'dır — listeyi her seferinde değiştirmek yerine yeni mesajları ekler. Konuşma geçmişinin düğümler arasında üzerine yazılmadan birikmesini sağlayan budur.
+</Aside>
+
+### 2. Düğümler (Nodes) — İş Yapan Fonksiyonlar
+
+Her düğüm mevcut durumu alır, bir şey yapar ve durum güncellemelerini döndürür.
+
+```python
+from langchain_anthropic import ChatAnthropic
+
+model = ChatAnthropic(model="claude-sonnet-4-20250514")
+
+async def analyze_disruption(state: FlightDisruptionState) -> dict:
+    """Analyze the severity of a flight disruption."""
+    prompt = f"""Analyze this flight disruption:
+    Flight: {state['flight_number']}
+    Delay: {state['delay_minutes']} minutes
+    
+    Classify severity as: minor (under 60 min), moderate (60-180 min), 
+    severe (180-360 min), or critical (over 360 min).
+    Respond with ONLY the severity word."""
+
+    response = await model.ainvoke([{"role": "user", "content": prompt}])
+    return {"severity": response.content.strip().lower()}
+
+
+async def auto_resolve(state: FlightDisruptionState) -> dict:
+    """Handle minor disruptions automatically."""
+    return {
+        "rebooking_plan": f"Auto-resolved: {state['flight_number']} - "
+                          f"minor delay of {state['delay_minutes']}min. "
+                          f"Passengers notified via SMS.",
+        "messages": [{"role": "assistant",
+                      "content": "Minor disruption auto-resolved."}]
+    }
+
+
+async def escalate_to_ops(state: FlightDisruptionState) -> dict:
+    """Escalate severe disruptions to operations team."""
+    prompt = f"""Create a rebooking plan for flight {state['flight_number']}.
+    Severity: {state['severity']}, Delay: {state['delay_minutes']} minutes.
+    Consider: alternative flights, hotels, meal vouchers, premium priority."""
+
+    response = await model.ainvoke([{"role": "user", "content": prompt}])
+    return {
+        "rebooking_plan": response.content,
+        "messages": [{"role": "assistant",
+                      "content": "Escalated: Rebooking plan created for review."}]
+    }
+```
+
+### 3. Kenarlar (Edges) — Bağlantılar
+
+İki tür. **Normal kenarlar** her zaman A'dan B'ye gider. **Koşullu kenarlar** duruma göre sonraki düğümü seçer.
+
+```python
+# Normal edge — always goes this way
+graph.add_edge("analyze", "fetch_passengers")
+
+# Conditional edge — decides at runtime
+def route_by_severity(state: FlightDisruptionState) -> str:
+    if state["severity"] in ("minor",):
+        return "auto_resolve"
+    elif state["severity"] in ("moderate", "severe"):
+        return "escalate_to_ops"
+    else:
+        return "emergency_protocol"
+
+graph.add_conditional_edges(
+    "analyze",
+    route_by_severity,
+    {
+        "auto_resolve": "auto_resolve",
+        "escalate_to_ops": "escalate_to_ops",
+        "emergency_protocol": "emergency_protocol",
+    }
+)
+```
+
+### 4. Yaşam Döngüsü
+
+<Steps>
+1. **Tanımla** — Durum şemanızla bir `StateGraph` oluşturun
+2. **Düğüm ekle** — Fonksiyonları adlandırılmış düğümler olarak kaydedin
+3. **Kenar ekle** — Düğümleri normal veya koşullu kenarlarla bağlayın
+4. **Giriş noktası belirle** — Hangi düğüm ilk çalışacak
+5. **Derle** — Yürütülebilir bir `CompiledGraph`'a dönüştürün
+6. **Çağır** — Başlangıç durumuyla çalıştırın
+</Steps>
+
+## İlk Grafınızı Oluşturma
+
+Dört kavramın tümü, çalıştırılabilir bir grafta bir araya getirilmiş:
+
+```python
+from langgraph.graph import StateGraph, START, END
+from typing import Annotated
+from typing_extensions import TypedDict
+from langgraph.graph.message import add_messages
+from langchain_anthropic import ChatAnthropic
+
+class ResearchState(TypedDict):
+    messages: Annotated[list, add_messages]
+    topic: str
+    research_notes: str
+    summary: str
+
+model = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
+
+async def research(state: ResearchState) -> dict:
+    response = await model.ainvoke([
+        {"role": "system", "content": "You are a thorough researcher. "
+         "Provide detailed, factual notes about the given topic."},
+        {"role": "user", "content": f"Research this topic: {state['topic']}"}
+    ])
+    return {"research_notes": response.content}
+
+async def summarize(state: ResearchState) -> dict:
+    response = await model.ainvoke([
+        {"role": "system", "content": "Condense research notes into "
+         "a clear, 3-paragraph summary."},
+        {"role": "user", "content": f"Summarize:\n\n{state['research_notes']}"}
+    ])
+    return {
+        "summary": response.content,
+        "messages": [{"role": "assistant", "content": response.content}]
+    }
+
+# Build
+workflow = StateGraph(ResearchState)
+workflow.add_node("research", research)
+workflow.add_node("summarize", summarize)
+workflow.add_edge(START, "research")
+workflow.add_edge("research", "summarize")
+workflow.add_edge("summarize", END)
+
+graph = workflow.compile()
+
+result = await graph.ainvoke({
+    "topic": "Impact of AI agents on airline operations",
+    "messages": []
+})
+```
+
+<FlowDiagram title="Araştırma-Özetleme Grafı">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🚀</span>
+      <span class="node-label">START</span>
+      <span class="node-desc">Konu sağlandı</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔬</span>
+      <span class="node-label">Araştır</span>
+      <span class="node-desc">Detaylı notlar topla</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📋</span>
+      <span class="node-label">Özetle</span>
+      <span class="node-desc">3 paragrafa yoğunlaştır</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">END</span>
+      <span class="node-desc">Özet durumda</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<ColabLink title="Alıştırma: Araştırma-Özetleme Grafı Geliştirin" notebook="/notebooks/agent-dev/04-basic-graph.ipynb" level="Basic" />
+
+### Grafınızı Görselleştirme
+
+LangGraph grafınızı diyagram olarak çizer — hata ayıklama için paha biçilmez:
+
+```python
+# Generate a Mermaid diagram
+print(graph.get_graph().draw_mermaid())
+
+# Display as PNG in Jupyter
+from IPython.display import Image
+Image(graph.get_graph().draw_mermaid_png())
+```
+
+<PresenterNote>
+`04-basic-graph.ipynb` notebook'undaki Mermaid visualization hücresini çalıştırın. Graph yapısının koddan otomatik oluştuğunu gösterin. Sonra bir node ekleyin, bir edge değiştirin ve tekrar render edin. Visualization'ın kodla her zaman senkron olduğunu kanıtlayın. Sorun: "Bu graph'a yeni bir node eklesek akış nasıl değişir?"
+</PresenterNote>
+
+## Koşullu Yönlendirme: Karar Grafı
+
+Şimdi asıl güç. Gelen müşteri isteklerini sınıflandırıp özelleşmiş işleyicilere yönlendiren bir istek yönlendiricisi:
+
+```python
+from langgraph.graph import StateGraph, START, END
+
+class CustomerRequestState(TypedDict):
+    messages: Annotated[list, add_messages]
+    request_text: str
+    category: str        # "rebooking", "complaint", "inquiry"
+    response: str
+
+async def classify_request(state: CustomerRequestState) -> dict:
+    response = await model.ainvoke([
+        {"role": "system",
+         "content": "Classify the customer request into exactly one category: "
+                    "rebooking, complaint, or inquiry. Respond with ONLY the category."},
+        {"role": "user", "content": state["request_text"]}
+    ])
+    return {"category": response.content.strip().lower()}
+
+async def handle_rebooking(state: CustomerRequestState) -> dict:
+    response = await model.ainvoke([
+        {"role": "system",
+         "content": "You are a rebooking specialist. Find alternative flights. "
+                    "Be efficient and solution-oriented."},
+        {"role": "user", "content": state["request_text"]}
+    ])
+    return {"response": response.content}
+
+async def handle_complaint(state: CustomerRequestState) -> dict:
+    response = await model.ainvoke([
+        {"role": "system",
+         "content": "Handle complaints with empathy. Acknowledge, apologize, resolve."},
+        {"role": "user", "content": state["request_text"]}
+    ])
+    return {"response": response.content}
+
+async def handle_inquiry(state: CustomerRequestState) -> dict:
+    response = await model.ainvoke([
+        {"role": "system",
+         "content": "Answer travel inquiries. Be helpful and informative."},
+        {"role": "user", "content": state["request_text"]}
+    ])
+    return {"response": response.content}
+
+def route_request(state: CustomerRequestState) -> str:
+    category = state["category"]
+    if category == "rebooking":
+        return "handle_rebooking"
+    elif category == "complaint":
+        return "handle_complaint"
+    return "handle_inquiry"
+
+# Build the graph
+workflow = StateGraph(CustomerRequestState)
+workflow.add_node("classify", classify_request)
+workflow.add_node("handle_rebooking", handle_rebooking)
+workflow.add_node("handle_complaint", handle_complaint)
+workflow.add_node("handle_inquiry", handle_inquiry)
+
+workflow.add_edge(START, "classify")
+workflow.add_conditional_edges(
+    "classify", route_request,
+    {
+        "handle_rebooking": "handle_rebooking",
+        "handle_complaint": "handle_complaint",
+        "handle_inquiry": "handle_inquiry",
+    }
+)
+workflow.add_edge("handle_rebooking", END)
+workflow.add_edge("handle_complaint", END)
+workflow.add_edge("handle_inquiry", END)
+
+graph = workflow.compile()
+```
+
+<FlowDiagram title="Müşteri İstek Yönlendiricisi">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📥</span>
+      <span class="node-label">İstek</span>
+      <span class="node-desc">Müşteri mesajı gelir</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🏷️</span>
+      <span class="node-label">Sınıflandır</span>
+      <span class="node-desc">LLM kategoriyi belirler</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node warning">
+      <span class="node-icon">🔄</span>
+      <span class="node-label">Yeniden Rezervasyon</span>
+      <span class="node-desc">Alternatif uçuş bul</span>
+    </div>
+    <div class="flow-node danger">
+      <span class="node-icon">😤</span>
+      <span class="node-label">Şikayet</span>
+      <span class="node-desc">Empati + çözüm</span>
+    </div>
+    <div class="flow-node secondary">
+      <span class="node-icon">❔</span>
+      <span class="node-label">Bilgi Talebi</span>
+      <span class="node-desc">Bilgilendirici yanıt</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">Tüm işleyiciler → END</div>
+  </div>
+</FlowDiagram>
+
+<ColabLink title="Alıştırma: Koşullu Yönlendirme Grafı Geliştirin" notebook="/notebooks/agent-dev/05-conditional-graph.ipynb" level="Basic" />
+
+## İnsan-Döngüde (Human-in-the-Loop)
+
+Üretim agent'ları için, agent geri alınamaz eylemleri yürütmeden önce bir insanın onaylaması gerekir. LangGraph bunu `interrupt_before` ve `interrupt_after` ile birinci sınıf destekler.
+
+```python
+from langgraph.checkpoint.memory import MemorySaver
+
+checkpointer = MemorySaver()
+
+graph = workflow.compile(
+    checkpointer=checkpointer,
+    interrupt_before=["execute_rebooking"]  # Pause BEFORE this node
+)
+
+# Run until the interrupt
+config = {"configurable": {"thread_id": "request_001"}}
+result = await graph.ainvoke(initial_state, config)
+
+# Graph is paused. Show the plan to a human:
+print("Proposed rebooking plan:")
+print(result["rebooking_plan"])
+
+# Human approves... resume execution:
+result = await graph.ainvoke(None, config)
+```
+
+<FlowDiagram title="İnsan-Döngüde Kalıbı">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Analiz</span>
+      <span class="node-desc">Aksamayı değerlendir</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📋</span>
+      <span class="node-label">Planla</span>
+      <span class="node-desc">Yeniden rezervasyon planı oluştur</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">⏸️</span>
+      <span class="node-label">İnsan İncelemesi</span>
+      <span class="node-desc">Planı onayla veya değiştir</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">⚡</span>
+      <span class="node-label">Yürüt</span>
+      <span class="node-desc">Yeniden rezervasyonu uygula</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<Aside type="caution">
+`interrupt_before` ve `interrupt_after` bir **checkpointer** gerektirir. Checkpointer, graf durumunu kalıcı kılar, böylece daha sonra — hatta farklı bir süreçte bile — devam ettirilebilir. `MemorySaver` geliştirme için uygundur. Üretim için PostgreSQL veya Redis gerekir.
+</Aside>
+
+<KeyInsight>
+İnsan-döngüde, sonradan eklenen bir çözüm değildir. LangGraph'ın birinci sınıf bir özelliğidir. Graf durur, durumunu kalıcı kılar, insan girdisini bekler ve tam kaldığı yerden devam eder. İnsanların gerçekten güvendiği agent'ları böyle geliştirirsiniz.
+</KeyInsight>
+
+<PresenterNote>
+`05-conditional-graph.ipynb` notebook'undaki human-in-the-loop hücrelerini açın. Sorun: "Takımınız booking değiştiren bir agent'ı insan onayı olmadan deploy eder mi?" Çoğu hayır der. Interrupt pattern'ını notebook'ta çalıştırın — graph'ın nasıl durduğunu, state'i sakladığını ve onay sonrası devam ettiğini gösterin. "İşte production pattern'ı bu."
+</PresenterNote>
+
+## Çoklu Agent İş Birliği
+
+En güçlü LangGraph kalıbı: kalite sağlanana kadar yineleyen birden fazla uzmanlaşmış agent.
+
+```python
+class MultiAgentState(TypedDict):
+    messages: Annotated[list, add_messages]
+    task: str
+    research_output: str
+    review_feedback: str
+    final_report: str
+    iteration: int
+
+async def researcher(state: MultiAgentState) -> dict:
+    """Agent 1: Researches and produces a draft report."""
+    context = ""
+    if state.get("review_feedback"):
+        context = f"\n\nPrevious feedback to address:\n{state['review_feedback']}"
+
+    response = await model.ainvoke([
+        {"role": "system",
+         "content": "You are a thorough researcher. Produce a detailed report."},
+        {"role": "user",
+         "content": f"Task: {state['task']}{context}"}
+    ])
+    return {
+        "research_output": response.content,
+        "iteration": state.get("iteration", 0) + 1
+    }
+
+async def reviewer(state: MultiAgentState) -> dict:
+    """Agent 2: Reviews and provides feedback or approves."""
+    response = await model.ainvoke([
+        {"role": "system",
+         "content": "You are a critical reviewer. Evaluate for accuracy, "
+                    "completeness, clarity. If good enough, say APPROVED. "
+                    "Otherwise, provide specific feedback."},
+        {"role": "user",
+         "content": f"Review this report:\n\n{state['research_output']}"}
+    ])
+    return {"review_feedback": response.content}
+
+def should_continue(state: MultiAgentState) -> str:
+    if "APPROVED" in state["review_feedback"].upper():
+        return "finalize"
+    if state["iteration"] >= 3:
+        return "finalize"
+    return "revise"
+
+async def finalize(state: MultiAgentState) -> dict:
+    return {"final_report": state["research_output"]}
+
+# Build the multi-agent graph
+workflow = StateGraph(MultiAgentState)
+workflow.add_node("researcher", researcher)
+workflow.add_node("reviewer", reviewer)
+workflow.add_node("finalize", finalize)
+
+workflow.add_edge(START, "researcher")
+workflow.add_edge("researcher", "reviewer")
+workflow.add_conditional_edges(
+    "reviewer", should_continue,
+    {"revise": "researcher", "finalize": "finalize"}
+)
+workflow.add_edge("finalize", END)
+
+graph = workflow.compile()
+```
+
+<FlowDiagram title="Çoklu Agent Revizyon Döngüsü">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🚀</span>
+      <span class="node-label">START</span>
+      <span class="node-desc">Görev atandı</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔬</span>
+      <span class="node-label">Araştırmacı</span>
+      <span class="node-desc">Taslak rapor üretir</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">👁️</span>
+      <span class="node-label">İnceleyici</span>
+      <span class="node-desc">Eleştirir veya onaylar</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node danger">
+      <span class="node-icon">🔄</span>
+      <span class="node-label">Revize Et</span>
+      <span class="node-desc">Geri bildirimle araştırmacıya dön</span>
+    </div>
+    <div class="flow-arrow">veya</div>
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Sonlandır</span>
+      <span class="node-desc">Rapor onaylandı → END</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">↩ Zorla sonlandırma öncesi maksimum 3 revizyon döngüsü</div>
+  </div>
+</FlowDiagram>
+
+Bu bir **revizyon döngüsü** oluşturur. Araştırmacı taslak hazırlar, inceleyici eleştirir, araştırmacı revize eder. Maksimum 3 döngü veya inceleyici APPROVED diyene kadar. Bu kalıp yüksek kaliteli çıktılar üretmede son derece etkilidir.
+
+<ColabLink title="Challenge: Çoklu Agent Araştırma Sistemi Geliştirin" notebook="/notebooks/agent-dev/06-multi-agent.ipynb" level="Challenge" />
+
+<KeyInsight>
+Çoklu agent, daha fazla agent'a sahip olmak değildir. Birbirinin işini eleştiren uzmanlaşmış agent'lara sahip olmaktır. Revizyon döngüsü — taslak, inceleme, revizyon — tek başına çalışan bir agent'a göre tutarlı olarak daha iyi çıktı üretir.
+</KeyInsight>
+
+<DeepDive title="İleri Düzey: Alt Graflar, Kalıcılık ve LangSmith">
+
+### Alt Graflar — Modüler Agent Tasarımı
+
+Karmaşık agent'lar daha küçük graflardan oluşur. Alt graf, üst grafta düğüm olarak kullanılan derlenmiş bir graftır:
+
+```python
+# Subgraph for passenger handling
+passenger_workflow = StateGraph(PassengerState)
+passenger_workflow.add_node("check_tier", check_passenger_tier)
+passenger_workflow.add_node("find_alternatives", find_alternative_flights)
+passenger_workflow.add_node("rebook", execute_rebooking)
+passenger_subgraph = passenger_workflow.compile()
+
+# Use as a node in the parent graph
+main_workflow = StateGraph(DisruptionState)
+main_workflow.add_node("analyze", analyze_disruption)
+main_workflow.add_node("handle_passengers", passenger_subgraph)
+main_workflow.add_node("report", generate_report)
+```
+
+Her alt graf bağımsız olarak test edilebilir. Karmaşıklığı basit, doğrulanmış parçalardan birleştirin.
+
+### Kalıcı Kontrol Noktası
+
+Üretim için durum, süreç yeniden başlamalarında hayatta kalır:
+
+```python
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+
+async with AsyncPostgresSaver.from_conn_string(
+    "postgresql://user:pass@localhost:5432/agents"
+) as checkpointer:
+    graph = workflow.compile(checkpointer=checkpointer)
+    config = {"configurable": {"thread_id": "disruption_AF1234"}}
+    result = await graph.ainvoke(initial_state, config)
+```
+
+### LangSmith — Grafınızın İçini Görün
+
+Her düğüm yürütmesi, her LLM çağrısı, her durum güncellemesi — otomatik olarak izlenir:
+
+```python
+import os
+os.environ["LANGSMITH_TRACING"] = "true"
+os.environ["LANGSMITH_API_KEY"] = "your-key"
+os.environ["LANGSMITH_PROJECT"] = "agent-training"
+
+# Every invocation is now traced at smith.langchain.com
+```
+
+LangSmith şunları gösterir: düğüm yürütme sırası, LLM çağrısı başına girdi/çıktı, adım başına token kullanımı ve gecikme, hataların nerede oluştuğu, her kontrol noktasında tam durum. Hata ayıklama ve maliyet yönetimi için paha biçilmez.
+
+</DeepDive>
+
+## Temel Çıkarımlar
+
+<CardGrid>
+  <Card title="Graflar kararları mümkün kılar" icon="random">
+    Doğrusal chain'ler dallanamaz. Graflar, koşullu yönlendirme ve döngülerle gerçek iş akışlarını modeller.
+  </Card>
+  <Card title="Durum omurgadır" icon="document">
+    Paylaşılan tipli durum düğümler arasında akar. Reducer'lar güncellemelerin nasıl uygulandığını kontrol eder.
+  </Card>
+  <Card title="İnsan-döngüde yerleşiktir" icon="approve-check-circle">
+    `interrupt_before` + checkpointer = üretim kalitesinde insan gözetimi. Birinci sınıf, sonradan eklenen değil.
+  </Card>
+  <Card title="Çoklu agent = revizyon döngüleri" icon="setting">
+    Uzmanlaşmış agent'lar, kalite sağlanana kadar graf döngüleri aracılığıyla birbirinin çalışmasını eleştirir.
+  </Card>
+</CardGrid>
+
+## Sırada
+
+Tüm yapı taşlarına sahipsiniz: Araç bağlantısı için **MCP**, model etkileşimi için **LangChain**, durumlu orkestrasyon için **LangGraph**. Modül 5'te her şeyi üretime hazır bir agent'ta birleştiriyoruz ve zor problemleri ele alıyoruz — hata yönetimi, güvenlik, maliyet kontrolü.

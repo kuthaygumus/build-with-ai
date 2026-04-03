@@ -1,0 +1,590 @@
+---
+title: "Module 5: Production RAG"
+description: "Evaluation, scaling, monitoring, and the grand finale — Agent + RAG = Agentic RAG."
+---
+
+import DeepDive from '../../../components/DeepDive.astro';
+import ColabLink from '../../../components/ColabLink.astro';
+import ModuleHeader from '../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../components/PresenterNote.astro';
+import KeyInsight from '../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="60 min" day={2} goal="Evaluate, scale, and monitor RAG systems — then bring it all together with Agentic RAG." />
+
+## The Gap
+
+Your RAG demo works great in a notebook. Then you deploy it.
+
+<PresenterNote>
+`07-capstone-production.ipynb` notebook'unu Colab'da açın. Sorun: "Kim bir demo deploy edip beklemediği şekilde başarısız olmasını izledi?" Eller kalkar. "Demo ile production arasındaki boşluk — bu modül onu kapatıyor." Notebook'taki 4 failure senaryosunu sırayla okuyun. Her birinden sonra durun. Bunlar gerçek, varsayımsal değil.
+</PresenterNote>
+
+A user asks a question that retrieves **conflicting documents** and gets a contradictory answer. The system retrieves 10 chunks but the answer comes from only 1 — the rest **dilute** the quality. Latency spikes to 8 seconds. And you have no idea **why** the system gave a wrong answer last Tuesday.
+
+Four problems. This module gives you the tools to solve all of them.
+
+<KeyInsight>
+Demo-quality RAG answers the happy path. Production-quality RAG handles the edge cases, measures its own quality, and tells you when it's failing.
+</KeyInsight>
+
+## Evaluation with RAGAS
+
+You can't improve what you can't measure. **RAGAS** (Retrieval Augmented Generation Assessment) is the standard framework for evaluating RAG systems.
+
+### The Four Metrics
+
+<FlowDiagram title="RAGAS: What It Measures">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Retrieval Quality</span>
+      <span class="node-desc">Did we find the right docs?</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📊</span>
+      <span class="node-label">Context Precision</span>
+      <span class="node-desc">Are retrieved chunks relevant?</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.25rem;">
+    <div class="flow-node secondary" style="visibility: hidden;">
+      <span class="node-label">hidden</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📊</span>
+      <span class="node-label">Context Recall</span>
+      <span class="node-desc">Did we find ALL needed info?</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.75rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">✍️</span>
+      <span class="node-label">Generation Quality</span>
+      <span class="node-desc">Is the answer good?</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">📊</span>
+      <span class="node-label">Faithfulness</span>
+      <span class="node-desc">Is answer grounded in context?</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.25rem;">
+    <div class="flow-node secondary" style="visibility: hidden;">
+      <span class="node-label">hidden</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">📊</span>
+      <span class="node-label">Answer Relevancy</span>
+      <span class="node-desc">Does answer address the question?</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+| Metric | What It Asks | Low Score Means |
+|--------|-------------|-----------------|
+| **Context Precision** | Are the retrieved chunks relevant? | Too much noise in retrieval. Reduce k or add re-ranking. |
+| **Context Recall** | Did we find all needed information? | Missing relevant docs. Improve chunking or add multi-query. |
+| **Faithfulness** | Is the answer supported by the context? | Model is hallucinating beyond the context. Fix the prompt. |
+| **Answer Relevancy** | Does the answer address the question? | Model is going off-topic. Focus the system prompt. |
+
+### Implementation
+
+```python
+from ragas import evaluate
+from ragas.metrics import (
+    faithfulness,
+    answer_relevancy,
+    context_precision,
+    context_recall,
+)
+from datasets import Dataset
+
+eval_data = {
+    "question": [
+        "How do I authenticate with the Flight Offers API?",
+        "What is the baggage allowance for economy?",
+        "Can I modify a booking after ticketing?"
+    ],
+    "answer": [
+        "Use OAuth 2.0 client credentials flow with /v1/security/oauth2/token.",
+        "Economy baggage allowance is typically 23kg for checked bags.",
+        "Yes, modifications are possible through the Booking Management API."
+    ],
+    "contexts": [
+        ["The Flight API uses OAuth 2.0. Send credentials to /v1/security/oauth2/token..."],
+        ["Baggage policies vary by airline. Standard economy: 23kg checked, 8kg carry-on..."],
+        ["Post-ticketing changes require the Booking Management API. Some changes incur fees..."]
+    ],
+    "ground_truth": [
+        "OAuth 2.0 client credentials flow via /v1/security/oauth2/token endpoint.",
+        "23kg for checked luggage, varies by airline and fare class.",
+        "Yes, via Booking Management API, subject to airline rules and possible fees."
+    ]
+}
+
+results = evaluate(
+    Dataset.from_dict(eval_data),
+    metrics=[faithfulness, answer_relevancy, context_precision, context_recall],
+)
+print(results)
+# {'faithfulness': 0.92, 'answer_relevancy': 0.88,
+#  'context_precision': 0.65, 'context_recall': 0.90}
+```
+
+### Reading the Scores
+
+```text
+Faithfulness:       0.92  — Answers are well-grounded
+Answer Relevancy:   0.88  — Answers address the questions
+Context Precision:  0.65  — Too many irrelevant chunks retrieved
+Context Recall:     0.90  — Important info is being found
+
+Diagnosis: Retrieval finds the right stuff but also too much noise.
+Action: Add re-ranking or reduce k.
+```
+
+<PresenterNote>
+`07-capstone-production.ipynb` notebook'undaki RAGAS evaluation hücrelerini çalıştırın. Context Precision 0.65 = %35 gürültü. Sorun: "Module 4'ten hangi teknik bunu düzeltir?" Re-ranking. Notebook'ta cross-encoder ekleyin, tekrar çalıştırın ve precision'ın 0.85+'e çıktığını gösterin. Tekniğin işe yaradığının canlı kanıtı.
+</PresenterNote>
+
+<Aside type="tip">
+Run RAGAS on **every change** to your pipeline — new chunking strategy, different embedding model, added re-ranking. This is your regression test suite.
+</Aside>
+
+## Golden Test Sets
+
+Automated metrics are essential. But you also need **human-curated test cases** that represent your most important queries.
+
+```python
+golden_tests = [
+    {
+        "id": "auth-001",
+        "question": "How do I authenticate with the Flight Offers API?",
+        "expected_answer": "OAuth 2.0 client credentials via /v1/security/oauth2/token",
+        "expected_sources": ["flight-api-reference.pdf"],
+        "category": "authentication",
+        "difficulty": "easy",
+    },
+    {
+        "id": "error-001",
+        "question": "What does error code 4812 mean in Hotel Search?",
+        "expected_answer": "Invalid property code format",
+        "expected_sources": ["hotel-api-errors.md"],
+        "category": "error-handling",
+        "difficulty": "medium",
+    },
+    {
+        "id": "complex-001",
+        "question": "Can I change my flight to a different airline after check-in?",
+        "expected_answer": "Requires cancellation and rebooking. Cross-airline changes not supported.",
+        "expected_sources": ["booking-modifications.pdf", "check-in-rules.md"],
+        "category": "complex-workflow",
+        "difficulty": "hard",
+    },
+    # Aim for 50-100 tests covering all categories
+]
+```
+
+```python
+def run_golden_tests(rag_chain, tests, run_name="baseline"):
+    results = []
+    for test in tests:
+        answer = rag_chain.invoke(test["question"])
+        sources = [doc.metadata["source"] for doc in retriever.invoke(test["question"])]
+        source_hit = any(s in sources for s in test["expected_sources"])
+        results.append({"id": test["id"], "source_hit": source_hit, "answer": answer})
+
+    hits = sum(1 for r in results if r["source_hit"])
+    print(f"Run: {run_name} | Source Hit Rate: {hits}/{len(results)} ({hits/len(results)*100:.0f}%)")
+    return results
+
+# Compare pipeline versions
+run_golden_tests(rag_chain_v1, golden_tests, "v1_baseline")
+run_golden_tests(rag_chain_v2, golden_tests, "v2_with_reranking")
+```
+
+## Production Pitfalls
+
+Three patterns that kill production RAG systems. Each has a specific fix.
+
+### Pitfall 1: Lost in the Middle
+
+LLMs pay more attention to the **beginning and end** of the context. If the critical chunk is in the middle, it might be ignored.
+
+<FlowDiagram title="Lost in the Middle">
+  <div class="flow-row">
+    <div class="flow-node success">
+      <span class="node-icon">👁️</span>
+      <span class="node-label">Chunk 1</span>
+      <span class="node-desc">LLM pays attention</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node danger">
+      <span class="node-icon">😶</span>
+      <span class="node-label">Chunk 3: THE ANSWER</span>
+      <span class="node-desc">LLM might miss this!</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">👁️</span>
+      <span class="node-label">Chunk 5</span>
+      <span class="node-desc">LLM pays attention</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+**Fixes**: Reduce k (fewer chunks = less "middle"), re-rank so best chunk is always first, or use the bookend pattern — place the most relevant chunks at positions 1 and last.
+
+### Pitfall 2: Conflicting Sources
+
+Your knowledge base contains a 2023 doc saying "rate limit: 100/min" and a 2024 doc saying "500/min." RAG retrieves both. LLM picks one at random.
+
+**Fixes**: Add `version` and `date` metadata, filter for latest during retrieval, include "prefer the most recent source" in the prompt, and remove outdated docs during indexing.
+
+```python
+# Metadata-aware retrieval
+results = vector_store.similarity_search(
+    "rate limit for flight API",
+    k=5,
+    filter={"version": "v2"}  # only latest
+)
+```
+
+### Pitfall 3: Over-Retrieval
+
+Retrieving 20 chunks when only 2 are relevant. The signal drowns in noise.
+
+**Fixes**: Retrieve broadly (k=20), then re-rank and keep top 5. Or use MMR for diverse, relevant results.
+
+```python
+# Retrieve 20, re-rank, keep 5
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain_cohere import CohereRerank
+
+retriever = ContextualCompressionRetriever(
+    base_compressor=CohereRerank(top_n=5),
+    base_retriever=vector_store.as_retriever(search_kwargs={"k": 20})
+)
+```
+
+## Scaling for Production
+
+### Multi-Level Caching
+
+Cache at three levels to avoid redundant computation:
+
+```python
+from cachetools import TTLCache
+
+# Level 1: Don't re-embed the same query
+embedding_cache = TTLCache(maxsize=5000, ttl=86400)  # 24h
+
+# Level 2: Same query = same retrieved chunks
+retrieval_cache = TTLCache(maxsize=1000, ttl=3600)   # 1h
+
+# Level 3: Exact same question = same answer
+answer_cache = TTLCache(maxsize=500, ttl=1800)       # 30min
+```
+
+### Async Processing
+
+Don't block on sequential operations. Run dense and sparse retrieval in parallel:
+
+```python
+import asyncio
+
+async def async_rag(question: str) -> dict:
+    # Dense + sparse retrieval in parallel
+    dense_task = asyncio.create_task(
+        vector_store.asimilarity_search(question, k=10)
+    )
+    sparse_task = asyncio.create_task(
+        bm25_retriever.ainvoke(question)
+    )
+    dense_results, sparse_results = await asyncio.gather(dense_task, sparse_task)
+
+    # Merge, re-rank, generate
+    all_results = dense_results + sparse_results
+    reranked = reranker.compress_documents(all_results, question)
+    answer = await llm.ainvoke(prompt.format(
+        context="\n\n".join(d.page_content for d in reranked[:5]),
+        question=question
+    ))
+    return {"answer": answer.content, "sources": reranked[:5]}
+```
+
+### Cost Optimization
+
+| Component | Cost Driver | Optimization |
+|-----------|------------|--------------|
+| **Embedding** | Tokens embedded | Use `text-embedding-3-small` ($0.02/1M) over `large` ($0.13/1M) |
+| **LLM** | Context tokens | Reduce k, compress context, use `gpt-4o-mini` for simple queries |
+| **Vector DB** | Storage + queries | Dimension reduction, quantization |
+| **Re-ranking** | API calls | Only re-rank when initial confidence is low |
+
+```python
+# Cost-aware model routing
+def choose_model(context_length: int) -> str:
+    if context_length < 2000:
+        return "gpt-4o-mini"   # $0.15/1M input tokens
+    return "gpt-4o"             # $2.50/1M — handles long context better
+```
+
+## Monitoring
+
+Track what matters in production:
+
+```python
+class RAGMonitor:
+    def track_query(self, question: str, rag_fn):
+        start = time.time()
+        result = rag_fn(question)
+        latency = time.time() - start
+
+        self.log({
+            "question": question,
+            "latency_ms": latency * 1000,
+            "num_chunks": len(result.get("sources", [])),
+            "model": result.get("model", "unknown"),
+        })
+
+        if latency > 5.0:
+            logger.warning(f"High latency: {latency:.1f}s for: {question[:50]}")
+
+        return result
+```
+
+And the most valuable signal: **user feedback.**
+
+```python
+def collect_feedback(query_id: str, helpful: bool, comment: str = ""):
+    feedback_store.append({
+        "query_id": query_id,
+        "helpful": helpful,
+        "comment": comment,
+    })
+
+    # Alert on negative feedback trends
+    recent_negative = sum(1 for f in feedback_store[-100:] if not f["helpful"])
+    if recent_negative > 20:
+        logger.warning(f"High negative feedback: {recent_negative}/100")
+```
+
+<PresenterNote>
+`07-capstone-production.ipynb` notebook'undaki monitoring ve feedback hücrelerini gösterin. Sorun: "RAG sistemindeki en pahalı bug nedir?" Kullanıcıların rapor etmediği yanlış cevaplar. Sisteme güvenmeyi bırakırlar. Notebook'taki feedback collection ve alert threshold'larını çalıştırın. "Kullanıcılarınız vazgeçmeden önce sistemin ne zaman başarısız olduğunu bilmeniz gerekir."
+</PresenterNote>
+
+## Multi-Tenant Architecture
+
+In enterprise, different users see different documents. Enforce this at the **retrieval** level, not the generation level.
+
+```python
+class MultiTenantRetriever:
+    def retrieve(self, query: str, user_id: str, user_roles: list[str]):
+        return self.vector_store.similarity_search(
+            query,
+            k=10,
+            filter={
+                "$or": [
+                    {"access": "public"},
+                    {"owner": user_id},
+                    {"allowed_roles": {"$in": user_roles}},
+                ]
+            }
+        )
+```
+
+<Aside type="caution">
+**Security**: Always filter at retrieval, not generation. If a restricted document makes it into the LLM context, the model might reveal it regardless of system prompt instructions. The context window is the trust boundary.
+</Aside>
+
+## Capstone Exercise
+
+<ColabLink title="Capstone: Production-Ready RAG with Evaluation" notebook="/notebooks/rag/07-capstone-production.ipynb" level="Capstone" />
+
+Build a production-grade RAG system that includes everything:
+
+<Steps>
+1. Document loading with metadata preservation
+2. Recursive chunking with optimized parameters
+3. Hybrid retrieval (dense + BM25)
+4. Cross-encoder re-ranking
+5. Prompt with citation requirements
+6. RAGAS evaluation on a golden test set
+7. Latency tracking and error monitoring
+8. Cost estimation per query
+</Steps>
+
+This is the culmination of all 5 modules. Every technique, combined into one tested system.
+
+## Grand Finale: Agent + RAG = The Complete Picture
+
+We've now completed both training series. Let's see what they look like together.
+
+<FlowDiagram title="The Convergence">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🤖</span>
+      <span class="node-label">Part 1: Agents</span>
+      <span class="node-desc">Reason, decide, act</span>
+    </div>
+    <div class="flow-arrow animated">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📚</span>
+      <span class="node-label">Part 2: RAG</span>
+      <span class="node-desc">Retrieve, ground, cite</span>
+    </div>
+    <div class="flow-arrow animated">=</div>
+    <div class="flow-node success">
+      <span class="node-icon">⚡</span>
+      <span class="node-label">Agentic RAG</span>
+      <span class="node-desc">The gold standard</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<CardGrid>
+  <Card title="Agent Without RAG" icon="warning">
+    Can act, but hallucinates facts. Makes decisions on possibly wrong information. Dangerous in production.
+  </Card>
+  <Card title="RAG Without Agent" icon="warning">
+    Always retrieves, even when unnecessary. Single-pass, no reasoning loop. Can't handle complex questions.
+  </Card>
+  <Card title="Agentic RAG" icon="approve-check-circle">
+    Reasons about what it knows vs. what to look up. Retrieves strategically. Validates its own answers. Calls tools when knowledge isn't enough. The gold standard for enterprise AI.
+  </Card>
+</CardGrid>
+
+The Agentic RAG pattern from Module 4 is the bridge. An agent with tools that include a retriever, a re-ranker, and a validator — deciding at each step whether to search, reformulate, or answer. Add API tools, and it doesn't just answer questions — it takes action based on grounded information.
+
+<FlowDiagram title="The Complete Agentic RAG Architecture">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">👤</span>
+      <span class="node-label">User Goal</span>
+      <span class="node-desc">"Rebook passengers from cancelled AF1234"</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">Agent Reasons</span>
+      <span class="node-desc">What do I need to know?</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">📚</span>
+      <span class="node-label">RAG: Retrieve Policy</span>
+      <span class="node-desc">Rebooking rules, priority tiers</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">⚡</span>
+      <span class="node-label">Tool: Flight API</span>
+      <span class="node-desc">Find alternatives</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">⚡</span>
+      <span class="node-label">Tool: Booking API</span>
+      <span class="node-desc">Execute rebookings</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Goal Achieved</span>
+      <span class="node-desc">Passengers rebooked per policy</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow animated" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">↩ loop: reason → retrieve/act → evaluate → next step</div>
+  </div>
+</FlowDiagram>
+
+<PresenterNote>
+Kapanış anı. `07-capstone-production.ipynb` notebook'undaki son hücreyi çalıştırın — tüm tekniklerin birleştiği Agentic RAG demo'su. Agent Training Module 1'deki ilk demo'ya bağlayın: "O agent'ı hatırlıyor musunuz? Şimdi tüm dokümanlara, policy'lere ve tarihsel verilere RAG erişimi olduğunu düşünün. Sadece aksiyon almıyor — dayanaklı, kaynaklı bilgiyle aksiyon alıyor." Durun. Sindirmelerini sağlayın.
+</PresenterNote>
+
+<KeyInsight>
+The agent decides what to do. RAG ensures it knows the facts. Tools let it act on them. This triad — reasoning, knowledge, action — is the architecture pattern for enterprise AI. You now have all three.
+</KeyInsight>
+
+<DeepDive title="Advanced RAG Architecture Patterns at Scale">
+
+### Pattern 1: Router RAG
+
+Route queries to specialized pipelines based on domain:
+
+```python
+router_prompt = """Classify: flights, hotels, payments, or general.
+Query: {query}
+Category:"""
+
+pipelines = {
+    "flights": flight_rag_chain,
+    "hotels": hotel_rag_chain,
+    "payments": payment_rag_chain,
+    "general": general_rag_chain,
+}
+
+category = llm.invoke(router_prompt.format(query=question)).strip()
+answer = pipelines[category].invoke(question)
+```
+
+### Pattern 2: Corrective RAG (CRAG)
+
+After retrieval, evaluate whether the documents are actually relevant. If not, fall back to web search or acknowledge ignorance:
+
+```python
+def corrective_rag(question: str) -> str:
+    docs = retriever.invoke(question)
+    score = evaluate_relevance(question, docs)  # LLM-as-judge
+
+    if score >= 4:
+        return generate_from_context(question, docs)
+    elif score >= 2:
+        web_docs = web_search(question)
+        return generate_from_context(question, docs + web_docs)
+    else:
+        return "I don't have reliable information for this question."
+```
+
+### Pattern 3: Self-Reflective RAG
+
+Generate, then critique, then refine. Loop until the answer is fully supported:
+
+```python
+def self_reflective_rag(question: str, max_iterations: int = 3) -> str:
+    for i in range(max_iterations):
+        docs = retriever.invoke(question)
+        answer = generate_from_context(question, docs)
+        critique = llm.invoke(f"Is this answer fully supported by context? {answer}")
+
+        if "fully supported" in critique.content.lower():
+            return answer
+        question = llm.invoke(f"Refine query based on: {critique.content}").content
+
+    return answer  # best effort
+```
+
+These patterns compose. A Router RAG where each sub-pipeline uses Corrective RAG with Self-Reflection. Architecture follows requirements: accuracy needs, latency budget, cost constraints.
+
+</DeepDive>
+
+## What to Take Away
+
+From this module — and from the entire RAG series:
+
+1. **Measure everything.** RAGAS for automated evaluation, golden test sets for regression testing. If you can't measure it, you can't improve it — and you won't know when it breaks.
+
+2. **Production is about the edge cases.** Lost-in-the-middle, conflicting sources, over-retrieval, multi-tenant security. Each has specific, actionable fixes. Know them.
+
+3. **Agent + RAG + Tools = Enterprise AI.** The agent reasons. RAG provides grounded knowledge. Tools enable action. This triad is the architecture pattern you'll build production systems on.
+
+You started this training asking "what is RAG?" You're ending it knowing how to build, evaluate, scale, and operate production RAG systems — and how to combine them with agents for the full picture. That's the foundation. Now go build something real.

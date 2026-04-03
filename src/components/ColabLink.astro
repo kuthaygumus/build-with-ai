@@ -1,0 +1,124 @@
+---
+interface Props {
+  title: string;
+  notebook: string;
+  level?: 'Basic' | 'Challenge' | 'Capstone';
+}
+
+const { title, notebook, level = 'Basic' } = Astro.props;
+
+// ── Configure your GitHub repo here ──
+// Once you push to GitHub, set these values and all ColabLinks
+// will automatically generate direct Colab URLs.
+const GITHUB_OWNER = 'kgumus';               // GitHub username or org
+const GITHUB_REPO = 'build-with-ai';          // Repository name
+const GITHUB_BRANCH = 'main';                 // Branch name
+
+const colabUrl = `https://colab.research.google.com/github/${GITHUB_OWNER}/${GITHUB_REPO}/blob/${GITHUB_BRANCH}/public${notebook}`;
+
+const config: Record<string, { color: string; bg: string; icon: string }> = {
+  Basic:     { color: '#10b981', bg: 'rgba(16, 185, 129, 0.08)', icon: '📗' },
+  Challenge: { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.08)', icon: '📙' },
+  Capstone:  { color: '#ef4444', bg: 'rgba(239, 68, 68, 0.08)',  icon: '📕' },
+};
+
+const c = config[level];
+---
+
+<a
+  href={colabUrl}
+  target="_blank"
+  rel="noopener noreferrer"
+  class="colab-link"
+  style={`--lc: ${c.color}; --lbg: ${c.bg}`}
+>
+  <div class="colab-icon">
+    <span>{c.icon}</span>
+  </div>
+  <div class="colab-content">
+    <span class="colab-title">{title}</span>
+    <span class="colab-meta">
+      <span class="colab-badge">{level}</span>
+      <span class="colab-open">Open in Google Colab &#8599;</span>
+    </span>
+  </div>
+  <div class="colab-arrow">&#8594;</div>
+</a>
+
+<style>
+  .colab-link {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    margin: 1.25rem 0;
+    border: 1px solid var(--lc);
+    border-radius: 12px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--lbg);
+  }
+
+  .colab-link:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    border-color: var(--lc);
+  }
+
+  .colab-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    transition: transform 0.3s;
+  }
+
+  .colab-link:hover .colab-icon {
+    transform: scale(1.15);
+  }
+
+  .colab-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+  }
+
+  .colab-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .colab-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .colab-badge {
+    padding: 0.1rem 0.5rem;
+    border-radius: 1rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--lc);
+    border: 1px solid var(--lc);
+  }
+
+  .colab-open {
+    color: var(--sl-color-gray-3);
+    font-size: 0.75rem;
+  }
+
+  .colab-arrow {
+    color: var(--lc);
+    font-size: 1.2rem;
+    transition: transform 0.3s;
+    flex-shrink: 0;
+  }
+
+  .colab-link:hover .colab-arrow {
+    transform: translateX(4px);
+  }
+</style>

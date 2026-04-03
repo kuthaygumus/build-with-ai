@@ -1,0 +1,78 @@
+---
+interface Props {
+  duration: string;
+  day: number;
+  goal: string;
+}
+
+const { duration, day, goal } = Astro.props;
+---
+
+<div class="module-header">
+  <div class="module-meta">
+    <span class="module-day">Day {day}</span>
+    <span class="module-sep">|</span>
+    <span class="module-duration">{duration}</span>
+  </div>
+  <p class="module-goal">{goal}</p>
+</div>
+
+<style>
+  .module-header {
+    margin-bottom: 2.5rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.04));
+    border-radius: 12px;
+    border-left: 4px solid #6366f1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .module-header::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 200px;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.03));
+    pointer-events: none;
+  }
+
+  .module-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .module-day {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    padding: 0.2rem 0.75rem;
+    border-radius: 2rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .module-sep {
+    color: var(--sl-color-gray-4);
+    font-size: 0.8rem;
+  }
+
+  .module-duration {
+    color: var(--sl-color-gray-2);
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+
+  .module-goal {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--sl-color-gray-1);
+  }
+</style>

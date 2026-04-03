@@ -1,0 +1,352 @@
+---
+title: "Modül 1: Bilgi Problemi"
+description: "LLM'ler kurumsal bilgide neden başarısız olur, RAG aslında neyi çözer ve fine-tuning yerine ne zaman tercih edilmelidir."
+---
+
+import DeepDive from '../../../../components/DeepDive.astro';
+import ColabLink from '../../../../components/ColabLink.astro';
+import ModuleHeader from '../../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../../components/PresenterNote.astro';
+import KeyInsight from '../../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="40 min" day={1} goal="RAG'ın neden var olduğunu, neyi çözdüğünü ve fine-tuning yerine ne zaman tercih edilmesi gerektiğini anlayın." />
+
+## Önce Demo
+
+Tanımlardan önce, RAG'ın nasıl çalıştığını izleyelim.
+
+<PresenterNote>
+`03-e2e-rag.ipynb` notebook'unu Colab'da açın. İlk iki hücreyi çalıştırın: biri plain LLM'e soru sorar, diğeri RAG-powered sisteme aynı soruyu sorar. İki çıktıyı yan yana gösterin. Kontrastı izlemelerini sağlayın — henüz açıklamayın. Sorun: "İki cevap arasındaki fark ne? Neden biri kaynak gösteriyor, diğeri göstermiyor?"
+</PresenterNote>
+
+Dün güncellenen bir şirket içi politika belgeniz var. Düz bir LLM'e sorun:
+
+```text
+Q: What is the company's remote work policy for contractors in Q4 2026?
+A: I don't have specific information about your company's internal policies...
+```
+
+Şimdi aynı soruyu RAG destekli bir sisteme sorun:
+
+```text
+Q: What is the company's remote work policy for contractors in Q4 2026?
+A: According to the Contractor Policy (v3.2, updated Oct 1 2026),
+   contractors may work remotely up to 3 days per week, subject to
+   manager approval and compliance with local labor regulations.
+   [Source: contractor-policy-v3.2.pdf, page 14]
+```
+
+Aynı model. Aynı soru. Fark: birinin belgelerinize erişimi var. Diğerinin yok.
+
+**İşte RAG budur.** Daha akıllı bir model değil -- daha akıllı bir mimari.
+
+<KeyInsight>
+RAG, LLM'lere hiçbir zaman eğitilmedikleri bilgilere erişim sağlar. Model değişmez. Girdi değişir.
+</KeyInsight>
+
+## LLM'ler Kurumsal Bilgide Neden Başarısız Olur
+
+LLM'lerin üç temel kör noktası vardır. Her biri kurumsal kullanım için engeldir. RAG üçünü de çözer.
+
+### 1. Halüsinasyon
+
+LLM'ler bir şeyi "bilmez". Sonraki token'ı tahmin ederler. Eğitim verisi bir konuda yetersiz olduğunda, boşluğu makul görünen kurguyla doldururlar.
+
+```python
+# Ask about a specific Flight API version
+response = llm("What are the parameters for the FlightOffers v4 API?")
+# The LLM will confidently describe parameters that don't exist,
+# mixing real v2 params with invented ones.
+# It doesn't know the difference. It can't.
+```
+
+<PresenterNote>
+`03-e2e-rag.ipynb` notebook'undaki hallucination demo hücresini çalıştırın. Var olmayan bir internal API hakkında soru sorun ve LLM'in güvenle uydurduğunu gösterin. Sorun: "Bunu production'a deploy eder misiniz?" Oda sessizleşir. Sonra RAG versiyonunu çalıştırın — aynı soru, gerçek dokümana dayalı cevap. Fark apaçık.
+</PresenterNote>
+
+### 2. Eskimiş Bilgi
+
+Her modelin bir eğitim kesim tarihi vardır. Dünya ilerlemeye devam eder. Model ise etmez.
+
+Dahili belgeleriniz her gün değişir. Yeniden eğitim GPU-haftaları ve altı haneli maliyetler gerektirir. Bu bir iş akışı değil -- bir krizdir.
+
+### 3. Özel Verilere Sıfır Erişim
+
+LLM'ler açık internet üzerinde eğitilir. Dahili wiki'leriniz, müşteri sözleşmeleriniz, GDS dokümantasyonunuz, olay raporlarınız veya mimari kararlarınız hakkında **sıfır bilgiye** sahiptirler.
+
+Bu bir model kalitesi sorunu değildir. GPT-5 bunu çözmeyecek. Claude 4 bunu çözmeyecek. **Bu bir mimari sorunudur.** RAG mimari çözümdür.
+
+<FlowDiagram title="Üç Kör Nokta">
+  <div class="flow-row">
+    <div class="flow-node danger">
+      <span class="node-icon">🎭</span>
+      <span class="node-label">Halüsinasyon</span>
+      <span class="node-desc">Makul görünen kurgu üretir</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node danger">
+      <span class="node-icon">📅</span>
+      <span class="node-label">Eskimiş Bilgi</span>
+      <span class="node-desc">Eğitim kesim tarihi aylık gecikir</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node danger">
+      <span class="node-icon">🔒</span>
+      <span class="node-label">Özel Veri Yok</span>
+      <span class="node-desc">Belgelerinizi göremez</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow animated" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">↓ RAG üçünü de çözer</div>
+  </div>
+  <div class="flow-row" style="justify-content: center;">
+    <div class="flow-node success">
+      <span class="node-icon">📚</span>
+      <span class="node-label">RAG</span>
+      <span class="node-desc">Yanıtları gerçek belgelere dayandırır</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+## RAG Nedir -- 30 Saniyede
+
+**Retrieval-Augmented Generation (Erişimle Güçlendirilmiş Üretim).** Modelin eğitimden "hatırladığı" bilgilere güvenmek yerine, ilgili belgeleri alıp prompt'a enjekte edersiniz.
+
+Model belgelerinizi okur, sonra yanıtlar. Her seferinde. Güncel veri. Kaynak gösterimli.
+
+<FlowDiagram title="RAG Akışı">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Soru</span>
+      <span class="node-desc">Kullanıcı bir şey sorar</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Erişim (Retrieve)</span>
+      <span class="node-desc">İlgili chunk'ları bul</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📄</span>
+      <span class="node-label">Güçlendirme (Augment)</span>
+      <span class="node-desc">Belgeleri prompt'a enjekte et</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Üretim (Generate)</span>
+      <span class="node-desc">Dayanaklı yanıt + kaynaklar</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+Kilit nokta: **LLM tüm bilgi tabanınızı asla görmez.** Yalnızca en ilgili birkaç chunk'ı, soruyla birlikte enjekte edilmiş olarak görür.
+
+```python
+# RAG in 10 lines of pseudocode
+def rag_answer(question: str) -> str:
+    # 1. Find relevant documents
+    relevant_docs = vector_store.similarity_search(question, k=5)
+
+    # 2. Build prompt with context
+    context = "\n\n".join([doc.page_content for doc in relevant_docs])
+    prompt = f"""Answer based ONLY on this context. If unsure, say so.
+
+Context:
+{context}
+
+Question: {question}"""
+
+    # 3. Generate grounded answer
+    return llm.invoke(prompt)
+```
+
+<PresenterNote>
+`03-e2e-rag.ipynb` notebook'undaki RAG pseudocode hücresini gösterin. Satır satır geçin. Vurgulayın: LLM aynı, sihir 2. satırdaki similarity_search'te. Sorun: "similarity_search arka planda ne yapıyor sizce?" 1-2 tahmin alın. "İşte Module 2'de `01-embeddings-viz.ipynb` ile bunu derinlemesine öğreneceğiz."
+</PresenterNote>
+
+## RAG vs Fine-Tuning
+
+Bu herkesin sorduğu sorudur. İşte karar noktası:
+
+| | RAG | Fine-Tuning |
+|---|---|---|
+| **Amaç** | Modelin bir şeyi **bilmesi** gerekiyor | Modelin farklı **davranması** gerekiyor |
+| **Veri güncelliği** | Gerçek zamanlı (istediğiniz zaman yeniden indeksleyin) | Eskir (yeniden eğitim gerektirir) |
+| **Kaynak gösterimi** | Yerleşik (hangi belgeden geldiğini bilirsiniz) | Mümkün değil |
+| **Maliyet** | Düşük (embedding + depolama) | Yüksek (GPU saatleri) |
+| **Halüsinasyon kontrolü** | Güçlü (kaynaklara dayalı) | Zayıf (hâlâ serbestçe üretir) |
+| **En uygun olduğu alan** | Bilgi erişimi, Soru-Cevap, arama | Ton, format, alan dili |
+
+<KeyInsight>
+Modelin bir şeyi **bilmesi** gerektiğinde RAG kullanın. Modelin farklı **davranması** gerektiğinde fine-tuning kullanın. Canlı ortamda genellikle ikisini birden kullanırsınız.
+</KeyInsight>
+
+<FlowDiagram title="Hangisini Ne Zaman Kullanmalı">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Belirli belgeler mi lazım?</span>
+      <span class="node-desc">Politikalar, API'ler, sözleşmeler</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">📚</span>
+      <span class="node-label">RAG</span>
+      <span class="node-desc">Eriş ve dayandır</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Farklı bir ton mu lazım?</span>
+      <span class="node-desc">Stil, format, alan jargonu</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">🎯</span>
+      <span class="node-label">Fine-Tuning</span>
+      <span class="node-desc">Davranışı modele eğit</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Hiçbiri mi?</span>
+      <span class="node-desc">Genel yetenek yeterli</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">💬</span>
+      <span class="node-label">Prompt Mühendisliği</span>
+      <span class="node-desc">Daha iyi bir prompt yazın</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+## Gerçek Kullanım Alanları -- Sizin Dünyanız
+
+Bir seyahat teknolojisi şirketinin içinde zaten var olan verileri düşünün:
+
+<CardGrid>
+  <Card title="GDS Dokümantasyonu" icon="document">
+    Binlerce sayfa Cryptic komutu, API spesifikasyonu, entegrasyon kılavuzu. Geliştiriciler bunları her gün araştırıyor. RAG, bunları doğal dilde sorgulanabilir hale getirir.
+  </Card>
+  <Card title="Müşteri Desteği" icon="comment">
+    Destek temsilcileri, ürün belgeleri, sorun giderme kılavuzları ve geçmiş destek biletlerine dayalı yapay zeka destekli yanıtlar alır. Daha hızlı çözüm, daha az eskalasyon.
+  </Card>
+  <Card title="Olay Sonrası Raporları" icon="warning">
+    Geçmiş kesintiler, kök nedenler, düzeltme adımları. Sabah 3'te bir şey bozulduğunda, nöbetçi mühendis sorar: "Bu daha önce oldu mu?" RAG yanıtı bulur.
+  </Card>
+  <Card title="Dahili Wiki'ler" icon="open-book">
+    Mühendislik standartları, mimari kararlar, oryantasyon belgeleri. Yeni çalışanlar soru sorar, RAG wiki'den yanıtlar -- sayfa referanslarıyla birlikte.
+  </Card>
+</CardGrid>
+
+<PresenterNote>
+Sorun: "Bu use case'lerden hangisi takımınıza en çok zaman kazandırır?" 2-3 cevap alın. Bunlar eğitimin geri kalanı için zihinsel çapalar olacak. `03-e2e-rag.ipynb` notebook'unda bu use case'lerden birini end-to-end göstereceğimizi söyleyin.
+</PresenterNote>
+
+## İndeksleme Aşaması -- Sorgulardan Önce Ne Olur
+
+RAG herhangi bir şeyi yanıtlayabilmeden önce, bilgi tabanınızı hazırlarsınız. Bu çevrimdışı olarak bir kez yapılır:
+
+<FlowDiagram title="Çevrimdışı İndeksleme Pipeline'ı">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📄</span>
+      <span class="node-label">Yükle</span>
+      <span class="node-desc">PDF, web, markdown, API</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">✂️</span>
+      <span class="node-label">Chunk'la</span>
+      <span class="node-desc">Odaklı parçalara böl</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧮</span>
+      <span class="node-label">Embedding Oluştur</span>
+      <span class="node-desc">Metni vektörlere dönüştür</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">💾</span>
+      <span class="node-label">Depola</span>
+      <span class="node-desc">Vektör veritabanına kaydet</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+```python
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
+from langchain_chroma import Chroma
+
+# 1. Load
+docs = PyPDFLoader("flight-api-guide.pdf").load()
+
+# 2. Chunk
+chunks = RecursiveCharacterTextSplitter(
+    chunk_size=1000, chunk_overlap=200
+).split_documents(docs)
+
+# 3. Embed + Store
+vector_store = Chroma.from_documents(
+    documents=chunks,
+    embedding=OpenAIEmbeddings(model="text-embedding-3-small"),
+    persist_directory="./chroma_db"
+)
+
+print(f"Indexed {len(chunks)} chunks from {len(docs)} pages")
+```
+
+Gelecek modüllerde her adıma derinlemesine dalacağız. Şimdilik akışı hatırlayın: **Yükle, Chunk'la, Embedding Oluştur, Depola.**
+
+## Sonraki Adımlar
+
+Bu modül size **neden**'i verdi. Geri kalanı size **nasıl**'ı verir:
+
+| Modül | Konu | Ne İnşa Edeceksiniz |
+|-------|------|---------------------|
+| 2 | Embedding'ler ve Vektör Dünyası | Metin embedding'i, semantik arama, anlam görselleştirme |
+| 3 | RAG Pipeline'ı | Sıfırdan uçtan uca tam bir RAG sistemi |
+| 4 | Gelişmiş RAG | HyDE, re-ranking, agentic RAG |
+| 5 | Prodüksiyon RAG | Değerlendirme, ölçeklendirme, izleme, büyük final |
+
+<DeepDive title="RAG'ın Akademik Kökenleri">
+
+RAG, 2020 yılında Facebook AI Research'teki Patrick Lewis ve arkadaşları tarafından yayımlanan **"Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks"** makalesinde tanıtılmıştır.
+
+Temel katkı: önceden eğitilmiş bir seq2seq modeli (BART) ile yoğun bir retriever'ı (DPR) birleştirip uçtan uca eğitmek. Retriever ve generator, neyin erişileceğini ve nasıl üretileceğini ortaklaşa optimize eder.
+
+Modern RAG önemli ölçüde ayrışmıştır. Günümüz sistemleri donmuş LLM'ler (uçtan uca eğitim yok), FAISS yerine vektör veritabanları ve fine-tuned generator'lar yerine prompt mühendisliği kullanır. "RAG" terimi, belirli bir mimariden bir **tasarım kalıbına** evrilmiştir -- üretimi güçlendirmek için harici bilgi erişen herhangi bir sistem.
+
+**RAG soy ağacındaki önemli makaleler:**
+1. **DPR** (Karpukhin ve ark., 2020) -- Dense Passage Retrieval
+2. **RAG** (Lewis ve ark., 2020) -- Orijinal makale
+3. **RETRO** (Borgeaud ve ark., 2022) -- Ölçekte retrieval ile güçlendirilmiş transformer'lar
+4. **Self-RAG** (Asai ve ark., 2023) -- LLM ne zaman erişeceğine kendisi karar verir
+5. **CRAG** (Yan ve ark., 2024) -- Erişim değerlendirmeli Düzeltici RAG
+
+</DeepDive>
+
+## Önemli Çıkarımlar
+
+Üç şey:
+
+1. **LLM'lerin üç kör noktası vardır** -- halüsinasyon, eskimiş bilgi, özel veriye erişim yok. RAG üçünü de modeli değiştirmeden, girdiyi değiştirerek düzeltir.
+
+2. **RAG = eriş, sonra üret.** İlgili belgeleri bul, prompt'a enjekte et, modelin kanıta dayalı yanıt vermesini sağla. Basit konsept, güçlü sonuçlar.
+
+3. **RAG vs fine-tuning bir yarış değildir.** RAG bilgi içindir. Fine-tuning davranış içindir. Hangi sorunu çözdüğünüzü bilin.
+
+## Sıradaki
+
+İlk pratik soru: "similarity_search" gerçekte nasıl çalışır? Metni, anlamı yakalayan sayılara nasıl dönüştürürsünüz? **Modül 2: Embedding'ler ve Vektör Dünyası.**

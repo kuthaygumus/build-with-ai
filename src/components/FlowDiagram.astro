@@ -1,0 +1,11 @@
+---
+interface Props {
+  title?: string;
+}
+const { title } = Astro.props;
+---
+
+<div class="flow-diagram">
+  {title && <div class="diagram-title">{title}</div>}
+  <slot />
+</div>

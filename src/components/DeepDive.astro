@@ -1,0 +1,85 @@
+---
+interface Props {
+  title?: string;
+}
+
+const { title = 'Deep Dive' } = Astro.props;
+---
+
+<details class="deep-dive">
+  <summary>{title}</summary>
+  <div class="deep-dive-content">
+    <slot />
+  </div>
+</details>
+
+<style>
+  .deep-dive {
+    margin: 1.5rem 0;
+    border: 1px solid rgba(99, 102, 241, 0.15);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .deep-dive:hover {
+    border-color: rgba(99, 102, 241, 0.3);
+  }
+
+  .deep-dive summary {
+    padding: 0.85rem 1.25rem;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.06), rgba(139, 92, 246, 0.04));
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--sl-color-white);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    transition: background 0.3s;
+    user-select: none;
+  }
+
+  .deep-dive summary:hover {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.07));
+  }
+
+  .deep-dive summary::before {
+    content: '🔬';
+    font-size: 1rem;
+  }
+
+  .deep-dive summary::after {
+    content: '›';
+    margin-left: auto;
+    font-size: 1.2rem;
+    font-weight: 300;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    color: rgba(99, 102, 241, 0.6);
+  }
+
+  .deep-dive[open] summary::after {
+    transform: rotate(90deg);
+  }
+
+  .deep-dive[open] summary {
+    border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+  }
+
+  .deep-dive-content {
+    padding: 1.25rem;
+    animation: slideDown 0.3s ease-out;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+</style>

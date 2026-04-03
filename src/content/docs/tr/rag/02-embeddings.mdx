@@ -1,0 +1,407 @@
+---
+title: "Modül 2: Embedding'ler ve Vektör Dünyası"
+description: "Anlam nasıl geometriye dönüşür -- embedding'ler, benzerlik metrikleri, vektör veritabanları ve ilk semantik aramanız."
+---
+
+import DeepDive from '../../../../components/DeepDive.astro';
+import ColabLink from '../../../../components/ColabLink.astro';
+import ModuleHeader from '../../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../../components/PresenterNote.astro';
+import KeyInsight from '../../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="60 min" day={1} goal="Embedding'leri sezgisel olarak anlayın, vektör depolarıyla çalışın ve ilk semantik aramanızı oluşturun." />
+
+## Önce Demo
+
+Herhangi bir tanım yapmadan önce, şunu izleyin.
+
+<PresenterNote>
+`01-embeddings-viz.ipynb` notebook'unu Colab'da açın. İlk 3 hücreyi çalıştırarak 8-10 travel cümlesini embed edin. t-SNE plot hücresini çalıştırın ve 2D görselleştirmeyi gösterin. Flight cümleleri bir arada, hotel cümleleri bir arada, billing bir arada. Matematiği henüz açıklamayın. Sadece anlamın geometriye dönüştüğünü görmelerini sağlayın. Sorun: "Bu kümelenmeyi model'a kim öğretti?"
+</PresenterNote>
+
+Seyahat hakkında sekiz cümle. Etiket yok. Kategori yok. Sadece bir modele beslenen metin.
+
+Model sayılar döndürür. Bu sayıları çizeriz. Ve bir anda: uçuş cümleleri bir arada kümelenir. Otel cümleleri bir arada kümelenir. İptaller bir arada kümelenir.
+
+Kimse modele bu kategorilerin var olduğunu söylemedi. **"Geciken uçuş" ile "geç varış"ın aynı anlama geldiğini -- ve "çikolatalı kek"in gelmediğini kendi başına öğrendi.**
+
+İşte bu bir embedding'dir. Koordinat olarak anlam. Mesafe olarak benzerlik.
+
+<KeyInsight>
+Embedding, metni bir sayı listesine -- bir vektöre -- dönüştürür; burada benzer anlamlar yakın koordinatlar üretir. RAG retrieval'ının tüm temeli budur.
+</KeyInsight>
+
+## Embedding'ler Somut Olarak Nedir
+
+Bir embedding bir sayı listesidir. Genellikle 768 ile 3072 arası sayı. Her cümle bir vektör olur:
+
+```python
+from openai import OpenAI
+
+client = OpenAI()
+response = client.embeddings.create(
+    model="text-embedding-3-small",
+    input="The flight from CDG to NRT was delayed 3 hours"
+)
+
+vector = response.data[0].embedding
+print(f"Dimensions: {len(vector)}")   # 1536
+print(f"First 5 values: {vector[:5]}")  # [0.012, -0.034, 0.087, ...]
+```
+
+Uçuş gecikmeleri hakkında iki cümle, 1536 boyutlu uzayda **birbirine yakın** vektörler üretecektir. Çikolatalı kek hakkında bir cümle ise **uzakta** olacaktır. Bu yakınlık ölçülebilir -- ve retrieval'ı çalıştıran tam olarak budur.
+
+<FlowDiagram title="Metinden Vektöre, Vektörden Benzerliğe">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">✈️</span>
+      <span class="node-label">"Flight was delayed"</span>
+      <span class="node-desc">[0.12, -0.34, 0.87, ...]</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">📐</span>
+      <span class="node-label">Kosinüs Benzerliği</span>
+      <span class="node-desc">0.94 -- çok benzer!</span>
+    </div>
+    <div class="flow-arrow animated">←</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">✈️</span>
+      <span class="node-label">"Plane arrived late"</span>
+      <span class="node-desc">[0.11, -0.32, 0.85, ...]</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<PresenterNote>
+`01-embeddings-viz.ipynb` notebook'undaki cosine similarity matrisini gösterin. Sorun: "Bu neden keyword search'ten daha iyi?" Cevaplar alın. Punchline: "delayed flight" keyword araması "late arrival" yazan dokümanı bulamaz. `02-vector-search.ipynb` notebook'unda bunu canlı kanıtlayacağız — aynı sorgu, keyword vs semantic sonuçları yan yana.
+</PresenterNote>
+
+## Benzerlik Metrikleri
+
+Vektörleriniz olduğunda, ne kadar yakın olduklarını ölçmeniz gerekir. Üç yaklaşım, bir kazanan.
+
+### Kosinüs Benzerliği -- Varsayılan
+
+İki vektör arasındaki **açıyı** ölçer. Büyüklüğü yok sayar, yöne odaklanır.
+
+```python
+import numpy as np
+
+def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+# Flight delay vectors — similar meaning
+vec_delay = np.array([0.12, -0.34, 0.87])
+vec_late  = np.array([0.11, -0.32, 0.85])
+
+# Chocolate cake vector — different meaning
+vec_cake  = np.array([0.78,  0.56, -0.12])
+
+print(cosine_similarity(vec_delay, vec_late))   # 0.999 — almost identical
+print(cosine_similarity(vec_delay, vec_cake))   # 0.12  — completely different
+```
+
+**Aralık**: -1 (zıt anlam) ile +1 (aynı anlam) arası. Zamanın %90'ında bunu kullanacaksınız.
+
+### Nokta Çarpım ve Öklidyen Mesafe
+
+| Metrik | Ne Ölçer | Ne Zaman Kullanılır |
+|--------|----------|---------------------|
+| **Kosinüs Benzerliği** | Vektörler arası açı | Metin için varsayılan. Çoğu embedding modeli vektörleri normalize eder, bu da kosinüsü nokta çarpıma eşdeğer kılar. |
+| **Nokta Çarpım** | Bir vektörün diğeri üzerindeki projeksiyonu | Büyüklüğün önemli olduğu durumlar (ilgililik puanlama). Hesaplaması daha hızlı. |
+| **Öklidyen Mesafe** | Doğrusal mesafe | Düşük boyutlu uzaylar, kümeleme. Metin için daha az yaygın. |
+
+<Aside type="tip">
+OpenAI'ın embedding modelleri **normalize edilmiş vektörler** üretir -- yani kosinüs benzerliği ve nokta çarpım aynı sıralamayı verir. Vektör veritabanınızın hangisi için optimize ettiğini kullanın.
+</Aside>
+
+## Embedding Modelleri
+
+Tüm embedding modelleri eşit değildir. Seçiminiz retrieval kalitesini, maliyeti ve hızı etkiler.
+
+<Tabs>
+  <TabItem label="OpenAI">
+```python
+from openai import OpenAI
+
+client = OpenAI()
+response = client.embeddings.create(
+    model="text-embedding-3-small",  # 1536 dims, $0.02/1M tokens
+    input="Flight Offers API authentication"
+)
+embedding = response.data[0].embedding
+```
+
+| Model | Boyut | Maliyet/1M token | Kalite |
+|-------|-------|------------------|--------|
+| `text-embedding-3-small` | 1536 | $0.02 | İyi -- eğitim varsayılanımız |
+| `text-embedding-3-large` | 3072 | $0.13 | En iyi -- prodüksiyon kullanımı |
+  </TabItem>
+
+  <TabItem label="Cohere">
+```python
+import cohere
+
+co = cohere.Client("your-api-key")
+response = co.embed(
+    texts=["Flight Offers API authentication"],
+    model="embed-english-v3.0",
+    input_type="search_document"  # or "search_query" for queries
+)
+```
+
+Cohere, `search_document` (indeksleme için) ve `search_query` (sorgulama için) arasında ayrım yapar. Bu asimetrik kodlama, retrieval kalitesini artırır.
+  </TabItem>
+
+  <TabItem label="Açık Kaynak">
+```python
+from sentence_transformers import SentenceTransformer
+
+# Free, runs locally, no API key
+model = SentenceTransformer("all-MiniLM-L6-v2")
+embeddings = model.encode([
+    "Flight Offers API",
+    "Hotel reservation system",
+    "Chocolate cake recipe"
+])
+print(f"Shape: {embeddings.shape}")  # (3, 384)
+```
+
+| Model | Boyut | Dosya Boyutu | Kalite |
+|-------|-------|--------------|--------|
+| `all-MiniLM-L6-v2` | 384 | 80MB | İyi, hızlı |
+| `all-mpnet-base-v2` | 768 | 420MB | Daha iyi |
+| `BAAI/bge-large-en-v1.5` | 1024 | 1.3GB | Ticari seviyeye yakın |
+
+Güncel karşılaştırmalar için [MTEB Liderlik Tablosu](https://huggingface.co/spaces/mteb/leaderboard)'na bakın.
+  </TabItem>
+</Tabs>
+
+## Vektör Veritabanları -- Neden İhtiyacınız Var
+
+"Embedding'leri Postgres'te depolayıp benzerliği hesaplayamaz mıyım?"
+
+Teknik olarak evet. 1536 boyutlu 1 milyon belgede, sorgu başına 1.5 milyar kayan noktalı sayı karşılaştırması demektir. Yanıt süresi: saniyeler. Kabul edilemez.
+
+Vektör veritabanları, milyarlarca vektörü milisaniyeler içinde aramak için **Yaklaşık En Yakın Komşu (ANN)** algoritmalarını kullanır. Çok küçük bir doğruluk kaybı karşılığında muazzam hız kazanırlar.
+
+<FlowDiagram title="Vektör Veritabanları Neden Var">
+  <div class="flow-row">
+    <div class="flow-node danger">
+      <span class="node-icon">🐌</span>
+      <span class="node-label">Kaba Kuvvet</span>
+      <span class="node-desc">Her vektörü karşılaştır. O(n). Saniyeler.</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">⚡</span>
+      <span class="node-label">ANN Araması</span>
+      <span class="node-desc">Akıllı indeksleme. O(log n). Milisaniyeler.</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+### Mevcut Seçenekler
+
+<Tabs>
+  <TabItem label="Chroma">
+```python
+import chromadb
+from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+
+client = chromadb.PersistentClient(path="./chroma_db")
+
+collection = client.get_or_create_collection(
+    name="travel_docs",
+    embedding_function=OpenAIEmbeddingFunction(
+        api_key="your-key",
+        model_name="text-embedding-3-small"
+    )
+)
+
+# Add documents — Chroma handles embedding
+collection.add(
+    documents=[
+        "Flight Offers API returns available flights for a given route.",
+        "Hotel Search API supports filtering by star rating.",
+        "Booking API requires a valid PNR for confirmation."
+    ],
+    ids=["doc1", "doc2", "doc3"],
+    metadatas=[
+        {"source": "flight-api.md", "category": "flights"},
+        {"source": "hotel-api.md", "category": "hotels"},
+        {"source": "booking-api.md", "category": "booking"}
+    ]
+)
+
+# Semantic search
+results = collection.query(
+    query_texts=["How do I search for flights?"],
+    n_results=2
+)
+```
+
+**En uygun olduğu alan**: Prototipleme, öğrenme, küçük-orta ölçekli veri setleri. Açık kaynak, gömülü, sunucu gerektirmez.
+  </TabItem>
+
+  <TabItem label="pgvector">
+```sql
+-- Enable the extension
+CREATE EXTENSION vector;
+
+-- Create table with vector column
+CREATE TABLE documents (
+    id SERIAL PRIMARY KEY,
+    content TEXT,
+    source TEXT,
+    embedding vector(1536)
+);
+
+-- Create ANN index
+CREATE INDEX ON documents
+USING ivfflat (embedding vector_cosine_ops)
+WITH (lists = 100);
+
+-- Semantic search
+SELECT content, source,
+       1 - (embedding <=> query_embedding) AS similarity
+FROM documents
+ORDER BY embedding <=> query_embedding
+LIMIT 5;
+```
+
+**En uygun olduğu alan**: Halihazırda PostgreSQL kullanan ekipler. Prodüksiyona hazır, tanıdık araçlar, SQL arayüzü.
+  </TabItem>
+
+  <TabItem label="Pinecone">
+```python
+from pinecone import Pinecone
+
+pc = Pinecone(api_key="your-api-key")
+
+pc.create_index(
+    name="travel-docs",
+    dimension=1536,
+    metric="cosine",
+    spec={"serverless": {"cloud": "aws", "region": "us-east-1"}}
+)
+
+index = pc.Index("travel-docs")
+
+# Query with metadata filtering
+results = index.query(
+    vector=[0.11, -0.32, ...],
+    top_k=5,
+    filter={"category": {"$eq": "flights"}},
+    include_metadata=True
+)
+```
+
+**En uygun olduğu alan**: Tam yönetimli, sunucusuz, kurumsal ölçek. Yönetilecek altyapı yok.
+  </TabItem>
+</Tabs>
+
+### Hızlı Karşılaştırma
+
+| Özellik | Chroma | pgvector | Pinecone |
+|---------|--------|----------|----------|
+| **Tür** | Gömülü | PostgreSQL eklentisi | Yönetimli bulut |
+| **Kurulum** | `pip install` | PostgreSQL + eklenti | API anahtarı |
+| **Ölçek** | ~100K belge | ~10M belge | Milyarlar |
+| **Maliyet** | Ücretsiz | Ücretsiz (kendi DB'niz) | Kullandıkça öde |
+| **En uygun alan** | Geliştirme/öğrenme | Mevcut Postgres | Kurumsal |
+
+<Aside type="tip">
+Bu eğitimde **Chroma** kullanıyoruz. Kurulumu en basit olanıdır ve öğrenmek için idealdir. Her kavram doğrudan herhangi bir başka vektör veritabanına aktarılabilir.
+</Aside>
+
+## Uygulamalı Çalışma
+
+<ColabLink title="Uygulamalı: Metin Embedding'le, Anlamı Görselleştir, Semantik Ara" notebook="/notebooks/rag/01-embeddings-viz.ipynb" level="Basic" />
+
+Bu notebook'ta şunları yapacaksınız:
+
+<Steps>
+1. Farklı alanlardaki seyahatle ilgili cümleler için embedding'ler oluşturun
+2. Tüm çiftler arasında kosinüs benzerliğini hesaplayın
+3. t-SNE kullanarak embedding uzayını 2D olarak görselleştirin
+4. Hangi cümlelerin bir arada kümelendiğini görün -- ve nedenini anlayın
+</Steps>
+
+<PresenterNote>
+`01-embeddings-viz.ipynb` notebook'unu canlı olarak adım adım geçin. "Aha anı" t-SNE plot çıktığında olur — flight cümleleri hotel cümlelerinden ayrı kümelenir. Sorun: "Model'a bu kategorileri biz mi söyledik?" Hayır. Dili anlayarak kendisi çıkardı. Sonra `02-vector-search.ipynb` notebook'una geçin ve ChromaDB ile semantic search yapın.
+</PresenterNote>
+
+<ColabLink title="Uygulamalı: ChromaDB ile Semantik Arama Sistemi Oluşturun" notebook="/notebooks/rag/02-vector-search.ipynb" level="Basic" />
+
+Bu notebook'ta şunları yapacaksınız:
+
+<Steps>
+1. ChromaDB'yi yerel olarak kurun
+2. Travel API'leri hakkındaki belgeleri meta verilerle birlikte indeksleyin
+3. Semantik arama yapın ve anahtar kelime aramasıyla karşılaştırın
+4. Meta veri filtreleme ile deney yapın (yalnızca uçuşlar, yalnızca oteller)
+</Steps>
+
+<DeepDive title="ANN Algoritmaları -- HNSW, IVF ve Quantization">
+
+Vektör veritabanları kaba kuvvet karşılaştırması yapmaz. Küçük bir recall kaybı karşılığında muazzam hız sağlayan Yaklaşık En Yakın Komşu algoritmalarını kullanırlar.
+
+### HNSW (Hierarchical Navigable Small World)
+
+En popüler algoritma. Çok katmanlı bir graf oluşturur -- tepede hızlı kaba arama için seyrek bağlantılar, altta hassas yerel arama için yoğun bağlantılar. Arama tepeden başlar ve aşağı doğru ilerler.
+
+**Temel parametreler:**
+- `M` -- düğüm başına maksimum bağlantı (yüksek = daha iyi recall, daha fazla bellek)
+- `ef_construction` -- inşa sırasında arama genişliği (yüksek = daha iyi indeks, daha yavaş inşa)
+- `ef_search` -- sorgu sırasında arama genişliği (yüksek = daha iyi recall, daha yavaş sorgu)
+
+```python
+# Chroma uses HNSW by default
+collection = client.create_collection(
+    name="my_collection",
+    metadata={
+        "hnsw:M": 32,                # default: 16
+        "hnsw:construction_ef": 200,  # default: 100
+        "hnsw:search_ef": 100         # default: 10
+    }
+)
+```
+
+### IVF (Inverted File Index)
+
+Vektör uzayını kümelere böler. Sorgu zamanında tüm alan yerine yalnızca en yakın kümeleri arar.
+
+### Product Quantization (PQ)
+
+Bellek kullanımını azaltmak için vektörleri sıkıştırır. Her vektörü alt vektörlere böler ve her birini bağımsız olarak kuantize eder. Bellek azaltma: minimal kalite kaybıyla **32 kat**.
+
+### Performans
+
+| Algoritma | Sorgu Süresi | Bellek | Recall@10 |
+|-----------|-------------|--------|-----------|
+| Kaba Kuvvet | O(n) | 1x | %100 |
+| IVF | O(n/k) | 1x | ~%95 |
+| HNSW | O(log n) | 1.5x | ~%99 |
+| IVF + PQ | O(n/k) | 0.03x | ~%90 |
+
+Çoğu vektör veritabanı varsayılan olarak HNSW kullanır -- en iyi recall/hız dengesini sunar.
+
+</DeepDive>
+
+## Önemli Çıkarımlar
+
+Üç şey:
+
+1. **Embedding'ler anlamı matematiğe dönüştürür.** Benzer metin yakın vektörler üretir. Farklı metin uzak vektörler üretir. RAG retrieval'ının arkasındaki tüm mekanizma budur.
+
+2. **Kosinüs benzerliği varsayılan metriğinizdir.** Büyüklüğü yok sayarak vektörler arasındaki açıyı ölçer. Her büyük embedding modeliyle çalışır.
+
+3. **Vektör veritabanları bunu ölçeklendirir.** HNSW gibi ANN algoritmaları, milyonlarca vektörü milisaniyeler içinde aramanızı sağlar. Öğrenmek için Chroma ile başlayın, prodüksiyonda pgvector veya Pinecone'a geçin.
+
+## Sıradaki
+
+Metni vektörlere dönüştürmeyi ve benzerlerini aramayı biliyorsunuz. Şimdi: ham belgelerden dayanaklı yanıtlara giden eksiksiz bir pipeline'ı nasıl kurarsınız? **Modül 3: RAG Pipeline'ı.**

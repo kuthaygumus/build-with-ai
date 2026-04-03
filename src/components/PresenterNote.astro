@@ -1,0 +1,100 @@
+---
+interface Props {
+  label?: string;
+}
+const { label = 'Presenter Note' } = Astro.props;
+---
+
+<details class="presenter-note-wrap">
+  <summary>{label}</summary>
+  <div class="presenter-note-content">
+    <slot />
+  </div>
+</details>
+
+<style>
+  /* Hidden by default — only visible in presenter mode */
+  .presenter-note-wrap {
+    display: none;
+    margin: 1.5rem 0;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+
+  /* Show when presenter mode is active (set by global script on <html>) */
+  :global(html[data-presenter]) .presenter-note-wrap {
+    display: block;
+  }
+
+  .presenter-note-wrap:hover {
+    border-color: rgba(251, 191, 36, 0.5);
+  }
+
+  .presenter-note-wrap summary {
+    padding: 0.7rem 1.1rem;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.08), rgba(245, 158, 11, 0.04));
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(251, 191, 36, 0.9);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    user-select: none;
+    transition: background 0.3s;
+  }
+
+  .presenter-note-wrap summary:hover {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(245, 158, 11, 0.06));
+  }
+
+  .presenter-note-wrap summary::before {
+    content: '🎤';
+    font-size: 0.9rem;
+  }
+
+  .presenter-note-wrap summary::after {
+    content: '›';
+    margin-left: auto;
+    font-size: 1.2rem;
+    font-weight: 300;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    color: rgba(251, 191, 36, 0.5);
+  }
+
+  .presenter-note-wrap[open] summary::after {
+    transform: rotate(90deg);
+  }
+
+  .presenter-note-wrap[open] summary {
+    border-bottom: 1px solid rgba(251, 191, 36, 0.15);
+  }
+
+  .presenter-note-wrap .presenter-note-content {
+    padding: 1rem 1.25rem;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--sl-color-gray-2);
+    animation: presenterSlide 0.3s ease-out;
+  }
+
+  @keyframes presenterSlide {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media print {
+    .presenter-note-wrap { display: none; }
+  }
+</style>

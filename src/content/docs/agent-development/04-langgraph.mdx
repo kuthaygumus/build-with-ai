@@ -1,0 +1,642 @@
+---
+title: "Module 4: LangGraph — Stateful Agents"
+description: "Build agents with decision-making, state management, and human-in-the-loop control using LangGraph's graph-based architecture."
+---
+
+import DeepDive from '../../../components/DeepDive.astro';
+import ColabLink from '../../../components/ColabLink.astro';
+import ModuleHeader from '../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../components/PresenterNote.astro';
+import KeyInsight from '../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="90 min" day={2} goal="Build agents with decision-making, state management, human-in-the-loop, and multi-agent collaboration." />
+
+## Why Chains Aren't Enough
+
+In Module 3, you built chains — linear sequences. Data flows in one direction. That works for "analyze this disruption." It fails completely for "handle this disruption."
+
+Why? Because handling requires **decisions**.
+
+<FlowDiagram title="The Problem: Chains Can't Decide">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📥</span>
+      <span class="node-label">Input</span>
+      <span class="node-desc">Disruption arrives</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Analyze</span>
+      <span class="node-desc">Determine severity</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Decide</span>
+      <span class="node-desc">Severe? Minor? Critical?</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+After the decision point, the flow should split: minor disruptions auto-resolve, severe ones escalate to ops, critical ones trigger emergency protocol. A linear chain can't branch. It can't loop. It can't wait for human approval before proceeding. It can't retry a specific step while keeping the rest of the state intact.
+
+**LangGraph** solves all of this by modeling your agent as a **graph** — nodes do work, edges control flow.
+
+<PresenterNote>
+`04-basic-graph.ipynb` notebook'unu Colab'da açın ama henüz çalıştırmayın. Sorun: "Takımınızda bir karar içeren bir workflow düşünün — 'yolcu premium ise X yap, değilse Y yap' gibi. Bunu Module 3'teki chain ile yapabilir misiniz?" Cevap: temiz bir şekilde hayır. "İşte graph'lara neden ihtiyacımız var — şimdi notebook'ta görelim."
+</PresenterNote>
+
+<KeyInsight>
+Chains are straight lines. Real workflows have forks, loops, and checkpoints. LangGraph gives you the graph structure to model all of them — with state that persists across every step.
+</KeyInsight>
+
+## Four Building Blocks
+
+LangGraph has exactly four concepts. Everything else is built from these.
+
+### 1. State — The Shared Memory
+
+State is typed data that flows through your graph. Every node can read it and write to it.
+
+```python
+from typing import Annotated
+from typing_extensions import TypedDict
+from langgraph.graph.message import add_messages
+
+class FlightDisruptionState(TypedDict):
+    messages: Annotated[list, add_messages]  # Accumulates conversation history
+    flight_number: str
+    delay_minutes: int
+    severity: str                # Set by the analysis node
+    affected_passengers: list    # Set by the data retrieval node
+    rebooking_plan: str          # Set by the planning node
+    human_approved: bool         # Set by the human-in-the-loop step
+```
+
+<Aside type="note">
+The `Annotated[list, add_messages]` pattern is key. `add_messages` is a **reducer** — instead of replacing the list each time, it appends new messages. This is how conversation history accumulates across nodes without overwriting.
+</Aside>
+
+### 2. Nodes — Functions That Do Work
+
+Each node takes the current state, does something, and returns state updates.
+
+```python
+from langchain_anthropic import ChatAnthropic
+
+model = ChatAnthropic(model="claude-sonnet-4-20250514")
+
+async def analyze_disruption(state: FlightDisruptionState) -> dict:
+    """Analyze the severity of a flight disruption."""
+    prompt = f"""Analyze this flight disruption:
+    Flight: {state['flight_number']}
+    Delay: {state['delay_minutes']} minutes
+    
+    Classify severity as: minor (under 60 min), moderate (60-180 min), 
+    severe (180-360 min), or critical (over 360 min).
+    Respond with ONLY the severity word."""
+
+    response = await model.ainvoke([{"role": "user", "content": prompt}])
+    return {"severity": response.content.strip().lower()}
+
+
+async def auto_resolve(state: FlightDisruptionState) -> dict:
+    """Handle minor disruptions automatically."""
+    return {
+        "rebooking_plan": f"Auto-resolved: {state['flight_number']} - "
+                          f"minor delay of {state['delay_minutes']}min. "
+                          f"Passengers notified via SMS.",
+        "messages": [{"role": "assistant",
+                      "content": "Minor disruption auto-resolved."}]
+    }
+
+
+async def escalate_to_ops(state: FlightDisruptionState) -> dict:
+    """Escalate severe disruptions to operations team."""
+    prompt = f"""Create a rebooking plan for flight {state['flight_number']}.
+    Severity: {state['severity']}, Delay: {state['delay_minutes']} minutes.
+    Consider: alternative flights, hotels, meal vouchers, premium priority."""
+
+    response = await model.ainvoke([{"role": "user", "content": prompt}])
+    return {
+        "rebooking_plan": response.content,
+        "messages": [{"role": "assistant",
+                      "content": "Escalated: Rebooking plan created for review."}]
+    }
+```
+
+### 3. Edges — The Wiring
+
+Two types. **Normal edges** always go from A to B. **Conditional edges** choose the next node based on state.
+
+```python
+# Normal edge — always goes this way
+graph.add_edge("analyze", "fetch_passengers")
+
+# Conditional edge — decides at runtime
+def route_by_severity(state: FlightDisruptionState) -> str:
+    if state["severity"] in ("minor",):
+        return "auto_resolve"
+    elif state["severity"] in ("moderate", "severe"):
+        return "escalate_to_ops"
+    else:
+        return "emergency_protocol"
+
+graph.add_conditional_edges(
+    "analyze",
+    route_by_severity,
+    {
+        "auto_resolve": "auto_resolve",
+        "escalate_to_ops": "escalate_to_ops",
+        "emergency_protocol": "emergency_protocol",
+    }
+)
+```
+
+### 4. The Lifecycle
+
+<Steps>
+1. **Define** — Create a `StateGraph` with your state schema
+2. **Add nodes** — Register functions as named nodes
+3. **Add edges** — Wire nodes with normal or conditional edges
+4. **Set entry point** — Which node runs first
+5. **Compile** — Convert to an executable `CompiledGraph`
+6. **Invoke** — Run with initial state
+</Steps>
+
+## Building Your First Graph
+
+All four concepts, wired together into a runnable graph:
+
+```python
+from langgraph.graph import StateGraph, START, END
+from typing import Annotated
+from typing_extensions import TypedDict
+from langgraph.graph.message import add_messages
+from langchain_anthropic import ChatAnthropic
+
+class ResearchState(TypedDict):
+    messages: Annotated[list, add_messages]
+    topic: str
+    research_notes: str
+    summary: str
+
+model = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
+
+async def research(state: ResearchState) -> dict:
+    response = await model.ainvoke([
+        {"role": "system", "content": "You are a thorough researcher. "
+         "Provide detailed, factual notes about the given topic."},
+        {"role": "user", "content": f"Research this topic: {state['topic']}"}
+    ])
+    return {"research_notes": response.content}
+
+async def summarize(state: ResearchState) -> dict:
+    response = await model.ainvoke([
+        {"role": "system", "content": "Condense research notes into "
+         "a clear, 3-paragraph summary."},
+        {"role": "user", "content": f"Summarize:\n\n{state['research_notes']}"}
+    ])
+    return {
+        "summary": response.content,
+        "messages": [{"role": "assistant", "content": response.content}]
+    }
+
+# Build
+workflow = StateGraph(ResearchState)
+workflow.add_node("research", research)
+workflow.add_node("summarize", summarize)
+workflow.add_edge(START, "research")
+workflow.add_edge("research", "summarize")
+workflow.add_edge("summarize", END)
+
+graph = workflow.compile()
+
+result = await graph.ainvoke({
+    "topic": "Impact of AI agents on airline operations",
+    "messages": []
+})
+```
+
+<FlowDiagram title="Research-Summarize Graph">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🚀</span>
+      <span class="node-label">START</span>
+      <span class="node-desc">Topic provided</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔬</span>
+      <span class="node-label">Research</span>
+      <span class="node-desc">Gather detailed notes</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📋</span>
+      <span class="node-label">Summarize</span>
+      <span class="node-desc">Condense into 3 paragraphs</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">END</span>
+      <span class="node-desc">Summary in state</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<ColabLink title="Exercise: Build a Research-Summarize Graph" notebook="/notebooks/agent-dev/04-basic-graph.ipynb" level="Basic" />
+
+### Visualizing Your Graph
+
+LangGraph renders your graph as a diagram — invaluable for debugging:
+
+```python
+# Generate a Mermaid diagram
+print(graph.get_graph().draw_mermaid())
+
+# Display as PNG in Jupyter
+from IPython.display import Image
+Image(graph.get_graph().draw_mermaid_png())
+```
+
+<PresenterNote>
+`04-basic-graph.ipynb` notebook'undaki Mermaid visualization hücresini çalıştırın. Graph yapısının koddan otomatik oluştuğunu gösterin. Sonra bir node ekleyin, bir edge değiştirin ve tekrar render edin. Visualization'ın kodla her zaman senkron olduğunu kanıtlayın. Sorun: "Bu graph'a yeni bir node eklesek akış nasıl değişir?"
+</PresenterNote>
+
+## Conditional Routing: The Decision Graph
+
+Now the real power. A customer request router that classifies incoming requests and routes them to specialized handlers:
+
+```python
+from langgraph.graph import StateGraph, START, END
+
+class CustomerRequestState(TypedDict):
+    messages: Annotated[list, add_messages]
+    request_text: str
+    category: str        # "rebooking", "complaint", "inquiry"
+    response: str
+
+async def classify_request(state: CustomerRequestState) -> dict:
+    response = await model.ainvoke([
+        {"role": "system",
+         "content": "Classify the customer request into exactly one category: "
+                    "rebooking, complaint, or inquiry. Respond with ONLY the category."},
+        {"role": "user", "content": state["request_text"]}
+    ])
+    return {"category": response.content.strip().lower()}
+
+async def handle_rebooking(state: CustomerRequestState) -> dict:
+    response = await model.ainvoke([
+        {"role": "system",
+         "content": "You are a rebooking specialist. Find alternative flights. "
+                    "Be efficient and solution-oriented."},
+        {"role": "user", "content": state["request_text"]}
+    ])
+    return {"response": response.content}
+
+async def handle_complaint(state: CustomerRequestState) -> dict:
+    response = await model.ainvoke([
+        {"role": "system",
+         "content": "Handle complaints with empathy. Acknowledge, apologize, resolve."},
+        {"role": "user", "content": state["request_text"]}
+    ])
+    return {"response": response.content}
+
+async def handle_inquiry(state: CustomerRequestState) -> dict:
+    response = await model.ainvoke([
+        {"role": "system",
+         "content": "Answer travel inquiries. Be helpful and informative."},
+        {"role": "user", "content": state["request_text"]}
+    ])
+    return {"response": response.content}
+
+def route_request(state: CustomerRequestState) -> str:
+    category = state["category"]
+    if category == "rebooking":
+        return "handle_rebooking"
+    elif category == "complaint":
+        return "handle_complaint"
+    return "handle_inquiry"
+
+# Build the graph
+workflow = StateGraph(CustomerRequestState)
+workflow.add_node("classify", classify_request)
+workflow.add_node("handle_rebooking", handle_rebooking)
+workflow.add_node("handle_complaint", handle_complaint)
+workflow.add_node("handle_inquiry", handle_inquiry)
+
+workflow.add_edge(START, "classify")
+workflow.add_conditional_edges(
+    "classify", route_request,
+    {
+        "handle_rebooking": "handle_rebooking",
+        "handle_complaint": "handle_complaint",
+        "handle_inquiry": "handle_inquiry",
+    }
+)
+workflow.add_edge("handle_rebooking", END)
+workflow.add_edge("handle_complaint", END)
+workflow.add_edge("handle_inquiry", END)
+
+graph = workflow.compile()
+```
+
+<FlowDiagram title="Customer Request Router">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📥</span>
+      <span class="node-label">Request</span>
+      <span class="node-desc">Customer message arrives</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">🏷️</span>
+      <span class="node-label">Classify</span>
+      <span class="node-desc">LLM determines category</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔄</span>
+      <span class="node-label">Rebooking</span>
+      <span class="node-desc">Find alternative flights</span>
+    </div>
+    <div class="flow-node secondary">
+      <span class="node-icon">😤</span>
+      <span class="node-label">Complaint</span>
+      <span class="node-desc">Empathy + resolution</span>
+    </div>
+    <div class="flow-node secondary">
+      <span class="node-icon">❔</span>
+      <span class="node-label">Inquiry</span>
+      <span class="node-desc">Informative answer</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">All handlers → END</div>
+  </div>
+</FlowDiagram>
+
+<ColabLink title="Exercise: Build a Conditional Routing Graph" notebook="/notebooks/agent-dev/05-conditional-graph.ipynb" level="Basic" />
+
+## Human-in-the-Loop
+
+For production agents, you need a human to approve before the agent executes irreversible actions. LangGraph has first-class support via `interrupt_before` and `interrupt_after`.
+
+```python
+from langgraph.checkpoint.memory import MemorySaver
+
+checkpointer = MemorySaver()
+
+graph = workflow.compile(
+    checkpointer=checkpointer,
+    interrupt_before=["execute_rebooking"]  # Pause BEFORE this node
+)
+
+# Run until the interrupt
+config = {"configurable": {"thread_id": "request_001"}}
+result = await graph.ainvoke(initial_state, config)
+
+# Graph is paused. Show the plan to a human:
+print("Proposed rebooking plan:")
+print(result["rebooking_plan"])
+
+# Human approves... resume execution:
+result = await graph.ainvoke(None, config)
+```
+
+<FlowDiagram title="Human-in-the-Loop Pattern">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Analyze</span>
+      <span class="node-desc">Assess disruption</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📋</span>
+      <span class="node-label">Plan</span>
+      <span class="node-desc">Generate rebooking plan</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">⏸️</span>
+      <span class="node-label">Human Review</span>
+      <span class="node-desc">Approve or modify plan</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">⚡</span>
+      <span class="node-label">Execute</span>
+      <span class="node-desc">Apply rebooking</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<Aside type="caution">
+`interrupt_before` and `interrupt_after` require a **checkpointer**. The checkpointer persists graph state so it can be resumed later — even in a different process. `MemorySaver` is fine for development. Production needs PostgreSQL or Redis.
+</Aside>
+
+<KeyInsight>
+Human-in-the-loop isn't a hack bolted on after the fact. It's a first-class feature of LangGraph. The graph pauses, persists its state, waits for human input, and resumes exactly where it left off. This is how you build agents people actually trust.
+</KeyInsight>
+
+<PresenterNote>
+`05-conditional-graph.ipynb` notebook'undaki human-in-the-loop hücrelerini açın. Sorun: "Takımınız booking değiştiren bir agent'ı insan onayı olmadan deploy eder mi?" Çoğu hayır der. Interrupt pattern'ını notebook'ta çalıştırın — graph'ın nasıl durduğunu, state'i sakladığını ve onay sonrası devam ettiğini gösterin. "İşte production pattern'ı bu."
+</PresenterNote>
+
+## Multi-Agent Collaboration
+
+The most powerful LangGraph pattern: multiple specialized agents that iterate until quality is met.
+
+```python
+class MultiAgentState(TypedDict):
+    messages: Annotated[list, add_messages]
+    task: str
+    research_output: str
+    review_feedback: str
+    final_report: str
+    iteration: int
+
+async def researcher(state: MultiAgentState) -> dict:
+    """Agent 1: Researches and produces a draft report."""
+    context = ""
+    if state.get("review_feedback"):
+        context = f"\n\nPrevious feedback to address:\n{state['review_feedback']}"
+
+    response = await model.ainvoke([
+        {"role": "system",
+         "content": "You are a thorough researcher. Produce a detailed report."},
+        {"role": "user",
+         "content": f"Task: {state['task']}{context}"}
+    ])
+    return {
+        "research_output": response.content,
+        "iteration": state.get("iteration", 0) + 1
+    }
+
+async def reviewer(state: MultiAgentState) -> dict:
+    """Agent 2: Reviews and provides feedback or approves."""
+    response = await model.ainvoke([
+        {"role": "system",
+         "content": "You are a critical reviewer. Evaluate for accuracy, "
+                    "completeness, clarity. If good enough, say APPROVED. "
+                    "Otherwise, provide specific feedback."},
+        {"role": "user",
+         "content": f"Review this report:\n\n{state['research_output']}"}
+    ])
+    return {"review_feedback": response.content}
+
+def should_continue(state: MultiAgentState) -> str:
+    if "APPROVED" in state["review_feedback"].upper():
+        return "finalize"
+    if state["iteration"] >= 3:
+        return "finalize"
+    return "revise"
+
+async def finalize(state: MultiAgentState) -> dict:
+    return {"final_report": state["research_output"]}
+
+# Build the multi-agent graph
+workflow = StateGraph(MultiAgentState)
+workflow.add_node("researcher", researcher)
+workflow.add_node("reviewer", reviewer)
+workflow.add_node("finalize", finalize)
+
+workflow.add_edge(START, "researcher")
+workflow.add_edge("researcher", "reviewer")
+workflow.add_conditional_edges(
+    "reviewer", should_continue,
+    {"revise": "researcher", "finalize": "finalize"}
+)
+workflow.add_edge("finalize", END)
+
+graph = workflow.compile()
+```
+
+<FlowDiagram title="Multi-Agent Revision Loop">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🚀</span>
+      <span class="node-label">START</span>
+      <span class="node-desc">Task assigned</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔬</span>
+      <span class="node-label">Researcher</span>
+      <span class="node-desc">Produces draft report</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">👁️</span>
+      <span class="node-label">Reviewer</span>
+      <span class="node-desc">Critiques or approves</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔄</span>
+      <span class="node-label">Revise</span>
+      <span class="node-desc">Back to researcher with feedback</span>
+    </div>
+    <div class="flow-arrow">or</div>
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Finalize</span>
+      <span class="node-desc">Report approved → END</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">↩ Max 3 revision cycles before forced finalization</div>
+  </div>
+</FlowDiagram>
+
+This creates a **revision loop**. The researcher drafts, the reviewer critiques, the researcher revises. Up to 3 cycles, or until the reviewer says APPROVED. This pattern is extremely effective for producing high-quality outputs.
+
+<ColabLink title="Challenge: Build a Multi-Agent Research System" notebook="/notebooks/agent-dev/06-multi-agent.ipynb" level="Challenge" />
+
+<KeyInsight>
+Multi-agent isn't about having more agents. It's about having specialized agents that critique each other's work. The revision loop — draft, review, revise — consistently produces better output than a single agent working alone.
+</KeyInsight>
+
+<DeepDive title="Advanced: Subgraphs, Persistence, and LangSmith">
+
+### Subgraphs — Modular Agent Design
+
+Complex agents compose from smaller graphs. A subgraph is a compiled graph used as a node in a parent graph:
+
+```python
+# Subgraph for passenger handling
+passenger_workflow = StateGraph(PassengerState)
+passenger_workflow.add_node("check_tier", check_passenger_tier)
+passenger_workflow.add_node("find_alternatives", find_alternative_flights)
+passenger_workflow.add_node("rebook", execute_rebooking)
+passenger_subgraph = passenger_workflow.compile()
+
+# Use as a node in the parent graph
+main_workflow = StateGraph(DisruptionState)
+main_workflow.add_node("analyze", analyze_disruption)
+main_workflow.add_node("handle_passengers", passenger_subgraph)
+main_workflow.add_node("report", generate_report)
+```
+
+Each subgraph is independently testable. Compose complexity from simple, validated pieces.
+
+### Persistent Checkpointing
+
+For production, state survives process restarts:
+
+```python
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+
+async with AsyncPostgresSaver.from_conn_string(
+    "postgresql://user:pass@localhost:5432/agents"
+) as checkpointer:
+    graph = workflow.compile(checkpointer=checkpointer)
+    config = {"configurable": {"thread_id": "disruption_AF1234"}}
+    result = await graph.ainvoke(initial_state, config)
+```
+
+### LangSmith — See Inside Your Graph
+
+Every node execution, every LLM call, every state update — traced automatically:
+
+```python
+import os
+os.environ["LANGSMITH_TRACING"] = "true"
+os.environ["LANGSMITH_API_KEY"] = "your-key"
+os.environ["LANGSMITH_PROJECT"] = "agent-training"
+
+# Every invocation is now traced at smith.langchain.com
+```
+
+LangSmith shows: node execution order, input/output per LLM call, token usage and latency per step, where errors occurred, full state at every checkpoint. Invaluable for debugging and cost management.
+
+</DeepDive>
+
+## Key Takeaways
+
+<CardGrid>
+  <Card title="Graphs enable decisions" icon="random">
+    Linear chains can't branch. Graphs model real workflows with conditional routing and loops.
+  </Card>
+  <Card title="State is the backbone" icon="document">
+    Shared typed state flows through nodes. Reducers control how updates are applied.
+  </Card>
+  <Card title="Human-in-the-loop is built in" icon="approve-check-circle">
+    `interrupt_before` + checkpointer = production-grade human oversight. First-class, not bolted on.
+  </Card>
+  <Card title="Multi-agent = revision loops" icon="setting">
+    Specialized agents critique each other's work through graph cycles until quality is met.
+  </Card>
+</CardGrid>
+
+## Next Up
+
+You have all the building blocks: **MCP** for tool connectivity, **LangChain** for model interaction, **LangGraph** for stateful orchestration. In Module 5, we combine everything into a production-ready agent and tackle the hard problems — error handling, security, cost management.
