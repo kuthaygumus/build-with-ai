@@ -272,8 +272,6 @@ You write `prompt | model | parser`. You get streaming, async, batching, retries
 LCEL isn't just a pretty syntax. It's a runtime contract. Every chain you build with pipes automatically gets streaming, async, batching, retries, and observability — for free.
 </KeyInsight>
 
-<ColabLink title="Exercise: Build Your First Chain" notebook="/notebooks/agent-dev/3.1-first-chain.ipynb" level="Basic" />
-
 ## Hands-On: Disruption Analysis Chain
 
 Let's build something real — a chain that analyzes flight disruptions and generates passenger communications.
@@ -426,8 +424,6 @@ r2 = chain_with_memory.invoke(
     config=config
 )
 ```
-
-<ColabLink title="Exercise: Build a Conversational Chain with Memory" notebook="/notebooks/agent-dev/3.2-memory.ipynb" level="Basic" />
 
 ### Memory Strategies
 
@@ -602,4 +598,7 @@ You've built linear chains — data flows in one direction. But what happens whe
 
 That's where the pipe operator hits its limits. **Module 4: LangGraph** picks up exactly where chains leave off.
 
-<ColabLink title="Challenge: Build a Multi-Step Analysis Chain" notebook="/notebooks/agent-dev/3.2-memory.ipynb" level="Challenge" />
+## Exercises
+
+<ColabLink title="Exercise 3.1: Build Your First Chain" notebook="/notebooks/agent-dev/3.1-first-chain.ipynb" level="Basic" />
+<ColabLink title="Exercise 3.2: Build a Conversational Chain with Memory" notebook="/notebooks/agent-dev/3.2-memory.ipynb" level="Basic" />
