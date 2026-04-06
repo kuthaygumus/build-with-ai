@@ -15,15 +15,18 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 
 ## Start with Failure
 
-Your Module 3 pipeline works. Until it doesn't. Before learning advanced techniques, let's see **exactly how** naive RAG fails — because each failure mode has a specific fix.
+Module 3 pipeline'ınız çalışıyor. Çalışmayana kadar. İleri teknikleri öğrenmeden önce, naive RAG'ın **tam olarak nasıl** başarısız olduğunu görelim — her başarısızlık modunun spesifik bir çözümü var.
 
 <PresenterNote>
-[04-hyde-comparison.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/04-hyde-comparison.ipynb) notebook'unu Colab'da açın. İlk 3 hücreyi çalıştırarak basic RAG pipeline'ı kurun. Sonra 3 sorgu çalıştırın: bir casual dil sorgusu, doğru dokümanın düşük sıralandığı bir sorgu, birden fazla doküman gerektiren bir sorgu. Başarısızlıkları görmelerini sağlayın. Sorun: "Bu 3 farklı başarısızlığın ortak noktası ne?" Her birinin spesifik bir fix'i var.
+**Ekranda:** Colab — [04-hyde-comparison.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/04-hyde-comparison.ipynb)
+**Yapın:** 'Setup' ve 'Basic RAG Pipeline' bölümlerini çalıştırın (ilk 3 hücre). Sonra 3 sorgu çalıştırın: casual dil sorgusu, doğru dokümanın düşük sıralandığı sorgu, birden fazla doküman gerektiren sorgu. Başarısızlıkları görsünler.
+**Sorun:** "Bu 3 farklı başarısızlığın ortak noktası ne?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — Query Transformation bölümüne geçin.
 </PresenterNote>
 
 ### Failure 1: Query-Document Mismatch
 
-The user asks casually. The docs are technical. Semantic similarity between them is low — even though the doc contains the answer.
+Kullanıcı günlük dille sorar. Dokümanlar teknik. Aralarındaki semantic similarity düşük — doküman cevabı içermesine rağmen.
 
 ```text
 User query:   "Why is my booking not showing up?"
@@ -37,7 +40,7 @@ The embedding vectors are far apart. The right doc isn't retrieved.
 
 ### Failure 2: Relevant but Buried
 
-The retriever finds the right document — but ranks it 8th. Your pipeline only passes the top 5 to the LLM:
+Retriever doğru dokümanı bulur — ama 8. sıraya koyar. Pipeline'ınız LLM'e sadece ilk 5'i geçirir:
 
 ```text
 Rank 1: [0.82] General booking API overview      ← too broad
@@ -48,7 +51,7 @@ Rank 8: [0.72] PNR retrieval troubleshooting      ← THIS IS THE ANSWER
 
 ### Failure 3: Answer Spans Multiple Documents
 
-The answer requires three documents. Naive RAG finds two, misses the third. The answer is incomplete — or worse, wrong:
+Cevap üç doküman gerektirir. Naive RAG ikisini bulur, üçüncüsünü kaçırır. Cevap eksik — ya da daha kötüsü, yanlış:
 
 ```text
 Query: "Can I change my flight after check-in?"
@@ -104,16 +107,16 @@ Answer: "Yes, changes are allowed up to 24h before." — WRONG.
 </FlowDiagram>
 
 <KeyInsight>
-Advanced RAG isn't about more complexity — it's about fixing specific, predictable failure modes. Diagnose the failure first. Apply the targeted fix.
+Advanced RAG daha fazla karmaşıklık değil — spesifik, öngörülebilir başarısızlık modlarını düzeltmek. Önce başarısızlığı teşhis edin. Hedefli çözümü uygulayın.
 </KeyInsight>
 
 ## Fix 1: Query Transformation
 
-Don't search with the raw user query. Transform it into something that retrieves better.
+Ham kullanıcı sorgusuyla aramayın. Daha iyi retrieve eden bir şeye dönüştürün.
 
 ### HyDE (Hypothetical Document Embeddings)
 
-The core insight: **a hypothetical answer is more similar to the real answer than the question is.**
+İşin özü şu: **varsayımsal bir cevap, gerçek cevaba sorunun kendisinden daha benzer.**
 
 <FlowDiagram title="HyDE: Question → Hypothetical Answer → Search">
   <div class="flow-row">
@@ -168,15 +171,18 @@ hyde_embedding = embeddings.embed_query(hypothetical_doc)
 results = vector_store.similarity_search_by_vector(hyde_embedding, k=5)
 ```
 
-Why this works: the hypothetical doc uses **the same vocabulary** as real docs. "PNR expired" matches "PNR retrieval returns 404" much better than "booking not showing up" does.
+Neden çalışır: varsayımsal doküman gerçek dokümanlarla **aynı kelime dağarcığını** kullanır. "PNR expired" ifadesi "PNR retrieval returns 404" ile "booking not showing up"a göre çok daha iyi eşleşir.
 
 <PresenterNote>
-[04-hyde-comparison.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/04-hyde-comparison.ipynb) notebook'undaki HyDE karşılaştırma hücrelerini çalıştırın. Similarity score'ları yan yana gösterin: direkt soru = 0.65, HyDE = 0.89. Rakamlar argümanı yapar. Sorun: "Bu ekstra LLM call'ın maliyeti ne?" Yaklaşık 1 cent ve 1-2 saniye. Çoğu use case için değer. Sonra [05-reranking.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/05-reranking.ipynb) notebook'una geçeceğimizi söyleyin.
+**Ekranda:** Colab — [04-hyde-comparison.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/04-hyde-comparison.ipynb)
+**Yapın:** 'HyDE Comparison' hücrelerini çalıştırın. Similarity score'ları yan yana gösterin: direkt soru = 0.65, HyDE = 0.89. Rakamlar argümanı yapar. Ekstra LLM call'ın maliyeti: yaklaşık 1 cent ve 1-2 saniye.
+**Sorun:** "Bu ekstra LLM call'ın maliyeti ne? Değer mi?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — Multi-Query ve Step-Back bölümlerine geçin.
 </PresenterNote>
 
 ### Multi-Query
 
-Generate multiple perspectives of the same question to cast a wider retrieval net:
+Aynı sorunun birden fazla perspektifini üretip daha geniş bir retrieval ağı atın:
 
 ```python
 multi_query_prompt = ChatPromptTemplate.from_messages([
@@ -203,7 +209,7 @@ unique_results = list({doc.page_content: doc for doc in all_results}.values())
 
 ### Step-Back Prompting
 
-Ask a broader question first, use that context to answer the specific question:
+Önce daha geniş bir soru sorun, o bağlamı spesifik soruyu cevaplamak için kullanın:
 
 ```python
 step_back_prompt = ChatPromptTemplate.from_messages([
@@ -240,9 +246,9 @@ You can combine these. Use Multi-Query to generate variants, then apply HyDE to 
 
 ## Fix 2: Re-Ranking
 
-Retrieval gets you candidates. Re-ranking **reorders them for precision.**
+Retrieval size adayları getirir. Re-ranking **hassasiyet için yeniden sıralar.**
 
-The pattern: retrieve broadly with a fast bi-encoder, then re-rank precisely with a slow cross-encoder.
+Pattern: hızlı bi-encoder ile geniş retrieve, sonra yavaş cross-encoder ile hassas re-rank.
 
 <FlowDiagram title="Two-Stage Retrieval + Re-Ranking">
   <div class="flow-row">
@@ -266,7 +272,7 @@ The pattern: retrieve broadly with a fast bi-encoder, then re-rank precisely wit
   </div>
 </FlowDiagram>
 
-The difference: bi-encoders embed query and document **separately** (fast, but approximate). Cross-encoders process query and document **together** (slow, but precise — they see the interaction between every word in both).
+Fark: bi-encoder'lar sorgu ve dokümanı **ayrı ayrı** embed eder (hızlı ama yaklaşık). Cross-encoder'lar sorgu ve dokümanı **birlikte** işler (yavaş ama hassas — iki taraftaki her kelimenin etkileşimini görür).
 
 ### With Cohere Reranker
 
@@ -311,12 +317,12 @@ Re-ranking typically improves answer quality by **10-25%** on standard benchmark
 
 ## Fix 3: Agentic RAG
 
-This is where RAG meets the Agent training from Part 1.
+RAG ile Part 1'deki Agent eğitiminin buluşma noktası.
 
-In naive RAG, retrieval happens **always and exactly once**. Agentic RAG lets an agent decide:
-- **Whether** to retrieve (maybe the answer is already known)
-- **What** to search for (reformulate based on what it's found so far)
-- **Whether to search again** (if the first retrieval wasn't enough)
+Naive RAG'da retrieval **her zaman ve tam olarak bir kez** olur. Agentic RAG bir agent'ın karar vermesini sağlar:
+- Retrieve **edilmeli mi** (belki cevap zaten biliniyor)
+- **Ne** aranmalı (şu ana kadar bulunanlara göre yeniden formüle et)
+- **Tekrar aranmalı mı** (ilk retrieval yeterli değilse)
 
 <FlowDiagram title="Naive RAG vs Agentic RAG">
   <div class="flow-row">
@@ -466,35 +472,45 @@ print(f"Answer: {result['answer']}")
 ```
 
 <PresenterNote>
-[05-reranking.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/05-reranking.ipynb) notebook'undaki re-ranking hücrelerini çalıştırarak before/after karşılaştırmasını gösterin. Sonra agentic RAG konseptini açıklamak için 3 farklı sorgu deneyin: "Merhaba" (retrieve etmemeli), "Flight API auth nasıl?" (bir kez retrieve), "Tüm API'lerin auth yöntemlerini karşılaştır" (birden fazla retrieve). Sorun: "Agent her sorguda retrieve yapmalı mı? Neden olmasın?"
+**Ekranda:** Colab — [05-reranking.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/05-reranking.ipynb)
+**Yapın:** 'Re-ranking' hücrelerini çalıştırarak before/after karşılaştırmasını gösterin. Sonra 3 farklı sorgu deneyin: "Merhaba" (retrieve etmemeli), "Flight API auth nasıl?" (bir kez retrieve), "Tüm API'lerin auth yöntemlerini karşılaştır" (birden fazla retrieve).
+**Sorun:** "Agent her sorguda retrieve yapmalı mı? Neden olmasın?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — Hands-On Exercises bölümüne geçin.
 </PresenterNote>
 
-## Hands-On Exercises
+## Exercises
 
 <ColabLink title="Hands-on: Naive RAG vs HyDE — Head-to-Head Comparison" notebook="/notebooks/rag/04-hyde-comparison.ipynb" level="Basic" />
 
 <Steps>
-1. Build a naive RAG pipeline (same as Module 3)
-2. Add HyDE query transformation
-3. Run 10 test queries through both
-4. Compare retrieval precision and answer quality side by side
+1. Naive RAG pipeline kurun (Module 3 ile aynı)
+2. HyDE query transformation ekleyin
+3. 10 test sorgusu çalıştırın
+4. Retrieval hassasiyeti ve cevap kalitesini yan yana karşılaştırın
 </Steps>
 
 <ColabLink title="Hands-on: Add Re-Ranking and Measure the Improvement" notebook="/notebooks/rag/05-reranking.ipynb" level="Basic" />
 
 <Steps>
-1. Start with your Module 3 pipeline
-2. Add Cohere re-ranking (or open-source cross-encoder)
-3. Compare before/after on 10 test queries
-4. Quantify the improvement with precision metrics
+1. Module 3 pipeline'ınızla başlayın
+2. Cohere re-ranking (veya open-source cross-encoder) ekleyin
+3. 10 test sorgusunda before/after karşılaştırın
+4. İyileşmeyi precision metrikleriyle ölçün
 </Steps>
 
 <ColabLink title="Challenge: Build a Full Agentic RAG System" notebook="/notebooks/rag/06-agentic-rag.ipynb" level="Challenge" />
 
-Build the LangGraph agentic RAG from scratch. Test with:
-- Simple greetings (should NOT retrieve)
-- Technical questions (should retrieve once)
-- Complex multi-doc questions (should retrieve and reformulate)
+LangGraph ile agentic RAG'ı sıfırdan kurun. Şunlarla test edin:
+- Basit selamlaşmalar (retrieve etmeMELİ)
+- Teknik sorular (bir kez retrieve etmeli)
+- Karmaşık multi-doc sorular (retrieve edip yeniden formüle etmeli)
+
+<PresenterNote>
+**Ekranda:** Colab — [04-hyde-comparison.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/04-hyde-comparison.ipynb) ve [05-reranking.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/05-reranking.ipynb)
+**Yapın:** Notebook'ları gösterin ve egzersiz bölümlerini işaret edin. İlk HyDE'ı bitirenlerin re-ranking'e geçmesini söyleyin. Challenge notebook'unu erken bitirenler için gösterin.
+**Sorun:** "Hangi teknik kendi use case'iniz için en faydalı olur?"
+**Sonra:** Katılımcılara: Şimdi siz deneyin — notebook'un sonundaki YOUR TURN bölümlerini yapın. 10-15 dakika süre.
+</PresenterNote>
 
 <DeepDive title="RAPTOR, GraphRAG, and Multi-Modal RAG">
 
@@ -514,16 +530,16 @@ These represent the cutting edge. Most production systems don't need them yet �
 
 </DeepDive>
 
-## What to Take Away
+## Özet
 
-Three things:
+Üç şey:
 
-1. **Diagnose before fixing.** Naive RAG fails in three predictable ways: query mismatch, low ranking, missing context. Each has a specific, targeted solution.
+1. **Düzeltmeden önce teşhis edin.** Naive RAG üç öngörülebilir şekilde başarısız olur: sorgu uyumsuzluğu, düşük sıralama, eksik bağlam. Her birinin spesifik, hedefli çözümü var.
 
-2. **HyDE and re-ranking are highest ROI.** One extra LLM call (HyDE) or 10 lines of code (re-ranking) can improve retrieval by 10-25%. Do these before anything fancy.
+2. **HyDE ve re-ranking en yüksek ROI.** Bir ekstra LLM call (HyDE) veya 10 satır kod (re-ranking) retrieval'ı %10-25 iyileştirebilir. Süslü şeylerden önce bunları yapın.
 
-3. **Agentic RAG bridges Parts 1 and 2.** An agent that decides when, what, and how many times to retrieve. This is where the agent training and RAG training converge.
+3. **Agentic RAG Part 1 ile 2'yi birleştirir.** Ne zaman, ne ve kaç kez retrieve edeceğine karar veren bir agent. Agent eğitimi ile RAG eğitiminin kesişim noktası.
 
 ## Next Up
 
-Your RAG works. Your advanced techniques handle edge cases. Now: how do you know it's working well? How do you measure, monitor, scale, and operate it in production? **Module 5: Production RAG.**
+RAG'ınız çalışıyor. İleri teknikler edge case'leri hallediyor. Şimdi: iyi çalışıp çalışmadığını nasıl bileceksiniz? Nasıl ölçecek, izleyecek, ölçeklendirecek ve production'da işleteceksiniz? **Module 5: Production RAG.**

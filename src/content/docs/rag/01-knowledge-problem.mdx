@@ -18,17 +18,20 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 Before definitions, let's watch RAG work.
 
 <PresenterNote>
-[03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'unu Colab'da açın. İlk iki hücreyi çalıştırın: biri plain LLM'e soru sorar, diğeri RAG-powered sisteme aynı soruyu sorar. İki çıktıyı yan yana gösterin. Kontrastı izlemelerini sağlayın — henüz açıklamayın. Sorun: "İki cevap arasındaki fark ne? Neden biri kaynak gösteriyor, diğeri göstermiyor?"
+**Ekranda:** Colab — [03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb)
+**Yapın:** İlk 2 hücreyi çalıştırın: biri plain LLM'e, diğeri RAG-powered sisteme aynı soruyu sorar. İki çıktıyı yan yana gösterin. Henüz açıklamayın — kontrastı görmelerini sağlayın.
+**Sorun:** "İki cevap arasındaki fark ne? Neden biri kaynak gösteriyor, diğeri göstermiyor?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — "Why LLMs Fail" bölümüne geçin.
 </PresenterNote>
 
-You have an internal company policy document updated yesterday. Ask a plain LLM:
+Dün güncellenen bir internal şirket politika dokümanınız var. Plain LLM'e sorun:
 
 ```text
 Q: What is the company's remote work policy for contractors?
 A: I don't have specific information about your company's internal policies...
 ```
 
-Now ask the same question to a system with RAG:
+Şimdi aynı soruyu RAG'lı bir sisteme sorun:
 
 ```text
 Q: What is the company's remote work policy for contractors?
@@ -38,9 +41,9 @@ A: According to the Contractor Policy (v3.2),
    [Source: contractor-policy-v3.2.pdf, page 14]
 ```
 
-Same model. Same question. The difference: one has access to your documents. The other doesn't.
+Aynı model. Aynı soru. Fark: birinin dokümanlarınıza erişimi var. Diğerinin yok.
 
-**That's RAG.** Not a smarter model — a smarter architecture.
+**RAG bu.** Daha akıllı bir model değil — daha akıllı bir mimari.
 
 <KeyInsight>
 RAG gives LLMs access to knowledge they were never trained on. The model doesn't change. The input does.
@@ -48,11 +51,11 @@ RAG gives LLMs access to knowledge they were never trained on. The model doesn't
 
 ## Why LLMs Fail at Enterprise Knowledge
 
-LLMs have three fundamental blind spots. Each one is a blocker for enterprise use. RAG addresses all three.
+LLM'lerin üç temel kör noktası var. Her biri enterprise kullanım için engelleyici. RAG üçünü de çözer.
 
 ### 1. Hallucination
 
-LLMs don't "know" things. They predict the next token. When training data is sparse on a topic, they fill the gap with plausible-sounding fiction.
+LLM'ler bir şeyleri "bilmez". Sonraki token'ı tahmin eder. Eğitim verisi bir konuda seyrekse, boşluğu inandırıcı görünen kurguyla doldurur.
 
 ```python
 # Ask about a specific Flight API version
@@ -63,20 +66,23 @@ response = llm("What are the parameters for the FlightOffers v4 API?")
 ```
 
 <PresenterNote>
-[03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'undaki hallucination demo hücresini çalıştırın. Var olmayan bir internal API hakkında soru sorun ve LLM'in güvenle uydurduğunu gösterin. Sorun: "Bunu production'a deploy eder misiniz?" Oda sessizleşir. Sonra RAG versiyonunu çalıştırın — aynı soru, gerçek dokümana dayalı cevap. Fark apaçık.
+**Ekranda:** Colab — [03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb)
+**Yapın:** 'Hallucination Demo' hücresini çalıştırın. Var olmayan bir internal API hakkında soru sorun — LLM'in güvenle uydurduğunu gösterin. Sonra RAG versiyonunu çalıştırın — aynı soru, gerçek dokümana dayalı cevap.
+**Sorun:** "Bunu production'a deploy eder misiniz?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — Stale Knowledge bölümüne geçin.
 </PresenterNote>
 
 ### 2. Stale Knowledge
 
-Every model has a training cutoff. The world keeps moving. The model doesn't.
+Her modelin bir eğitim kesim tarihi var. Dünya ilerlemeye devam eder. Model etmez.
 
-Your internal docs change daily. Retraining costs GPU-weeks and six figures. That's not a workflow — that's a crisis.
+Internal dokümanlarınız her gün değişir. Yeniden eğitim GPU-haftaları ve altı haneli rakamlar demek. Bu bir workflow değil — kriz.
 
 ### 3. Zero Access to Private Data
 
-LLMs are trained on the public internet. They have **zero knowledge** of your internal wikis, customer contracts, GDS documentation, incident reports, or architecture decisions.
+LLM'ler açık internet üzerinde eğitilir. Internal wiki'leriniz, müşteri sözleşmeleriniz, GDS dokümantasyonunuz, incident raporlarınız veya mimari kararlarınız hakkında **sıfır bilgiye** sahiptir.
 
-This isn't a model quality problem. GPT-5 won't fix it. Claude 4 won't fix it. **It's an architecture problem.** RAG is the architecture solution.
+Bu bir model kalitesi problemi değil. GPT-5 çözmeyecek. Claude 5 çözmeyecek. **Mimari problemi.** RAG mimari çözüm.
 
 <FlowDiagram title="The Three Blind Spots">
   <div class="flow-row">
@@ -110,11 +116,11 @@ This isn't a model quality problem. GPT-5 won't fix it. Claude 4 won't fix it. *
   </div>
 </FlowDiagram>
 
-## What Is RAG — In 30 Seconds
+## What Is RAG — 30 Saniyede
 
-**Retrieval-Augmented Generation.** Instead of relying on what the model "remembers" from training, you retrieve relevant documents and inject them into the prompt.
+**Retrieval-Augmented Generation.** Modelin eğitimden "hatırladığına" güvenmek yerine, ilgili dokümanları alıp prompt'a enjekte edersiniz.
 
-The model reads your docs, then answers. Every time. Fresh data. Cited sources.
+Model dokümanlarınızı okur, sonra cevaplar. Her seferinde. Taze veri. Kaynaklı cevaplar.
 
 <FlowDiagram title="The RAG Flow">
   <div class="flow-row">
@@ -144,7 +150,7 @@ The model reads your docs, then answers. Every time. Fresh data. Cited sources.
   </div>
 </FlowDiagram>
 
-The key insight: **the LLM never sees your entire knowledge base.** It sees only the few most relevant chunks, injected alongside the question.
+İşin özü şu: **LLM tüm bilgi tabanınızı asla görmez.** Sadece en ilgili birkaç parçayı görür, soruyla birlikte enjekte edilmiş olarak.
 
 ```python
 # RAG in 10 lines of pseudocode
@@ -166,12 +172,15 @@ Question: {question}"""
 ```
 
 <PresenterNote>
-[03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'undaki RAG pseudocode hücresini gösterin. Satır satır geçin. Vurgulayın: LLM aynı, sihir 2. satırdaki similarity_search'te. Sorun: "similarity_search arka planda ne yapıyor sizce?" 1-2 tahmin alın. "İşte Module 2'de [01-embeddings-viz.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/01-embeddings-viz.ipynb) ile bunu derinlemesine öğreneceğiz."
+**Ekranda:** Site — RAG pseudocode
+**Yapın:** Kodu satır satır geçin. Vurgulayın: LLM aynı, sihir 2. satırdaki similarity_search'te. 1-2 tahmin alın. "Module 2'de bunu derinlemesine öğreneceğiz."
+**Sorun:** "similarity_search arka planda ne yapıyor sizce?"
+**Sonra:** Site'ta devam — RAG vs Fine-Tuning bölümüne geçin.
 </PresenterNote>
 
 ## RAG vs Fine-Tuning
 
-This is the question everyone asks. Here's the decision:
+Herkesin sorduğu soru. Karar şöyle:
 
 | | RAG | Fine-Tuning |
 |---|---|---|
@@ -228,9 +237,9 @@ Use RAG when you need the model to **know** something. Use fine-tuning when you 
   </div>
 </FlowDiagram>
 
-## Real Use Cases — Your World
+## Real Use Cases — Sizin Dünyanız
 
-Think about the data that already exists inside a travel technology company:
+Bir seyahat teknolojisi şirketinde zaten mevcut olan veriyi düşünün:
 
 <CardGrid>
   <Card title="GDS Documentation" icon="document">
@@ -248,12 +257,15 @@ Think about the data that already exists inside a travel technology company:
 </CardGrid>
 
 <PresenterNote>
-Sorun: "Bu use case'lerden hangisi takımınıza en çok zaman kazandırır?" 2-3 cevap alın. Bunlar eğitimin geri kalanı için zihinsel çapalar olacak. [03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'unda bu use case'lerden birini end-to-end göstereceğimizi söyleyin.
+**Ekranda:** Site — Use Cases kartları
+**Yapın:** 2-3 cevap alın. Bunlar eğitimin geri kalanı için zihinsel çapalar olacak. Module 3'te [03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'unda bu use case'lerden birini end-to-end göstereceğinizi söyleyin.
+**Sorun:** "Bu use case'lerden hangisi takımınıza en çok zaman kazandırır?"
+**Sonra:** Site'ta devam — Indexing Phase bölümüne geçin.
 </PresenterNote>
 
-## The Indexing Phase — What Happens Before Queries
+## The Indexing Phase — Sorgudan Önce Ne Olur
 
-Before RAG can answer anything, you prepare your knowledge base. This happens offline, once:
+RAG herhangi bir şeyi cevaplayabilmeden önce bilgi tabanınızı hazırlarsınız. Bu offline olur, bir kez:
 
 <FlowDiagram title="Offline Indexing Pipeline">
   <div class="flow-row">
@@ -307,11 +319,11 @@ vector_store = Chroma.from_documents(
 print(f"Indexed {len(chunks)} chunks from {len(docs)} pages")
 ```
 
-We'll dive deep into each step in the coming modules. For now, remember the flow: **Load, Chunk, Embed, Store.**
+Her adımı sonraki modüllerde derinlemesine işleyeceğiz. Şimdilik akışı hatırlayın: **Load, Chunk, Embed, Store.**
 
-## What's Coming
+## Sırada Ne Var
 
-This module gave you the **why**. The rest gives you the **how**:
+Bu modül size **neden**'i verdi. Geri kalanı **nasıl**'ı verecek:
 
 | Module | Topic | What You Build |
 |--------|-------|----------------|
@@ -337,16 +349,16 @@ Modern RAG has diverged significantly. Today's systems use frozen LLMs (no end-t
 
 </DeepDive>
 
-## What to Take Away
+## Özet
 
-Three things:
+Üç şey:
 
-1. **LLMs have three blind spots** — hallucination, stale knowledge, no private data. RAG fixes all three, not by changing the model, but by changing the input.
+1. **LLM'lerin üç kör noktası var** — hallucination, eski bilgi, private veriye erişim yok. RAG üçünü de düzeltir — modeli değiştirerek değil, girdiyi değiştirerek.
 
-2. **RAG = retrieve, then generate.** Find the relevant documents, inject them into the prompt, let the model answer from evidence. Simple concept, powerful results.
+2. **RAG = al, sonra üret.** İlgili dokümanları bul, prompt'a enjekte et, modelin kanıttan cevap vermesini sağla. Basit konsept, güçlü sonuçlar.
 
-3. **RAG vs fine-tuning is not a competition.** RAG is for knowledge. Fine-tuning is for behavior. Know which problem you're solving.
+3. **RAG vs fine-tuning rekabet değil.** RAG bilgi için. Fine-tuning davranış için. Hangi problemi çözdüğünüzü bilin.
 
 ## Next Up
 
-The first practical question: how does "similarity_search" actually work? How do you turn text into numbers that capture meaning? **Module 2: Embeddings & The Vector World.**
+İlk pratik soru: "similarity_search" aslında nasıl çalışır? Metni anlam taşıyan sayılara nasıl dönüştürürsünüz? **Module 2: Embeddings & The Vector World.**

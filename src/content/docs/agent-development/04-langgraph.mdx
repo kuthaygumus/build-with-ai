@@ -15,9 +15,9 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 
 ## Why Chains Aren't Enough
 
-In Module 3, you built chains — linear sequences. Data flows in one direction. That works for "analyze this disruption." It fails completely for "handle this disruption."
+Module 3'te chain'ler kurdunuz — lineer diziler. Veri tek yönde akar. "Bu aksamamayı analiz et" için işe yarar. "Bu aksamayı yönet" için tamamen başarısız olur.
 
-Why? Because handling requires **decisions**.
+Neden? Çünkü yönetmek **karar** gerektirir.
 
 <FlowDiagram title="The Problem: Chains Can't Decide">
   <div class="flow-row">
@@ -41,12 +41,15 @@ Why? Because handling requires **decisions**.
   </div>
 </FlowDiagram>
 
-After the decision point, the flow should split: minor disruptions auto-resolve, severe ones escalate to ops, critical ones trigger emergency protocol. A linear chain can't branch. It can't loop. It can't wait for human approval before proceeding. It can't retry a specific step while keeping the rest of the state intact.
+Karar noktasından sonra akış dallanmalı: küçük aksamalar otomatik çözülmeli, ciddi olanlar operasyona yükseltilmeli, kritik olanlar acil protokolü tetiklemeli. Lineer chain dallanamaz. Döngü yapamaz. İnsan onayı bekleyemez. Bir adımı tekrar denerken state'in geri kalanını koruyamaz.
 
-**LangGraph** solves all of this by modeling your agent as a **graph** — nodes do work, edges control flow.
+**LangGraph** tüm bunları çözer — agent'ınızı **graph** olarak modeller. Node'lar iş yapar, edge'ler akışı kontrol eder.
 
 <PresenterNote>
-[04-basic-graph.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/04-basic-graph.ipynb) notebook'unu Colab'da açın ama henüz çalıştırmayın. Sorun: "Takımınızda bir karar içeren bir workflow düşünün — 'yolcu premium ise X yap, değilse Y yap' gibi. Bunu Module 3'teki chain ile yapabilir misiniz?" Cevap: temiz bir şekilde hayır. "İşte graph'lara neden ihtiyacımız var — şimdi notebook'ta görelim."
+**Ekranda:** Site — "Chains Can't Decide" diyagramı
+**Yapın:** Soruyu sorun ve düşünmelerini isteyin. Cevap: chain ile temiz bir şekilde yapılamaz. "İşte graph'lara neden ihtiyacımız var."
+**Sorun:** "Takımınızda bir karar içeren bir workflow düşünün — 'yolcu premium ise X yap, değilse Y yap' gibi. Bunu Module 3'teki chain ile yapabilir misiniz?"
+**Sonra:** Site'ta devam — Four Building Blocks bölümüne geçin.
 </PresenterNote>
 
 <KeyInsight>
@@ -55,11 +58,11 @@ Chains are straight lines. Real workflows have forks, loops, and checkpoints. La
 
 ## Four Building Blocks
 
-LangGraph has exactly four concepts. Everything else is built from these.
+LangGraph tam olarak dört kavramdan oluşur. Geri kalan her şey bunların üzerine kurulur.
 
-### 1. State — The Shared Memory
+### 1. State — Paylaşılan Hafıza
 
-State is typed data that flows through your graph. Every node can read it and write to it.
+State, graph'ınız boyunca akan tipli veri. Her node okuyabilir ve yazabilir.
 
 ```python
 from typing import Annotated
@@ -80,9 +83,9 @@ class FlightDisruptionState(TypedDict):
 The `Annotated[list, add_messages]` pattern is key. `add_messages` is a **reducer** — instead of replacing the list each time, it appends new messages. This is how conversation history accumulates across nodes without overwriting.
 </Aside>
 
-### 2. Nodes — Functions That Do Work
+### 2. Nodes — İş Yapan Fonksiyonlar
 
-Each node takes the current state, does something, and returns state updates.
+Her node mevcut state'i alır, bir şey yapar ve state güncellemesi döner.
 
 ```python
 from langchain_anthropic import ChatAnthropic
@@ -128,9 +131,9 @@ async def escalate_to_ops(state: FlightDisruptionState) -> dict:
     }
 ```
 
-### 3. Edges — The Wiring
+### 3. Edges — Kablolama
 
-Two types. **Normal edges** always go from A to B. **Conditional edges** choose the next node based on state.
+İki tür. **Normal edge'ler** her zaman A'dan B'ye gider. **Conditional edge'ler** state'e göre sonraki node'u seçer.
 
 ```python
 # Normal edge — always goes this way
@@ -156,7 +159,7 @@ graph.add_conditional_edges(
 )
 ```
 
-### 4. The Lifecycle
+### 4. Yaşam Döngüsü
 
 <Steps>
 1. **Define** — Create a `StateGraph` with your state schema
@@ -169,7 +172,7 @@ graph.add_conditional_edges(
 
 ## Building Your First Graph
 
-All four concepts, wired together into a runnable graph:
+Dört kavram, çalışabilir bir graph'a bağlanmış halde:
 
 ```python
 from langgraph.graph import StateGraph, START, END
@@ -249,11 +252,9 @@ result = await graph.ainvoke({
   </div>
 </FlowDiagram>
 
-<ColabLink title="Exercise: Build a Research-Summarize Graph" notebook="/notebooks/agent-dev/04-basic-graph.ipynb" level="Basic" />
-
 ### Visualizing Your Graph
 
-LangGraph renders your graph as a diagram — invaluable for debugging:
+LangGraph, graph'ınızı diyagram olarak render eder — debug için paha biçilmez:
 
 ```python
 # Generate a Mermaid diagram
@@ -265,12 +266,15 @@ Image(graph.get_graph().draw_mermaid_png())
 ```
 
 <PresenterNote>
-[04-basic-graph.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/04-basic-graph.ipynb) notebook'undaki Mermaid visualization hücresini çalıştırın. Graph yapısının koddan otomatik oluştuğunu gösterin. Sonra bir node ekleyin, bir edge değiştirin ve tekrar render edin. Visualization'ın kodla her zaman senkron olduğunu kanıtlayın. Sorun: "Bu graph'a yeni bir node eklesek akış nasıl değişir?"
+**Ekranda:** Colab — [04-basic-graph.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/04-basic-graph.ipynb)
+**Yapın:** 'Setup' ve 'Build Your First Graph' bölümlerini çalıştırın. Mermaid visualization hücresini çalıştırarak graph yapısının koddan otomatik oluştuğunu gösterin. Bir node ekleyin, tekrar render edin — visualization'ın kodla senkron olduğunu kanıtlayın.
+**Sorun:** "Bu graph'a yeni bir node eklesek akış nasıl değişir?"
+**Sonra:** Site'a dönün — Conditional Routing bölümüne geçin.
 </PresenterNote>
 
 ## Conditional Routing: The Decision Graph
 
-Now the real power. A customer request router that classifies incoming requests and routes them to specialized handlers:
+Asıl güç burada. Gelen istekleri sınıflandırıp uzmanlaşmış handler'lara yönlendiren bir customer request router:
 
 ```python
 from langgraph.graph import StateGraph, START, END
@@ -382,11 +386,9 @@ graph = workflow.compile()
   </div>
 </FlowDiagram>
 
-<ColabLink title="Exercise: Build a Conditional Routing Graph" notebook="/notebooks/agent-dev/05-conditional-graph.ipynb" level="Basic" />
-
 ## Human-in-the-Loop
 
-For production agents, you need a human to approve before the agent executes irreversible actions. LangGraph has first-class support via `interrupt_before` and `interrupt_after`.
+Production agent'larda, geri dönüşü olmayan aksiyonlar öncesinde insan onayı şart. LangGraph bunu `interrupt_before` ve `interrupt_after` ile first-class destekler.
 
 ```python
 from langgraph.checkpoint.memory import MemorySaver
@@ -447,12 +449,15 @@ Human-in-the-loop isn't a hack bolted on after the fact. It's a first-class feat
 </KeyInsight>
 
 <PresenterNote>
-[05-conditional-graph.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/05-conditional-graph.ipynb) notebook'undaki human-in-the-loop hücrelerini açın. Sorun: "Takımınız booking değiştiren bir agent'ı insan onayı olmadan deploy eder mi?" Çoğu hayır der. Interrupt pattern'ını notebook'ta çalıştırın — graph'ın nasıl durduğunu, state'i sakladığını ve onay sonrası devam ettiğini gösterin. "İşte production pattern'ı bu."
+**Ekranda:** Colab — [05-conditional-graph.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/05-conditional-graph.ipynb)
+**Yapın:** 'Human-in-the-Loop' bölümündeki hücreleri çalıştırın. Graph'ın nasıl durduğunu, state'i sakladığını ve onay sonrası devam ettiğini canlı gösterin. "İşte production pattern'ı bu."
+**Sorun:** "Takımınız booking değiştiren bir agent'ı insan onayı olmadan deploy eder mi?"
+**Sonra:** Site'a dönün — Multi-Agent bölümüne geçin.
 </PresenterNote>
 
 ## Multi-Agent Collaboration
 
-The most powerful LangGraph pattern: multiple specialized agents that iterate until quality is met.
+LangGraph'ın en güçlü pattern'ı: kalite sağlanana kadar iterasyon yapan, uzmanlaşmış birden fazla agent.
 
 ```python
 class MultiAgentState(TypedDict):
@@ -557,12 +562,10 @@ graph = workflow.compile()
   </div>
 </FlowDiagram>
 
-This creates a **revision loop**. The researcher drafts, the reviewer critiques, the researcher revises. Up to 3 cycles, or until the reviewer says APPROVED. This pattern is extremely effective for producing high-quality outputs.
-
-<ColabLink title="Challenge: Build a Multi-Agent Research System" notebook="/notebooks/agent-dev/06-multi-agent.ipynb" level="Challenge" />
+Bu bir **revision loop** oluşturur. Researcher taslak yazar, reviewer eleştirir, researcher revize eder. Maksimum 3 döngü veya reviewer APPROVED diyene kadar. Yüksek kaliteli çıktı üretmek için son derece etkili bir pattern.
 
 <KeyInsight>
-Multi-agent isn't about having more agents. It's about having specialized agents that critique each other's work. The revision loop — draft, review, revise — consistently produces better output than a single agent working alone.
+Multi-agent daha fazla agent demek değil. Birbirinin işini eleştiren uzmanlaşmış agent'lar demek. Draft, review, revise döngüsü — tek başına çalışan bir agent'tan sürekli olarak daha iyi çıktı üretir.
 </KeyInsight>
 
 <DeepDive title="Advanced: Subgraphs, Persistence, and LangSmith">
@@ -620,23 +623,38 @@ LangSmith shows: node execution order, input/output per LLM call, token usage an
 
 </DeepDive>
 
+## Exercises
+
+<ColabLink title="Exercise: Build a Research-Summarize Graph" notebook="/notebooks/agent-dev/04-basic-graph.ipynb" level="Basic" />
+
+<ColabLink title="Exercise: Build a Conditional Routing Graph" notebook="/notebooks/agent-dev/05-conditional-graph.ipynb" level="Basic" />
+
+<ColabLink title="Challenge: Build a Multi-Agent Research System" notebook="/notebooks/agent-dev/06-multi-agent.ipynb" level="Challenge" />
+
+<PresenterNote>
+**Ekranda:** Colab — [04-basic-graph.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/04-basic-graph.ipynb) ve [05-conditional-graph.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/05-conditional-graph.ipynb)
+**Yapın:** Katılımcılara notebook'ları gösterin ve egzersiz bölümlerini işaret edin. İlk basic graph'ı bitirenlerin conditional graph'a geçmesini söyleyin.
+**Sorun:** "Hangi graph pattern'ını kendi iş akışlarınızda kullanırdınız?"
+**Sonra:** Katılımcılara: Şimdi siz deneyin — notebook'un sonundaki YOUR TURN bölümlerini yapın. 10-15 dakika süre.
+</PresenterNote>
+
 ## Key Takeaways
 
 <CardGrid>
-  <Card title="Graphs enable decisions" icon="random">
-    Linear chains can't branch. Graphs model real workflows with conditional routing and loops.
+  <Card title="Graph'lar karar verebilir" icon="random">
+    Lineer chain'ler dallanamaz. Graph'lar conditional routing ve döngülerle gerçek workflow'ları modeller.
   </Card>
-  <Card title="State is the backbone" icon="document">
-    Shared typed state flows through nodes. Reducers control how updates are applied.
+  <Card title="State omurgadır" icon="document">
+    Paylaşılan tipli state node'lar arasında akar. Reducer'lar güncellemelerin nasıl uygulanacağını kontrol eder.
   </Card>
-  <Card title="Human-in-the-loop is built in" icon="approve-check-circle">
-    `interrupt_before` + checkpointer = production-grade human oversight. First-class, not bolted on.
+  <Card title="Human-in-the-loop dahili" icon="approve-check-circle">
+    `interrupt_before` + checkpointer = production-grade insan denetimi. First-class, sonradan eklenmiş değil.
   </Card>
-  <Card title="Multi-agent = revision loops" icon="setting">
-    Specialized agents critique each other's work through graph cycles until quality is met.
+  <Card title="Multi-agent = revision loop'ları" icon="setting">
+    Uzmanlaşmış agent'lar birbirinin işini graph döngüleri üzerinden eleştirir.
   </Card>
 </CardGrid>
 
 ## Next Up
 
-You have all the building blocks: **MCP** for tool connectivity, **LangChain** for model interaction, **LangGraph** for stateful orchestration. In Module 5, we combine everything into a production-ready agent and tackle the hard problems — error handling, security, cost management.
+Tüm yapı taşlarına sahipsiniz: tool bağlantısı için **MCP**, model etkileşimi için **LangChain**, stateful orkestrasyon için **LangGraph**. Module 5'te hepsini production-ready bir agent'a birleştireceğiz — error handling, güvenlik, maliyet yönetimi.

@@ -15,23 +15,26 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 
 ## The Gap
 
-Your RAG demo works great in a notebook. Then you deploy it.
+RAG demo'nuz notebook'ta harika çalışır. Sonra deploy edersiniz.
 
 <PresenterNote>
-[07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb) notebook'unu Colab'da açın. Sorun: "Kim bir demo deploy edip beklemediği şekilde başarısız olmasını izledi?" Eller kalkar. "Demo ile production arasındaki boşluk — bu modül onu kapatıyor." Notebook'taki 4 failure senaryosunu sırayla okuyun. Her birinden sonra durun. Bunlar gerçek, varsayımsal değil.
+**Ekranda:** Colab — [07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb)
+**Yapın:** Notebook'u açın. 4 failure senaryosunu sırayla okuyun. Her birinden sonra durun — bunlar gerçek, varsayımsal değil. "Demo ile production arasındaki boşluk — bu modül onu kapatıyor."
+**Sorun:** "Kim bir demo deploy edip beklemediği şekilde başarısız olmasını izledi?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — RAGAS bölümüne geçin.
 </PresenterNote>
 
-A user asks a question that retrieves **conflicting documents** and gets a contradictory answer. The system retrieves 10 chunks but the answer comes from only 1 — the rest **dilute** the quality. Latency spikes to 8 seconds. And you have no idea **why** the system gave a wrong answer last Tuesday.
+Kullanıcı bir soru sorar, **çelişen dokümanlar** retrieve edilir ve çelişkili bir cevap alır. Sistem 10 chunk alır ama cevap sadece 1'inden gelir — geri kalanı kaliteyi **sulandırır**. Latency 8 saniyeye fırlar. Ve geçen Salı sistemin neden yanlış cevap verdiğini **bilmiyorsunuz**.
 
-Four problems. This module gives you the tools to solve all of them.
+Dört problem. Bu modül hepsini çözmek için araçları verir.
 
 <KeyInsight>
-Demo-quality RAG answers the happy path. Production-quality RAG handles the edge cases, measures its own quality, and tells you when it's failing.
+Demo kalitesi RAG happy path'i cevaplar. Production kalitesi RAG edge case'leri yönetir, kendi kalitesini ölçer ve ne zaman başarısız olduğunu söyler.
 </KeyInsight>
 
 ## Evaluation with RAGAS
 
-You can't improve what you can't measure. **RAGAS** (Retrieval Augmented Generation Assessment) is the standard framework for evaluating RAG systems.
+Ölçemediğinizi iyileştiremezsiniz. **RAGAS** (Retrieval Augmented Generation Assessment) RAG sistemlerini değerlendirmek için standart framework.
 
 ### The Four Metrics
 
@@ -150,7 +153,10 @@ Action: Add re-ranking or reduce k.
 ```
 
 <PresenterNote>
-[07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb) notebook'undaki RAGAS evaluation hücrelerini çalıştırın. Context Precision 0.65 = %35 gürültü. Sorun: "Module 4'ten hangi teknik bunu düzeltir?" Re-ranking. Notebook'ta cross-encoder ekleyin, tekrar çalıştırın ve precision'ın 0.85+'e çıktığını gösterin. Tekniğin işe yaradığının canlı kanıtı.
+**Ekranda:** Colab — [07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb)
+**Yapın:** 'RAGAS Evaluation' hücrelerini çalıştırın. Context Precision 0.65 = %35 gürültü. Cross-encoder ekleyip tekrar çalıştırın — precision'ın 0.85+'e çıktığını gösterin. Tekniğin işe yaradığının canlı kanıtı.
+**Sorun:** "Module 4'ten hangi teknik bunu düzeltir?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — Golden Test Sets bölümüne geçin.
 </PresenterNote>
 
 <Aside type="tip">
@@ -159,7 +165,7 @@ Run RAGAS on **every change** to your pipeline — new chunking strategy, differ
 
 ## Golden Test Sets
 
-Automated metrics are essential. But you also need **human-curated test cases** that represent your most important queries.
+Otomatik metrikler şart. Ama en önemli sorgularınızı temsil eden **insan tarafından hazırlanmış test case'lere** de ihtiyacınız var.
 
 ```python
 golden_tests = [
@@ -211,11 +217,11 @@ run_golden_tests(rag_chain_v2, golden_tests, "v2_with_reranking")
 
 ## Production Pitfalls
 
-Three patterns that kill production RAG systems. Each has a specific fix.
+Production RAG sistemlerini öldüren üç pattern. Her birinin spesifik çözümü var.
 
 ### Pitfall 1: Lost in the Middle
 
-LLMs pay more attention to the **beginning and end** of the context. If the critical chunk is in the middle, it might be ignored.
+LLM'ler context'in **başına ve sonuna** daha fazla dikkat eder. Kritik chunk ortadaysa görmezden gelebilir.
 
 <FlowDiagram title="Lost in the Middle">
   <div class="flow-row">
@@ -243,7 +249,7 @@ LLMs pay more attention to the **beginning and end** of the context. If the crit
 
 ### Pitfall 2: Conflicting Sources
 
-Your knowledge base contains a 2023 doc saying "rate limit: 100/min" and a 2024 doc saying "500/min." RAG retrieves both. LLM picks one at random.
+Bilgi tabanınızda 2023 dokümanı "rate limit: 100/min" diyor, 2024 dokümanı "500/min." RAG ikisini de alır. LLM rastgele birini seçer.
 
 **Fixes**: Add `version` and `date` metadata, filter for latest during retrieval, include "prefer the most recent source" in the prompt, and remove outdated docs during indexing.
 
@@ -258,7 +264,7 @@ results = vector_store.similarity_search(
 
 ### Pitfall 3: Over-Retrieval
 
-Retrieving 20 chunks when only 2 are relevant. The signal drowns in noise.
+Sadece 2'si ilgili olan 20 chunk retrieve etmek. Sinyal gürültüde boğulur.
 
 **Fixes**: Retrieve broadly (k=20), then re-rank and keep top 5. Or use MMR for diverse, relevant results.
 
@@ -277,7 +283,7 @@ retriever = ContextualCompressionRetriever(
 
 ### Multi-Level Caching
 
-Cache at three levels to avoid redundant computation:
+Gereksiz hesaplamayı önlemek için üç seviyede cache'leyin:
 
 ```python
 from cachetools import TTLCache
@@ -294,7 +300,7 @@ answer_cache = TTLCache(maxsize=500, ttl=1800)       # 30min
 
 ### Async Processing
 
-Don't block on sequential operations. Run dense and sparse retrieval in parallel:
+Sıralı işlemlerde bloklamayın. Dense ve sparse retrieval'ı paralel çalıştırın:
 
 ```python
 import asyncio
@@ -338,7 +344,7 @@ def choose_model(context_length: int) -> str:
 
 ## Monitoring
 
-Track what matters in production:
+Production'da önemli olanı takip edin:
 
 ```python
 class RAGMonitor:
@@ -360,7 +366,7 @@ class RAGMonitor:
         return result
 ```
 
-And the most valuable signal: **user feedback.**
+Ve en değerli sinyal: **kullanıcı feedback'i.**
 
 ```python
 def collect_feedback(query_id: str, helpful: bool, comment: str = ""):
@@ -377,12 +383,15 @@ def collect_feedback(query_id: str, helpful: bool, comment: str = ""):
 ```
 
 <PresenterNote>
-[07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb) notebook'undaki monitoring ve feedback hücrelerini gösterin. Sorun: "RAG sistemindeki en pahalı bug nedir?" Kullanıcıların rapor etmediği yanlış cevaplar. Sisteme güvenmeyi bırakırlar. Notebook'taki feedback collection ve alert threshold'larını çalıştırın. "Kullanıcılarınız vazgeçmeden önce sistemin ne zaman başarısız olduğunu bilmeniz gerekir."
+**Ekranda:** Colab — [07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb)
+**Yapın:** 'Monitoring' ve 'Feedback' hücrelerini çalıştırın. Feedback collection ve alert threshold'larını gösterin. "Kullanıcılarınız vazgeçmeden önce sistemin ne zaman başarısız olduğunu bilmeniz gerekir."
+**Sorun:** "RAG sistemindeki en pahalı bug nedir?" (Cevap: kullanıcıların rapor etmediği yanlış cevaplar)
+**Sonra:** Site'a dönün — Multi-Tenant Architecture bölümüne geçin.
 </PresenterNote>
 
 ## Multi-Tenant Architecture
 
-In enterprise, different users see different documents. Enforce this at the **retrieval** level, not the generation level.
+Enterprise'da farklı kullanıcılar farklı dokümanları görür. Bunu **retrieval** seviyesinde zorunlu kılın, generation seviyesinde değil.
 
 ```python
 class MultiTenantRetriever:
@@ -404,28 +413,35 @@ class MultiTenantRetriever:
 **Security**: Always filter at retrieval, not generation. If a restricted document makes it into the LLM context, the model might reveal it regardless of system prompt instructions. The context window is the trust boundary.
 </Aside>
 
-## Capstone Exercise
+## Exercises
 
 <ColabLink title="Capstone: Production-Ready RAG with Evaluation" notebook="/notebooks/rag/07-capstone-production.ipynb" level="Capstone" />
 
-Build a production-grade RAG system that includes everything:
+Her şeyi içeren production-grade bir RAG sistemi kurun:
 
 <Steps>
-1. Document loading with metadata preservation
-2. Recursive chunking with optimized parameters
+1. Metadata korumalı doküman yükleme
+2. Optimize parametrelerle recursive chunking
 3. Hybrid retrieval (dense + BM25)
 4. Cross-encoder re-ranking
-5. Prompt with citation requirements
-6. RAGAS evaluation on a golden test set
-7. Latency tracking and error monitoring
-8. Cost estimation per query
+5. Citation gereksinimleri olan prompt
+6. Golden test set üzerinde RAGAS evaluation
+7. Latency takibi ve error monitoring
+8. Sorgu başına maliyet tahmini
 </Steps>
 
-This is the culmination of all 5 modules. Every technique, combined into one tested system.
+5 modülün doruk noktası. Her teknik, test edilmiş tek bir sistemde birleştirilmiş.
 
-## Grand Finale: Agent + RAG = The Complete Picture
+<PresenterNote>
+**Ekranda:** Colab — [07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb)
+**Yapın:** Capstone notebook'unu gösterin ve tüm bölümleri işaret edin. Bu notebook tüm eğitimi birleştirir. Katılımcılara 20-25 dakika verin.
+**Sorun:** "Kendi takımınızda bu RAG mimarisini nerede uygulardınız?"
+**Sonra:** Katılımcılara: Şimdi siz deneyin — notebook'un sonundaki YOUR TURN bölümlerini yapın. 10-15 dakika süre.
+</PresenterNote>
 
-We've now completed both training series. Let's see what they look like together.
+## Grand Finale: Agent + RAG = Tam Resim
+
+İki eğitim serisini de tamamladık. Birlikte nasıl göründüklerine bakalım.
 
 <FlowDiagram title="The Convergence">
   <div class="flow-row">
@@ -461,7 +477,7 @@ We've now completed both training series. Let's see what they look like together
   </Card>
 </CardGrid>
 
-The Agentic RAG pattern from Module 4 is the bridge. An agent with tools that include a retriever, a re-ranker, and a validator — deciding at each step whether to search, reformulate, or answer. Add API tools, and it doesn't just answer questions — it takes action based on grounded information.
+Module 4'teki Agentic RAG pattern'ı köprü. Retriever, re-ranker ve validator'ı tool olarak kullanan bir agent — her adımda arayıp aramayacağına, yeniden formüle edip etmeyeceğine, cevap verip vermeyeceğine karar verir. API tool'ları ekleyin — artık sadece soru cevaplamıyor, dayanaklı bilgiye göre aksiyon alıyor.
 
 <FlowDiagram title="The Complete Agentic RAG Architecture">
   <div class="flow-row">
@@ -508,11 +524,14 @@ The Agentic RAG pattern from Module 4 is the bridge. An agent with tools that in
 </FlowDiagram>
 
 <PresenterNote>
-Kapanış anı. [07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb) notebook'undaki son hücreyi çalıştırın — tüm tekniklerin birleştiği Agentic RAG demo'su. Agent Training Module 1'deki ilk demo'ya bağlayın: "O agent'ı hatırlıyor musunuz? Şimdi tüm dokümanlara, policy'lere ve tarihsel verilere RAG erişimi olduğunu düşünün. Sadece aksiyon almıyor — dayanaklı, kaynaklı bilgiyle aksiyon alıyor." Durun. Sindirmelerini sağlayın.
+**Ekranda:** Colab — [07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb)
+**Yapın:** Son hücreyi çalıştırın — tüm tekniklerin birleştiği Agentic RAG demo'su. Agent Training Module 1'deki ilk demo'ya bağlayın: "O agent'ı hatırlıyor musunuz? Şimdi tüm dokümanlara, policy'lere ve tarihsel verilere RAG erişimi olduğunu düşünün." Durun. Sindirmelerini sağlayın.
+**Sorun:** "Bu mimarinin hangi parçası sizin iş probleminize en çok uygulanabilir?"
+**Sonra:** Kapanış. Tüm eğitim tamamlandı.
 </PresenterNote>
 
 <KeyInsight>
-The agent decides what to do. RAG ensures it knows the facts. Tools let it act on them. This triad — reasoning, knowledge, action — is the architecture pattern for enterprise AI. You now have all three.
+Agent ne yapacağına karar verir. RAG gerçekleri bilmesini sağlar. Tool'lar bunlara göre aksiyon almasını sağlar. Bu üçlü — reasoning, knowledge, action — enterprise AI'ın mimari pattern'ı. Artık üçüne de sahipsiniz.
 </KeyInsight>
 
 <DeepDive title="Advanced RAG Architecture Patterns at Scale">
@@ -577,14 +596,14 @@ These patterns compose. A Router RAG where each sub-pipeline uses Corrective RAG
 
 </DeepDive>
 
-## What to Take Away
+## Özet
 
-From this module — and from the entire RAG series:
+Bu modülden — ve tüm RAG serisinden:
 
-1. **Measure everything.** RAGAS for automated evaluation, golden test sets for regression testing. If you can't measure it, you can't improve it — and you won't know when it breaks.
+1. **Her şeyi ölçün.** Otomatik evaluation için RAGAS, regression testing için golden test set'ler. Ölçemiyorsanız iyileştiremezsiniz — ve ne zaman bozulduğunu bilemezsiniz.
 
-2. **Production is about the edge cases.** Lost-in-the-middle, conflicting sources, over-retrieval, multi-tenant security. Each has specific, actionable fixes. Know them.
+2. **Production edge case'lerle ilgili.** Lost-in-the-middle, çelişen kaynaklar, over-retrieval, multi-tenant güvenlik. Her birinin spesifik, uygulanabilir çözümü var.
 
-3. **Agent + RAG + Tools = Enterprise AI.** The agent reasons. RAG provides grounded knowledge. Tools enable action. This triad is the architecture pattern you'll build production systems on.
+3. **Agent + RAG + Tools = Enterprise AI.** Agent düşünür. RAG dayanaklı bilgi sağlar. Tool'lar aksiyon almayı mümkün kılar. Bu üçlü, production sistemlerinizi üzerine kuracağınız mimari pattern.
 
-You started this training asking "what is RAG?" You're ending it knowing how to build, evaluate, scale, and operate production RAG systems — and how to combine them with agents for the full picture. That's the foundation. Now go build something real.
+Bu eğitime "RAG nedir?" diye başladınız. Production RAG sistemleri kurmayı, değerlendirmeyi, ölçeklendirmeyi ve işletmeyi bilerek bitiriyorsunuz — ve bunları agent'larla nasıl birleştireceğinizi. Temel bu. Şimdi gidin gerçek bir şey yapın.

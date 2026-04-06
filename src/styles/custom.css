@@ -408,6 +408,48 @@ html {
 ::-webkit-scrollbar-thumb { background: var(--sl-color-gray-5); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--sl-color-gray-4); }
 
+/* --- Pagination (prev/next) — directional gradient fill --- */
+.pagination-links a {
+  border: 1px solid var(--sl-color-gray-5) !important;
+  border-radius: var(--ai-radius) !important;
+  transition: all var(--ai-transition) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.pagination-links a::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: linear-gradient(90deg, var(--ai-accent-glow), transparent);
+  transition: width var(--ai-transition);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pagination-links a[rel="prev"]::before {
+  left: 0;
+  background: linear-gradient(90deg, var(--ai-accent-glow), transparent);
+}
+
+.pagination-links a[rel="next"]::before {
+  right: 0;
+  left: auto;
+  background: linear-gradient(270deg, var(--ai-accent-glow), transparent);
+}
+
+.pagination-links a:hover {
+  border-color: var(--ai-accent) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px var(--ai-accent-glow);
+}
+
+.pagination-links a:hover::before {
+  width: 50%;
+}
+
 /* --- Footer credit --- */
 .main-pane::after {
   content: 'Built by Kuthay Gumus';

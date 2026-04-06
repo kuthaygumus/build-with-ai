@@ -13,9 +13,9 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 
 <ModuleHeader duration="75 min" day={1} goal="Build a complete RAG pipeline from scratch — load, chunk, retrieve, generate." />
 
-## The Pipeline at a Glance
+## Pipeline'a Genel Bakış
 
-Every RAG system, from a weekend prototype to a production system serving millions, follows the same four stages:
+Her RAG sistemi — hafta sonu prototipinden milyonlara hizmet eden production sistemine kadar — aynı dört aşamayı takip eder:
 
 <FlowDiagram title="The Four Stages of RAG">
   <div class="flow-row">
@@ -48,15 +48,18 @@ Every RAG system, from a weekend prototype to a production system serving millio
   </div>
 </FlowDiagram>
 
-The first two stages happen **offline** — before any user asks a question. The last two happen **online** — at query time. This distinction matters for performance and cost.
+İlk iki aşama **offline** gerçekleşir — herhangi bir kullanıcı soru sormadan önce. Son ikisi **online** — sorgu anında. Bu ayrım performans ve maliyet için kritik.
 
 <PresenterNote>
-[03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'unu Colab'da açın. Tahtaya offline/online sınırını çizin. Notebook'taki indexing hücrelerini (Load, Chunk, Embed, Store) gösterin. Sorun: "Indexing ile querying'i neden ayırıyoruz?" Cevap: indexing pahalı (embedding hesaplama) ama bir kere yapılır. Querying ucuz (vector lookup + LLM call) ve her request'te çalışır.
+**Ekranda:** Colab — [03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb)
+**Yapın:** Notebook'u açın. Tahtaya offline/online sınırını çizin. Indexing hücrelerini (Load, Chunk, Embed, Store) gösterin. Indexing pahalı ama bir kere yapılır; querying ucuz ve her request'te çalışır.
+**Sorun:** "Indexing ile querying'i neden ayırıyoruz?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — Document Loading bölümüne geçin.
 </PresenterNote>
 
 ## Stage 1: Document Loading
 
-Your knowledge base can come from anywhere. LangChain has loaders for all of them:
+Bilgi tabanınız her yerden gelebilir. LangChain hepsi için loader'lara sahip:
 
 <Tabs>
   <TabItem label="PDF">
@@ -122,26 +125,29 @@ documents = [
 Always preserve **metadata** during loading — source, page, date, category. You'll need it for citations, filtering, and debugging. Metadata is the difference between "here's your answer" and "here's your answer from page 14 of the API reference, updated last Tuesday."
 </Aside>
 
-## Stage 2: Chunking — The Make-or-Break Decision
+## Stage 2: Chunking — Ya Yapar Ya Kırar
 
-This is the single most impactful decision in your RAG pipeline. **Bad chunking ruins everything downstream.** Great retrieval can't fix chunks that split sentences mid-thought. Great prompts can't fix chunks that mix three unrelated topics.
+RAG pipeline'ınızdaki en etkili tek karar. **Kötü chunking aşağıdaki her şeyi mahveder.** Harika retrieval, cümleyi ortasından bölen chunk'ları düzeltemez. Harika prompt'lar, üç alakasız konuyu karıştıran chunk'ları düzeltemez.
 
 <KeyInsight>
-Chunking determines retrieval quality. Retrieval quality determines answer quality. Get this wrong, and nothing downstream can save you.
+Chunking retrieval kalitesini belirler. Retrieval kalitesi cevap kalitesini belirler. Bunu yanlış yaparsanız, aşağıdaki hiçbir şey kurtaramaz.
 </KeyInsight>
 
-Why chunk at all? Three reasons:
-1. LLMs have context limits — you can't stuff the entire knowledge base into a prompt
-2. Embedding models work best on focused passages, not 50-page documents
-3. Retrieval is more precise with smaller, topically coherent chunks
+Neden chunk'lıyoruz? Üç neden:
+1. LLM'lerin context limiti var — tüm bilgi tabanını prompt'a tıkamazsınız
+2. Embedding modelleri odaklı pasajlarda en iyi çalışır, 50 sayfalık dokümanlarda değil
+3. Retrieval, daha küçük ve konu odaklı chunk'larla daha hassas
 
 <PresenterNote>
-[03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'undaki chunking karşılaştırma hücrelerini çalıştırın. Tüm dokümanı embed etme vs paragraf paragraf embed etme farkını gösterin. Full-document embedding her şeyle zayıf eşleşir, paragraf embedding doğru paragrafla güçlü eşleşir. Sorun: "chunk_size=2000 ile chunk_size=500 arasındaki fark ne olur?" Notebook'ta deneyin.
+**Ekranda:** Colab — [03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb)
+**Yapın:** 'Chunking Comparison' hücrelerini çalıştırın. Full-document vs paragraf embedding farkını gösterin. Full-document embedding her şeyle zayıf eşleşir, paragraf embedding doğru paragrafla güçlü eşleşir. Notebook'ta chunk_size=2000 vs 500'ü deneyin.
+**Sorun:** "chunk_size=2000 ile chunk_size=500 arasındaki fark ne olur?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — Retrieval bölümüne geçin.
 </PresenterNote>
 
-### Strategy 1: Recursive Character Splitting — The Default
+### Strategy 1: Recursive Character Splitting — Varsayılan
 
-Tries natural boundaries first (paragraphs, then sentences, then words), falls back to smaller separators as needed:
+Önce doğal sınırları dener (paragraflar, sonra cümleler, sonra kelimeler), gerekirse daha küçük ayırıcılara düşer:
 
 ```python
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -163,11 +169,11 @@ chunks = splitter.split_documents(documents)
 print(f"Created {len(chunks)} chunks from {len(documents)} documents")
 ```
 
-**This is your starting point.** Use this until you have a specific reason not to.
+**Başlangıç noktanız bu.** Kullanmamak için spesifik bir nedeniniz olana kadar bunu kullanın.
 
 ### Strategy 2: Semantic Chunking
 
-Uses embeddings to detect topic boundaries. Splits when semantic similarity between consecutive sentences drops below a threshold:
+Konu sınırlarını tespit etmek için embedding kullanır. Ardışık cümleler arası semantic similarity bir eşiğin altına düştüğünde böler:
 
 ```python
 from langchain_experimental.text_splitter import SemanticChunker
@@ -187,7 +193,7 @@ chunks = splitter.split_documents(documents)
 
 ### Strategy 3: Document-Structure-Aware
 
-Uses the document's own structure — headings, sections — to define chunks:
+Dokümanın kendi yapısını kullanır — başlıklar, bölümler — chunk'ları tanımlamak için:
 
 ```python
 from langchain.text_splitter import MarkdownHeaderTextSplitter
@@ -240,11 +246,11 @@ chunks = splitter.split_text(markdown_text)
 
 ## Stage 3: Retrieval
 
-User asks a question. You need to find the most relevant chunks. Three approaches:
+Kullanıcı soru sorar. En ilgili chunk'ları bulmanız gerekir. Üç yaklaşım:
 
 ### Dense Retrieval (Semantic Search)
 
-Embed the query, find the nearest vectors. This is what you built in Module 2:
+Sorguyu embed et, en yakın vektörleri bul. Module 2'de bunu kurmuştunuz:
 
 ```python
 from langchain_openai import OpenAIEmbeddings
@@ -265,7 +271,7 @@ results = retriever.invoke("How do I authenticate with the Flight API?")
 
 ### Sparse Retrieval (BM25 / Keyword)
 
-Traditional keyword search. No embeddings. No meaning. Just term matching:
+Geleneksel keyword search. Embedding yok. Anlam yok. Sadece terim eşleştirme:
 
 ```python
 from langchain_community.retrievers import BM25Retriever
@@ -277,9 +283,9 @@ results = bm25_retriever.invoke("PNR AMAXTK error code 4812")
 **Strength**: Exact term matching. Error codes, PNR locators, acronyms.
 **Weakness**: "delayed flight" won't match "late arrival."
 
-### Hybrid Retrieval — Best of Both
+### Hybrid Retrieval — İkisinin İyisi
 
-This is the production default. Combine dense and sparse, merge results:
+Production varsayılanı bu. Dense ve sparse'ı birleştir, sonuçları merge et:
 
 ```python
 from langchain.retrievers import EnsembleRetriever
@@ -334,12 +340,12 @@ results = hybrid_retriever.invoke("OAuth2 credentials for flight-offers v2")
 </FlowDiagram>
 
 <KeyInsight>
-Hybrid retrieval is the production default. Pure semantic search misses exact terms. Pure keyword search misses meaning. Combine both. Start with 50/50 weights and tune from there.
+Hybrid retrieval production varsayılanı. Saf semantic search kesin terimleri kaçırır. Saf keyword search anlamı kaçırır. İkisini birleştirin. 50/50 ağırlıklarla başlayıp oradan ayarlayın.
 </KeyInsight>
 
 ## Stage 4: Generation
 
-You have relevant chunks. Now generate a grounded answer.
+İlgili chunk'larınız var. Şimdi dayanaklı bir cevap üretin.
 
 ```python
 from langchain_openai import ChatOpenAI
@@ -374,12 +380,15 @@ def format_context(docs):
 ```
 
 <PresenterNote>
-[03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'undaki generation hücresinde system prompt'u gösterin. "ONLY on the provided context" kuralını vurgulayın. Sorun: "Bu talimatı kaldırsak ne olur?" Model training data'sına geri döner ve hallucinate edebilir. Notebook'ta bu talimatı çıkarıp aynı soruyu tekrar sorun — farkı canlı gösterin.
+**Ekranda:** Colab — [03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb)
+**Yapın:** 'Generation' hücresinde system prompt'u gösterin. "ONLY on the provided context" kuralını vurgulayın. Bu talimatı çıkarıp aynı soruyu tekrar sorun — model training data'sına döner ve hallucinate edebilir. Farkı canlı gösterin.
+**Sorun:** "Bu talimatı kaldırsak ne olur?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — Full Pipeline bölümüne geçin.
 </PresenterNote>
 
-### The Full Pipeline — 25 Lines
+### Full Pipeline — 25 Satır
 
-Everything together:
+Her şey bir arada:
 
 ```python
 from langchain_community.document_loaders import PyPDFLoader
@@ -429,25 +438,28 @@ client credentials flow:
 [Source: flight-api-reference.pdf, Page: 12]
 ```
 
-25 lines. From PDF to grounded, cited answers.
+25 satır. PDF'ten dayanaklı, kaynaklı cevaplara.
 
-## Hands-On: Build It
+## Exercises
 
 <ColabLink title="Build a Complete RAG Pipeline: PDF to Answers" notebook="/notebooks/rag/03-e2e-rag.ipynb" level="Basic" />
 
-In this notebook you build the full pipeline from scratch:
+Bu notebook'ta pipeline'ı sıfırdan kurarsınız:
 
 <Steps>
-1. Load a PDF document (provided)
-2. Experiment with different chunking strategies
-3. Create embeddings and store in ChromaDB
-4. Implement dense retrieval
-5. Connect to an LLM for grounded generation
-6. Test with multiple queries and evaluate quality
+1. Bir PDF dokümanı yükleyin (sağlanmış)
+2. Farklı chunking stratejileri deneyin
+3. Embedding'ler oluşturup ChromaDB'ye kaydedin
+4. Dense retrieval implement edin
+5. Dayanaklı cevap üretimi için LLM'e bağlayın
+6. Birden fazla sorguyla test edin ve kaliteyi değerlendirin
 </Steps>
 
 <PresenterNote>
-[03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'u ana hands-on egzersizi. Katılımcılara 20-25 dakika verin. Dolaşın, API key sorunlarında yardım edin. Yaygın takılma noktası chunk size — chunk_size=2000 kullananlar 500-800 kullananlara göre daha kötü retrieval alır. Sonuçları incelerken bunu öğretme fırsatı olarak kullanın. Sorun: "Chunk size'ı nasıl seçtiniz ve sonucu nasıl etkiledi?"
+**Ekranda:** Colab — [03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb)
+**Yapın:** Ana hands-on egzersizi bu notebook. Katılımcılara 20-25 dakika verin. Dolaşın, API key sorunlarında yardım edin. Yaygın takılma noktası: chunk_size=2000 kullananlar 500-800'e göre daha kötü retrieval alır — bunu öğretme fırsatı olarak kullanın.
+**Sorun:** "Chunk size'ı nasıl seçtiniz ve sonucu nasıl etkiledi?"
+**Sonra:** Katılımcılara: Şimdi siz deneyin — notebook'un sonundaki YOUR TURN bölümlerini yapın. 10-15 dakika süre.
 </PresenterNote>
 
 <DeepDive title="Chunk Overlap, Metadata Filtering, and MMR">
@@ -493,16 +505,16 @@ The algorithm: fetch top-20, select the most relevant one, then for each remaini
 
 </DeepDive>
 
-## What to Take Away
+## Özet
 
-Three things:
+Üç şey:
 
-1. **Chunking is the highest-leverage decision.** Start with `RecursiveCharacterTextSplitter`, chunk_size 500-1000, overlap 100-200. Then benchmark and iterate.
+1. **Chunking en yüksek kaldıraçlı karar.** `RecursiveCharacterTextSplitter`, chunk_size 500-1000, overlap 100-200 ile başlayın. Sonra benchmark yapıp iterasyon yapın.
 
-2. **Hybrid retrieval beats pure semantic search.** Combine dense (meaning) with sparse (keywords). Production systems almost always use both.
+2. **Hybrid retrieval saf semantic search'ü yener.** Dense (anlam) ile sparse'ı (keyword) birleştirin. Production sistemleri neredeyse her zaman ikisini kullanır.
 
-3. **The prompt is your guardrail.** "Answer ONLY from context" is the single instruction that prevents hallucination in the generation step. Never skip it.
+3. **Prompt sizin guardrail'ınız.** "Answer ONLY from context" generation adımında hallucination'ı önleyen tek talimat. Asla atlamayın.
 
 ## Next Up
 
-Your pipeline works. But it fails on edge cases — casual queries that don't match technical docs, relevant chunks ranked too low, answers that need multiple documents. **Module 4: Advanced RAG** fixes all of these.
+Pipeline'ınız çalışıyor. Ama edge case'lerde başarısız oluyor — teknik dokümanlarla eşleşmeyen günlük sorgular, düşük sıralanan ilgili chunk'lar, birden fazla doküman gerektiren cevaplar. **Module 4: Advanced RAG** bunların hepsini düzeltir.

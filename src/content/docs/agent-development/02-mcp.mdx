@@ -19,10 +19,13 @@ You have 5 AI applications — Claude, ChatGPT, Cursor, your custom app, a CI bo
 
 Without a standard: **5 x 8 = 40 custom integrations.** Each with its own auth, data format, error handling, docs, and maintenance. Add one new tool? Five more integrations. Add one new AI client? Eight more.
 
-This is the **N x M problem**, and it's the same trap the hardware industry fell into before USB.
+Bu **N x M problemi**. Donanım sektörünün USB'den önce düştüğü tuzağın aynısı.
 
 <PresenterNote>
-Matematiği tahtaya yazın: 3 AI tool x 5 sistem = 15 entegrasyon. Sorun: "6. sistemi eklediğinizde ne olur?" (3 tane daha, toplam 18). Sonra [01-mcp-server.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/01-mcp-server.ipynb) notebook'unu Colab'da açın, ilk hücreyi gösterin. "Bu notebook'ta tek bir MCP server yazıp tüm AI client'lara bağlayacağız — N+M yaklaşımı."
+**Ekranda:** Site — N x M diyagramı
+**Yapın:** Matematiği tahtaya yazın: 3 AI tool x 5 sistem = 15 entegrasyon. "6. sistemi eklediğinizde ne olur?" (3 tane daha, toplam 18). Sonra N+M diyagramını gösterin.
+**Sorun:** "Kendi takımınızda kaç farklı entegrasyon noktası var?"
+**Sonra:** Aynı sayfada devam edin — Architecture bölümüne geçin.
 </PresenterNote>
 
 <FlowDiagram title="Before MCP: The N x M Nightmare">
@@ -72,11 +75,11 @@ Matematiği tahtaya yazın: 3 AI tool x 5 sistem = 15 entegrasyon. Sorun: "6. si
   </div>
 </FlowDiagram>
 
-Remember the world before USB? Printers needed parallel ports. Mice needed serial ports. Keyboards needed PS/2. Cameras needed FireWire. Every device had its own connector. Every computer needed every port.
+USB'den önceki dünyayı hatırlayın. Yazıcılar paralel port, fareler seri port, klavyeler PS/2, kameralar FireWire. Her cihazın kendi konektörü. Her bilgisayarda her port lazım.
 
-USB ended that. One standard. Everything works.
+USB bunu bitirdi. Tek standart. Her şey çalışır.
 
-**MCP is USB-C for AI.** One protocol, and any AI client can talk to any tool server.
+**MCP, AI dünyasının USB-C'si.** Tek protokol — herhangi bir AI client, herhangi bir tool server'la konuşabilir.
 
 <KeyInsight>
 MCP turns 40 custom integrations into 13. Build your tool once — it works with Claude, GPT, Cursor, and every future AI client that speaks the protocol. Build your client once — it works with every tool.
@@ -88,7 +91,7 @@ MCP was created by Anthropic and open-sourced in late 2024. It's already adopted
 
 ## Architecture: Three Layers
 
-MCP isn't a single connection. It's a layered system with clear separation of concerns — and that separation matters for security.
+MCP tek bir bağlantı değil. Katmanlı bir sistem — separation of concerns prensibiyle. Bu ayrım güvenlik için kritik.
 
 <FlowDiagram title="MCP Architecture">
   <div class="flow-row">
@@ -120,10 +123,13 @@ MCP isn't a single connection. It's a layered system with clear separation of co
 3. **Server** — Exposes capabilities (tools, resources, prompts) over the protocol. It wraps an external system — a database, an API, a file system — and makes it accessible to AI in a standardized way.
 </Steps>
 
-Why three layers instead of two? **Security.** The host controls what the AI can access. The client provides isolation — a misbehaving server can't poison others. The server is sandboxed, exposing only what it's designed to expose.
+Neden iki değil üç katman? **Güvenlik.** Host, AI'ın neye erişebileceğini kontrol eder. Client izolasyon sağlar — bozuk bir server diğerlerini zehirleyemez. Server sandbox'ta, sadece tasarlandığı şeyi açar.
 
 <PresenterNote>
-[01-mcp-server.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/01-mcp-server.ipynb) notebook'unda Host/Client/Server yapısını gösteren hücreyi açın. Tahtaya 3 katmanı çizin: bir host içinde 3 client, her biri farklı server'a bağlı. Sorun: "LLM'i doğrudan tool'lara bağlasak ne olur?" Cevaba yönlendirin: güvenlik, izolasyon, yaşam döngüsü yönetimi.
+**Ekranda:** Site — Architecture diyagramı
+**Yapın:** Tahtaya 3 katmanı çizin: bir host içinde 3 client, her biri farklı server'a bağlı. Güvenlik, izolasyon ve yaşam döngüsü yönetimini açıklayın.
+**Sorun:** "LLM'i doğrudan tool'lara bağlasak ne olur? Neden 3 katman?"
+**Sonra:** Site'ta devam — Transport bölümüne geçin.
 </PresenterNote>
 
 ## Transport: How Messages Move
@@ -201,7 +207,7 @@ Every MCP server exposes capabilities through exactly three types:
 
 ### Tools — Model-Controlled
 
-Tools are functions the AI decides to call. This is the most common primitive and the one you'll use 90% of the time.
+Tool'lar AI'ın çağırmaya karar verdiği fonksiyonlar. En yaygın primitive — zamanınızın %90'ında bunu kullanacaksınız.
 
 ```python
 from mcp.server import Server
@@ -230,11 +236,11 @@ async def search_flights(
     return format_flight_results(results)
 ```
 
-The AI model sees the tool name, description, and parameter schema — then decides when and how to call it. The docstring is critical: it's the AI's instruction manual for your tool.
+AI modeli tool adını, açıklamasını ve parametre şemasını görür — ne zaman ve nasıl çağıracağına kendisi karar verir. Docstring kritik: tool'unuzun AI için kullanma kılavuzu.
 
 ### Resources — Application-Controlled
 
-Resources are read-only data the AI can access. Think GET endpoints — context the host decides to include.
+Resource'lar AI'ın erişebildiği read-only veri. GET endpoint'leri gibi düşünün — host'un dahil etmeye karar verdiği bağlam.
 
 ```python
 @server.resource("flights://status/{flight_number}")
@@ -244,11 +250,11 @@ async def get_flight_status(flight_number: str) -> str:
     return json.dumps(status, indent=2)
 ```
 
-Resources use URI templates. The AI browses what's available and reads what it needs before taking action.
+Resource'lar URI template'leri kullanır. AI mevcut olanları tarar, aksiyon almadan önce ihtiyacı olanı okur.
 
 ### Prompts — User-Controlled
 
-Prompts are reusable templates the server provides. The user selects them from a menu — they standardize how the AI approaches domain-specific tasks.
+Prompt'lar server'ın sunduğu yeniden kullanılabilir template'ler. Kullanıcı menüden seçer — AI'ın domain-specific görevlere nasıl yaklaşacağını standartlaştırır.
 
 ```python
 @server.prompt()
@@ -270,7 +276,7 @@ Steps:
 
 ## MCP in the Wild
 
-You're probably already using MCP without realizing it.
+Muhtemelen farkında olmadan MCP kullanıyorsunuzdur.
 
 **Claude Code** has built-in MCP servers for file system operations, bash execution, and web fetching. Every time Claude Code reads a file or runs a command — that's MCP.
 
@@ -293,17 +299,18 @@ You're probably already using MCP without realizing it.
 }
 ```
 
-Now the AI assistant in your editor can query your database and interact with GitHub — through a standardized protocol. Swap the GitHub server for GitLab? The client code doesn't change.
+Artık editörünüzdeki AI asistanı veritabanınızı sorgulayabilir ve GitHub ile etkileşime geçebilir — standart bir protokol üzerinden. GitHub server'ını GitLab ile mi değiştirmek istiyorsunuz? Client kodu değişmez.
 
 <PresenterNote>
-[01-mcp-server.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/01-mcp-server.ipynb) notebook'unda tool tanımlama ve test hücrelerini çalıştırın (ilk 4 hücre). flight search tool'unu çağırın ve JSON-RPC response'unu gösterin. Sorun: "Bu server'a yeni bir tool eklemek için ne yapmanız gerekir?" Cevap: sadece yeni bir `@server.tool()` fonksiyonu yazmak.
+**Ekranda:** Colab — [01-mcp-server.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/01-mcp-server.ipynb)
+**Yapın:** 'Setup' ve 'Define Your First Tool' bölümlerini çalıştırın (ilk 4 hücre). Flight search tool'unu çağırın, JSON-RPC response'unu gösterin. Canlı tool çağrısının nasıl çalıştığını görmelerini sağlayın.
+**Sorun:** "Bu server'a yeni bir tool eklemek için ne yapmanız gerekir?"
+**Sonra:** Site'a dönün — Three Primitives bölümüne geçin.
 </PresenterNote>
 
 ## Hands-On: Building an MCP Server
 
-Let's build a flight information server from scratch. This is the kind of server you'd build to expose Flight APIs to any AI client.
-
-<ColabLink title="Exercise: Build Your First MCP Server" notebook="/notebooks/agent-dev/01-mcp-server.ipynb" level="Basic" />
+Sıfırdan bir flight information server yazacağız. Gerçek dünyada Flight API'lerini herhangi bir AI client'a açmak tam olarak böyle yapılır.
 
 ```python
 # flight_mcp_server.py
@@ -401,11 +408,9 @@ npx @modelcontextprotocol/inspector
 mcp dev flight_mcp_server.py
 ```
 
-<ColabLink title="Challenge: Add Resources and Prompts to Your Server" notebook="/notebooks/agent-dev/01-mcp-server.ipynb" level="Challenge" />
-
 ## Where MCP Sits in the Stack
 
-MCP is the **connectivity layer**. It sits between the agent brain (LLM + framework) and the external world. Everything above it reasons. Everything below it acts.
+MCP **bağlantı katmanı**. Agent beyni (LLM + framework) ile dış dünya arasında oturur. Üstündeki her şey düşünür. Altındaki her şey eylem yapar.
 
 <FlowDiagram title="MCP in the Agent Stack">
   <div class="flow-row">
@@ -435,10 +440,13 @@ MCP is the **connectivity layer**. It sits between the agent brain (LLM + framew
   </div>
 </FlowDiagram>
 
-In Module 3, you'll use LangChain to call tools. In Module 4, you'll use LangGraph to orchestrate complex flows. MCP is what standardizes the tool interface across all of these — the wiring between brain and hands.
+Module 3'te tool çağırmak için LangChain, Module 4'te karmaşık akışları orkestre etmek için LangGraph kullanacaksınız. MCP tüm bunlarda tool arayüzünü standartlaştıran şey — beyin ile eller arasındaki kablolama.
 
 <PresenterNote>
-[01-mcp-server.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/01-mcp-server.ipynb) notebook'undaki tools/resources/prompts bölümlerini sırayla gösterin. Sorun: "Üç primitive'den — tools, resources, prompts — hangisini takımınız en çok kullanır?" 2-3 cevap alın. "Peki resource olarak ne expose ederdiniz?" Yönlendirin: flight schedules, fare rules, route maps gibi read-only data.
+**Ekranda:** Colab — [01-mcp-server.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/01-mcp-server.ipynb)
+**Yapın:** Notebook'taki 'Resources' ve 'Prompts' bölümlerini çalıştırın. Tools/resources/prompts farkını canlı gösterin. Resource olarak flight schedules, fare rules gibi read-only data örnekleri verin.
+**Sorun:** "Üç primitive'den — tools, resources, prompts — hangisini takımınız en çok kullanır? Resource olarak ne expose ederdiniz?"
+**Sonra:** Notebook'ta DURUN. Katılımcılara: Şimdi siz deneyin — notebook'un sonundaki YOUR TURN bölümlerini yapın. 10-15 dakika süre.
 </PresenterNote>
 
 <DeepDive title="Advanced: Security and OAuth 2.1">
@@ -501,9 +509,15 @@ Production Streamable HTTP servers integrate with existing identity providers (A
 </CardGrid>
 
 <KeyInsight>
-MCP is the connectivity layer of the agent stack. Learn it once, wire everything. The protocol handles auth, transport, and discovery — you focus on what your tool actually does.
+MCP, agent stack'inin bağlantı katmanı. Bir kere öğren, her şeyi bağla. Protokol auth, transport ve discovery'yi halleder — siz tool'unuzun ne yaptığına odaklanırsınız.
 </KeyInsight>
+
+## Exercises
+
+<ColabLink title="Exercise: Build Your First MCP Server" notebook="/notebooks/agent-dev/01-mcp-server.ipynb" level="Basic" />
+
+<ColabLink title="Challenge: Add Resources and Prompts to Your Server" notebook="/notebooks/agent-dev/01-mcp-server.ipynb" level="Challenge" />
 
 ## Next Up
 
-You know how agents connect to tools. Now let's build the intelligence layer. **Module 3: LangChain Fundamentals** — where you'll learn to compose LLM calls into chains that actually do useful work.
+Agent'ların tool'lara nasıl bağlandığını artık biliyorsunuz. Sıra zeka katmanında. **Module 3: LangChain Fundamentals** — LLM çağrılarını gerçekten işe yarar chain'lere dönüştürmeyi öğreneceksiniz.

@@ -15,27 +15,30 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 
 ## Demo First
 
-Before we define anything, watch this.
+Tanımlardan önce, izleyin.
 
 <PresenterNote>
-[01-embeddings-viz.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/01-embeddings-viz.ipynb) notebook'unu Colab'da açın. İlk 3 hücreyi çalıştırarak 8-10 travel cümlesini embed edin. t-SNE plot hücresini çalıştırın ve 2D görselleştirmeyi gösterin. Flight cümleleri bir arada, hotel cümleleri bir arada, billing bir arada. Matematiği henüz açıklamayın. Sadece anlamın geometriye dönüştüğünü görmelerini sağlayın. Sorun: "Bu kümelenmeyi model'a kim öğretti?"
+**Ekranda:** Colab — [01-embeddings-viz.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/01-embeddings-viz.ipynb)
+**Yapın:** 'Setup' ve 'Generate Embeddings' bölümlerini çalıştırın (ilk 3 hücre). 8-10 travel cümlesini embed edin. t-SNE plot hücresini çalıştırıp 2D görselleştirmeyi gösterin. Matematiği henüz açıklamayın — sadece anlamın geometriye dönüştüğünü görsünler.
+**Sorun:** "Bu kümelenmeyi model'a kim öğretti?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — "What Are Embeddings" bölümüne geçin.
 </PresenterNote>
 
-Eight sentences about travel. No labels. No categories. Just text fed into a model.
+Seyahatle ilgili sekiz cümle. Etiket yok. Kategori yok. Sadece modele beslenen metin.
 
-The model returns numbers. We plot those numbers. And suddenly: flight sentences cluster together. Hotel sentences cluster together. Cancellations cluster together.
+Model sayılar döner. O sayıları çizeriz. Ve birden: flight cümleleri bir arada kümelenir. Hotel cümleleri bir arada. İptaller bir arada.
 
-Nobody told the model these categories exist. **It learned that "delayed flight" and "late arrival" mean the same thing — and "chocolate cake" does not.**
+Modele bu kategorilerin varlığını kimse söylemedi. **"Delayed flight" ile "late arrival"ın aynı anlama geldiğini kendisi öğrendi — "chocolate cake"in ise gelmediğini.**
 
-That's an embedding. Meaning as coordinates. Similarity as distance.
+İşte embedding bu. Anlam, koordinat olarak. Benzerlik, mesafe olarak.
 
 <KeyInsight>
 An embedding converts text into a list of numbers — a vector — where similar meanings produce nearby coordinates. This is the entire foundation of RAG retrieval.
 </KeyInsight>
 
-## What Are Embeddings, Concretely
+## Embedding Nedir — Somut Olarak
 
-An embedding is a list of numbers. Typically 768 to 3072 of them. Each sentence becomes one vector:
+Embedding bir sayı listesi. Genelde 768 ile 3072 arasında. Her cümle bir vektör olur:
 
 ```python
 from openai import OpenAI
@@ -51,7 +54,7 @@ print(f"Dimensions: {len(vector)}")   # 1536
 print(f"First 5 values: {vector[:5]}")  # [0.012, -0.034, 0.087, ...]
 ```
 
-Two sentences about flight delays will produce vectors that are **close together** in 1536-dimensional space. A sentence about chocolate cake will be **far away**. That closeness is measurable — and that's what makes retrieval work.
+Flight delay'leriyle ilgili iki cümle, 1536 boyutlu uzayda **birbirine yakın** vektörler üretir. Çikolatalı kekle ilgili bir cümle ise **uzakta** olur. Bu yakınlık ölçülebilir — retrieval'ı çalıştıran tam olarak bu.
 
 <FlowDiagram title="Text to Vector to Similarity">
   <div class="flow-row">
@@ -76,16 +79,19 @@ Two sentences about flight delays will produce vectors that are **close together
 </FlowDiagram>
 
 <PresenterNote>
-[01-embeddings-viz.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/01-embeddings-viz.ipynb) notebook'undaki cosine similarity matrisini gösterin. Sorun: "Bu neden keyword search'ten daha iyi?" Cevaplar alın. Punchline: "delayed flight" keyword araması "late arrival" yazan dokümanı bulamaz. [02-vector-search.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/02-vector-search.ipynb) notebook'unda bunu canlı kanıtlayacağız — aynı sorgu, keyword vs semantic sonuçları yan yana.
+**Ekranda:** Colab — [01-embeddings-viz.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/01-embeddings-viz.ipynb)
+**Yapın:** 'Cosine Similarity' hücresini çalıştırarak similarity matrisini gösterin. Punchline: "delayed flight" keyword araması "late arrival" yazan dokümanı bulamaz — ama embedding bulur.
+**Sorun:** "Bu neden keyword search'ten daha iyi?"
+**Sonra:** Site'a dönün — Similarity Metrics bölümüne geçin.
 </PresenterNote>
 
 ## Similarity Metrics
 
-Once you have vectors, you need to measure how close they are. Three approaches, one winner.
+Vektörleriniz var. Şimdi ne kadar yakın olduklarını ölçmeniz lazım. Üç yaklaşım, bir kazanan.
 
-### Cosine Similarity — The Default
+### Cosine Similarity — Varsayılan
 
-Measures the **angle** between two vectors. Ignores magnitude, focuses on direction.
+İki vektör arasındaki **açıyı** ölçer. Büyüklüğü yok sayar, yöne odaklanır.
 
 ```python
 import numpy as np
@@ -120,7 +126,7 @@ OpenAI's embedding models produce **normalized vectors** — meaning cosine simi
 
 ## Embedding Models
 
-Not all embedding models are equal. Your choice affects retrieval quality, cost, and speed.
+Tüm embedding modelleri eşit değil. Seçiminiz retrieval kalitesini, maliyeti ve hızı etkiler.
 
 <Tabs>
   <TabItem label="OpenAI">
@@ -180,13 +186,13 @@ Check the [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard) for
   </TabItem>
 </Tabs>
 
-## Vector Databases — Why You Need Them
+## Vector Databases — Neden Lazım
 
-"Can't I just store embeddings in Postgres and calculate similarity?"
+"Embedding'leri Postgres'te saklayıp similarity hesaplayamaz mıyım?"
 
-Technically yes. At 1 million documents with 1536 dimensions, that's 1.5 billion floating-point comparisons per query. Response time: seconds. Unacceptable.
+Teknik olarak evet. 1 milyon doküman, 1536 boyut: sorgu başına 1.5 milyar floating-point karşılaştırma. Yanıt süresi: saniyeler. Kabul edilemez.
 
-Vector databases use **Approximate Nearest Neighbor (ANN)** algorithms to search billions of vectors in milliseconds. They trade a tiny amount of accuracy for massive speed.
+Vector veritabanları **Approximate Nearest Neighbor (ANN)** algoritmaları kullanarak milyarlarca vektörü milisaniyeler içinde arar. Çok küçük bir doğruluktan feragat ederek devasa hız kazanır.
 
 <FlowDiagram title="Why Vector Databases Exist">
   <div class="flow-row">
@@ -318,33 +324,36 @@ results = index.query(
 For this training, we use **Chroma**. It's the simplest to set up and perfect for learning. Every concept transfers directly to any other vector database.
 </Aside>
 
-## Hands-On
+## Exercises
 
 <ColabLink title="Hands-on: Embed Text, Visualize Meaning, Search Semantically" notebook="/notebooks/rag/01-embeddings-viz.ipynb" level="Basic" />
 
-In this notebook you will:
+Bu notebook'ta:
 
 <Steps>
-1. Generate embeddings for travel-related sentences across domains
-2. Calculate cosine similarity between all pairs
-3. Visualize the embedding space in 2D using t-SNE
-4. See which sentences cluster together — and understand why
+1. Travel cümleleri için embedding üretin
+2. Tüm çiftler arası cosine similarity hesaplayın
+3. t-SNE ile embedding uzayını 2D'de görselleştirin
+4. Hangi cümlelerin kümelendiğini görün — ve nedenini anlayın
 </Steps>
-
-<PresenterNote>
-[01-embeddings-viz.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/01-embeddings-viz.ipynb) notebook'unu canlı olarak adım adım geçin. "Aha anı" t-SNE plot çıktığında olur — flight cümleleri hotel cümlelerinden ayrı kümelenir. Sorun: "Model'a bu kategorileri biz mi söyledik?" Hayır. Dili anlayarak kendisi çıkardı. Sonra [02-vector-search.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/02-vector-search.ipynb) notebook'una geçin ve ChromaDB ile semantic search yapın.
-</PresenterNote>
 
 <ColabLink title="Hands-on: Build a Semantic Search System with ChromaDB" notebook="/notebooks/rag/02-vector-search.ipynb" level="Basic" />
 
-In this notebook you will:
+Bu notebook'ta:
 
 <Steps>
-1. Set up ChromaDB locally
-2. Index documents about Travel APIs with metadata
-3. Perform semantic search and compare with keyword search
-4. Experiment with metadata filtering (search only flights, only hotels)
+1. ChromaDB'yi local kurun
+2. Travel API dokümanlarını metadata ile indeksleyin
+3. Semantic search yapıp keyword search ile karşılaştırın
+4. Metadata filtreleme deneyin (sadece flights, sadece hotels)
 </Steps>
+
+<PresenterNote>
+**Ekranda:** Colab — [01-embeddings-viz.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/01-embeddings-viz.ipynb) ve [02-vector-search.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/02-vector-search.ipynb)
+**Yapın:** İlk notebook'u adım adım gösterin. "Aha anı" t-SNE plot'unda olur. Sonra ikinci notebook'a geçerek ChromaDB ile keyword vs semantic search'ü canlı karşılaştırın.
+**Sorun:** "Model'a bu kategorileri biz mi söyledik? Keyword search 'late arrival' yazan dokümanı 'delayed flight' aramasıyla bulabilir mi?"
+**Sonra:** Katılımcılara: Şimdi siz deneyin — notebook'un sonundaki YOUR TURN bölümlerini yapın. 10-15 dakika süre.
+</PresenterNote>
 
 <DeepDive title="ANN Algorithms — HNSW, IVF, and Quantization">
 
@@ -392,16 +401,16 @@ Most vector databases default to HNSW — best recall-to-speed trade-off.
 
 </DeepDive>
 
-## What to Take Away
+## Özet
 
-Three things:
+Üç şey:
 
-1. **Embeddings turn meaning into math.** Similar text produces nearby vectors. Different text produces distant vectors. This is the entire mechanism behind RAG retrieval.
+1. **Embedding'ler anlamı matematiğe çevirir.** Benzer metin yakın vektörler üretir. Farklı metin uzak vektörler. RAG retrieval'ın tüm mekanizması bu.
 
-2. **Cosine similarity is your default metric.** It measures the angle between vectors, ignoring magnitude. Works with every major embedding model.
+2. **Cosine similarity varsayılan metrik.** Vektörler arası açıyı ölçer, büyüklüğü yok sayar. Tüm büyük embedding modelleriyle çalışır.
 
-3. **Vector databases make this scale.** ANN algorithms like HNSW let you search millions of vectors in milliseconds. Start with Chroma for learning, migrate to pgvector or Pinecone for production.
+3. **Vector veritabanları bunu ölçeklendirir.** HNSW gibi ANN algoritmaları milyonlarca vektörü milisaniyeler içinde aramanızı sağlar. Öğrenmek için Chroma, production için pgvector veya Pinecone.
 
 ## Next Up
 
-You know how to turn text into vectors and search for similar ones. Now: how do you build a complete pipeline from raw documents to grounded answers? **Module 3: The RAG Pipeline.**
+Metni vektörlere çevirmeyi ve benzerlerini aramayı biliyorsunuz. Şimdi: ham dokümanlardan dayanaklı cevaplara tam bir pipeline nasıl kurulur? **Module 3: The RAG Pipeline.**
