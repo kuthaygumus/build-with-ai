@@ -51,7 +51,7 @@ Her RAG sistemi — hafta sonu prototipinden milyonlara hizmet eden production s
 İlk iki aşama **offline** gerçekleşir — herhangi bir kullanıcı soru sormadan önce. Son ikisi **online** — sorgu anında. Bu ayrım performans ve maliyet için kritik.
 
 <PresenterNote>
-**Ekranda:** Colab — [03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb)
+**Ekranda:** Colab — [3.1-rag-pipeline.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/3.1-rag-pipeline.ipynb)
 **Yapın:** Notebook'u açın. Tahtaya offline/online sınırını çizin. Indexing hücrelerini (Load, Chunk, Embed, Store) gösterin. Indexing pahalı ama bir kere yapılır; querying ucuz ve her request'te çalışır.
 **Sorun:** "Indexing ile querying'i neden ayırıyoruz?"
 **Sonra:** Notebook'ta DURUN. Site'a dönün — Document Loading bölümüne geçin.
@@ -139,7 +139,7 @@ Neden chunk'lıyoruz? Üç neden:
 3. Retrieval, daha küçük ve konu odaklı chunk'larla daha hassas
 
 <PresenterNote>
-**Ekranda:** Colab — [03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb)
+**Ekranda:** Colab — [3.1-rag-pipeline.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/3.1-rag-pipeline.ipynb)
 **Yapın:** 'Chunking Comparison' hücrelerini çalıştırın. Full-document vs paragraf embedding farkını gösterin. Full-document embedding her şeyle zayıf eşleşir, paragraf embedding doğru paragrafla güçlü eşleşir. Notebook'ta chunk_size=2000 vs 500'ü deneyin.
 **Sorun:** "chunk_size=2000 ile chunk_size=500 arasındaki fark ne olur?"
 **Sonra:** Notebook'ta DURUN. Site'a dönün — Retrieval bölümüne geçin.
@@ -380,7 +380,7 @@ def format_context(docs):
 ```
 
 <PresenterNote>
-**Ekranda:** Colab — [03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb)
+**Ekranda:** Colab — [3.1-rag-pipeline.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/3.1-rag-pipeline.ipynb)
 **Yapın:** 'Generation' hücresinde system prompt'u gösterin. "ONLY on the provided context" kuralını vurgulayın. Bu talimatı çıkarıp aynı soruyu tekrar sorun — model training data'sına döner ve hallucinate edebilir. Farkı canlı gösterin.
 **Sorun:** "Bu talimatı kaldırsak ne olur?"
 **Sonra:** Notebook'ta DURUN. Site'a dönün — Full Pipeline bölümüne geçin.
@@ -442,7 +442,7 @@ client credentials flow:
 
 ## Exercises
 
-<ColabLink title="Build a Complete RAG Pipeline: PDF to Answers" notebook="/notebooks/rag/03-e2e-rag.ipynb" level="Basic" />
+<ColabLink title="Build a Complete RAG Pipeline: PDF to Answers" notebook="/notebooks/rag/3.1-rag-pipeline.ipynb" level="Basic" />
 
 Bu notebook'ta pipeline'ı sıfırdan kurarsınız:
 
@@ -456,7 +456,7 @@ Bu notebook'ta pipeline'ı sıfırdan kurarsınız:
 </Steps>
 
 <PresenterNote>
-**Ekranda:** Colab — [03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb)
+**Ekranda:** Colab — [3.1-rag-pipeline.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/3.1-rag-pipeline.ipynb)
 **Yapın:** Ana hands-on egzersizi bu notebook. Katılımcılara 20-25 dakika verin. Dolaşın, API key sorunlarında yardım edin. Yaygın takılma noktası: chunk_size=2000 kullananlar 500-800'e göre daha kötü retrieval alır — bunu öğretme fırsatı olarak kullanın.
 **Sorun:** "Chunk size'ı nasıl seçtiniz ve sonucu nasıl etkiledi?"
 **Sonra:** Katılımcılara: Şimdi siz deneyin — notebook'un sonundaki YOUR TURN bölümlerini yapın. 10-15 dakika süre.

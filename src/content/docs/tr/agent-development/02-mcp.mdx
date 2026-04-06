@@ -22,7 +22,7 @@ Bir standart olmadan: **5 x 8 = 40 özel entegrasyon.** Her birinin kendi kimlik
 Bu **N x M problemi** ve donanım endüstrisinin USB'den önce düştüğü aynı tuzak.
 
 <PresenterNote>
-Matematiği tahtaya yazın: 3 AI tool x 5 sistem = 15 entegrasyon. Sorun: "6. sistemi eklediğinizde ne olur?" (3 tane daha, toplam 18). Sonra [01-mcp-server.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/01-mcp-server.ipynb) notebook'unu Colab'da açın, ilk hücreyi gösterin. "Bu notebook'ta tek bir MCP server yazıp tüm AI client'lara bağlayacağız — N+M yaklaşımı."
+Matematiği tahtaya yazın: 3 AI tool x 5 sistem = 15 entegrasyon. Sorun: "6. sistemi eklediğinizde ne olur?" (3 tane daha, toplam 18). Sonra [2.1-mcp-concepts.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/2.1-mcp-concepts.ipynb) notebook'unu Colab'da açın, ilk hücreyi gösterin. "Bu notebook'ta tek bir MCP server yazıp tüm AI client'lara bağlayacağız — N+M yaklaşımı."
 </PresenterNote>
 
 <FlowDiagram title="MCP Öncesi: N x M Kabusu">
@@ -123,7 +123,7 @@ MCP tek bir bağlantı değil. Net sorumluluk ayrımına sahip katmanlı bir sis
 Neden iki yerine üç katman? **Güvenlik.** Host, AI'ın neye erişebileceğini kontrol eder. Client izolasyon sağlar — kötü davranan bir sunucu diğerlerini zehirleyemez. Server sandbox'lanmıştır, yalnızca sunmak üzere tasarlandığı şeyleri sunar.
 
 <PresenterNote>
-[01-mcp-server.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/01-mcp-server.ipynb) notebook'unda Host/Client/Server yapısını gösteren hücreyi açın. Tahtaya 3 katmanı çizin: bir host içinde 3 client, her biri farklı server'a bağlı. Sorun: "LLM'i doğrudan tool'lara bağlasak ne olur?" Cevaba yönlendirin: güvenlik, izolasyon, yaşam döngüsü yönetimi.
+[2.1-mcp-concepts.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/2.1-mcp-concepts.ipynb) notebook'unda Host/Client/Server yapısını gösteren hücreyi açın. Tahtaya 3 katmanı çizin: bir host içinde 3 client, her biri farklı server'a bağlı. Sorun: "LLM'i doğrudan tool'lara bağlasak ne olur?" Cevaba yönlendirin: güvenlik, izolasyon, yaşam döngüsü yönetimi.
 </PresenterNote>
 
 ## Transport: Mesajlar Nasıl Taşınır
@@ -296,14 +296,14 @@ Muhtemelen farkında olmadan zaten MCP kullanıyorsunuz.
 Artık editörünüzdeki AI asistanı veritabanınızı sorgulayabiliyor ve GitHub ile etkileşime girebiliyor — standart bir protokol aracılığıyla. GitHub sunucusunu GitLab ile değiştirin? İstemci kodu değişmez.
 
 <PresenterNote>
-[01-mcp-server.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/01-mcp-server.ipynb) notebook'unda tool tanımlama ve test hücrelerini çalıştırın (ilk 4 hücre). flight search tool'unu çağırın ve JSON-RPC response'unu gösterin. Sorun: "Bu server'a yeni bir tool eklemek için ne yapmanız gerekir?" Cevap: sadece yeni bir `@server.tool()` fonksiyonu yazmak.
+[2.1-mcp-concepts.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/2.1-mcp-concepts.ipynb) notebook'unda tool tanımlama ve test hücrelerini çalıştırın (ilk 4 hücre). flight search tool'unu çağırın ve JSON-RPC response'unu gösterin. Sorun: "Bu server'a yeni bir tool eklemek için ne yapmanız gerekir?" Cevap: sadece yeni bir `@server.tool()` fonksiyonu yazmak.
 </PresenterNote>
 
 ## Uygulamalı: MCP Sunucusu Geliştirme
 
 Sıfırdan bir uçuş bilgi sunucusu geliştirelim. Bu, Flight API'lerini herhangi bir AI istemcisine sunmak için geliştireceğiniz türde bir sunucu.
 
-<ColabLink title="Alıştırma: İlk MCP Sunucunuzu Geliştirin" notebook="/notebooks/agent-dev/01-mcp-server.ipynb" level="Basic" />
+<ColabLink title="Alıştırma: İlk MCP Sunucunuzu Geliştirin" notebook="/notebooks/agent-dev/2.1-mcp-concepts.ipynb" level="Basic" />
 
 ```python
 # flight_mcp_server.py
@@ -401,7 +401,7 @@ npx @modelcontextprotocol/inspector
 mcp dev flight_mcp_server.py
 ```
 
-<ColabLink title="Challenge: Sunucunuza Kaynaklar ve Prompt'lar Ekleyin" notebook="/notebooks/agent-dev/01-mcp-server.ipynb" level="Challenge" />
+<ColabLink title="Challenge: Sunucunuza Kaynaklar ve Prompt'lar Ekleyin" notebook="/notebooks/agent-dev/2.1-mcp-concepts.ipynb" level="Challenge" />
 
 ## MCP'nin Yığındaki Yeri
 
@@ -438,7 +438,7 @@ MCP, **bağlantı katmanıdır**. Agent beyni (LLM + framework) ile dış dünya
 Modül 3'te araçları çağırmak için LangChain kullanacaksınız. Modül 4'te karmaşık akışları orkestre etmek için LangGraph kullanacaksınız. MCP, tüm bunlar arasında araç arayüzünü standartlaştıran şeydir — beyin ile eller arasındaki kablolama.
 
 <PresenterNote>
-[01-mcp-server.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/01-mcp-server.ipynb) notebook'undaki tools/resources/prompts bölümlerini sırayla gösterin. Sorun: "Üç primitive'den — tools, resources, prompts — hangisini takımınız en çok kullanır?" 2-3 cevap alın. "Peki resource olarak ne expose ederdiniz?" Yönlendirin: flight schedules, fare rules, route maps gibi read-only data.
+[2.1-mcp-concepts.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/2.1-mcp-concepts.ipynb) notebook'undaki tools/resources/prompts bölümlerini sırayla gösterin. Sorun: "Üç primitive'den — tools, resources, prompts — hangisini takımınız en çok kullanır?" 2-3 cevap alın. "Peki resource olarak ne expose ederdiniz?" Yönlendirin: flight schedules, fare rules, route maps gibi read-only data.
 </PresenterNote>
 
 <DeepDive title="İleri Düzey: Güvenlik ve OAuth 2.1">

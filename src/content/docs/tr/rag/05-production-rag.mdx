@@ -18,7 +18,7 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 RAG demo'nuz notebook'ta harika çalışıyor. Sonra deploy ediyorsunuz.
 
 <PresenterNote>
-[07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb) notebook'unu Colab'da açın. Sorun: "Kim bir demo deploy edip beklemediği şekilde başarısız olmasını izledi?" Eller kalkar. "Demo ile production arasındaki boşluk — bu modül onu kapatıyor." Notebook'taki 4 failure senaryosunu sırayla okuyun. Her birinden sonra durun. Bunlar gerçek, varsayımsal değil.
+[5.1-production-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/5.1-production-rag.ipynb) notebook'unu Colab'da açın. Sorun: "Kim bir demo deploy edip beklemediği şekilde başarısız olmasını izledi?" Eller kalkar. "Demo ile production arasındaki boşluk — bu modül onu kapatıyor." Notebook'taki 4 failure senaryosunu sırayla okuyun. Her birinden sonra durun. Bunlar gerçek, varsayımsal değil.
 </PresenterNote>
 
 Bir kullanıcı, **çelişen belgeler** erişen bir soru sorar ve çelişkili bir yanıt alır. Sistem 10 chunk erişir ama yanıt yalnızca 1'inden gelir -- geri kalanı kaliteyi **sulandırır**. Gecikme 8 saniyeye çıkar. Ve geçen Salı sistemin **neden** yanlış yanıt verdiğine dair hiçbir fikriniz yoktur.
@@ -150,7 +150,7 @@ Action: Add re-ranking or reduce k.
 ```
 
 <PresenterNote>
-[07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb) notebook'undaki RAGAS evaluation hücrelerini çalıştırın. Context Precision 0.65 = %35 gürültü. Sorun: "Module 4'ten hangi teknik bunu düzeltir?" Re-ranking. Notebook'ta cross-encoder ekleyin, tekrar çalıştırın ve precision'ın 0.85+'e çıktığını gösterin. Tekniğin işe yaradığının canlı kanıtı.
+[5.1-production-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/5.1-production-rag.ipynb) notebook'undaki RAGAS evaluation hücrelerini çalıştırın. Context Precision 0.65 = %35 gürültü. Sorun: "Module 4'ten hangi teknik bunu düzeltir?" Re-ranking. Notebook'ta cross-encoder ekleyin, tekrar çalıştırın ve precision'ın 0.85+'e çıktığını gösterin. Tekniğin işe yaradığının canlı kanıtı.
 </PresenterNote>
 
 <Aside type="tip">
@@ -377,7 +377,7 @@ def collect_feedback(query_id: str, helpful: bool, comment: str = ""):
 ```
 
 <PresenterNote>
-[07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb) notebook'undaki monitoring ve feedback hücrelerini gösterin. Sorun: "RAG sistemindeki en pahalı bug nedir?" Kullanıcıların rapor etmediği yanlış cevaplar. Sisteme güvenmeyi bırakırlar. Notebook'taki feedback collection ve alert threshold'larını çalıştırın. "Kullanıcılarınız vazgeçmeden önce sistemin ne zaman başarısız olduğunu bilmeniz gerekir."
+[5.1-production-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/5.1-production-rag.ipynb) notebook'undaki monitoring ve feedback hücrelerini gösterin. Sorun: "RAG sistemindeki en pahalı bug nedir?" Kullanıcıların rapor etmediği yanlış cevaplar. Sisteme güvenmeyi bırakırlar. Notebook'taki feedback collection ve alert threshold'larını çalıştırın. "Kullanıcılarınız vazgeçmeden önce sistemin ne zaman başarısız olduğunu bilmeniz gerekir."
 </PresenterNote>
 
 ## Çok Kiracılı Mimari
@@ -406,7 +406,7 @@ class MultiTenantRetriever:
 
 ## Capstone Alıştırması
 
-<ColabLink title="Capstone: Değerlendirmeli Prodüksiyona Hazır RAG" notebook="/notebooks/rag/07-capstone-production.ipynb" level="Capstone" />
+<ColabLink title="Capstone: Değerlendirmeli Prodüksiyona Hazır RAG" notebook="/notebooks/rag/5.1-production-rag.ipynb" level="Capstone" />
 
 Her şeyi içeren prodüksiyon kalitesinde bir RAG sistemi kurun:
 
@@ -508,7 +508,7 @@ Modül 4'teki Agentic RAG kalıbı köprüdür. Bir retriever, bir re-ranker ve 
 </FlowDiagram>
 
 <PresenterNote>
-Kapanış anı. [07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb) notebook'undaki son hücreyi çalıştırın — tüm tekniklerin birleştiği Agentic RAG demo'su. Agent Training Module 1'deki ilk demo'ya bağlayın: "O agent'ı hatırlıyor musunuz? Şimdi tüm dokümanlara, policy'lere ve tarihsel verilere RAG erişimi olduğunu düşünün. Sadece aksiyon almıyor — dayanaklı, kaynaklı bilgiyle aksiyon alıyor." Durun. Sindirmelerini sağlayın.
+Kapanış anı. [5.1-production-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/5.1-production-rag.ipynb) notebook'undaki son hücreyi çalıştırın — tüm tekniklerin birleştiği Agentic RAG demo'su. Agent Training Module 1'deki ilk demo'ya bağlayın: "O agent'ı hatırlıyor musunuz? Şimdi tüm dokümanlara, policy'lere ve tarihsel verilere RAG erişimi olduğunu düşünün. Sadece aksiyon almıyor — dayanaklı, kaynaklı bilgiyle aksiyon alıyor." Durun. Sindirmelerini sağlayın.
 </PresenterNote>
 
 <KeyInsight>

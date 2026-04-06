@@ -18,7 +18,7 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 RAG demo'nuz notebook'ta harika çalışır. Sonra deploy edersiniz.
 
 <PresenterNote>
-**Ekranda:** Colab — [07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb)
+**Ekranda:** Colab — [5.1-production-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/5.1-production-rag.ipynb)
 **Yapın:** Notebook'u açın. 4 failure senaryosunu sırayla okuyun. Her birinden sonra durun — bunlar gerçek, varsayımsal değil. "Demo ile production arasındaki boşluk — bu modül onu kapatıyor."
 **Sorun:** "Kim bir demo deploy edip beklemediği şekilde başarısız olmasını izledi?"
 **Sonra:** Notebook'ta DURUN. Site'a dönün — RAGAS bölümüne geçin.
@@ -153,7 +153,7 @@ Action: Add re-ranking or reduce k.
 ```
 
 <PresenterNote>
-**Ekranda:** Colab — [07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb)
+**Ekranda:** Colab — [5.1-production-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/5.1-production-rag.ipynb)
 **Yapın:** 'RAGAS Evaluation' hücrelerini çalıştırın. Context Precision 0.65 = %35 gürültü. Cross-encoder ekleyip tekrar çalıştırın — precision'ın 0.85+'e çıktığını gösterin. Tekniğin işe yaradığının canlı kanıtı.
 **Sorun:** "Module 4'ten hangi teknik bunu düzeltir?"
 **Sonra:** Notebook'ta DURUN. Site'a dönün — Golden Test Sets bölümüne geçin.
@@ -383,7 +383,7 @@ def collect_feedback(query_id: str, helpful: bool, comment: str = ""):
 ```
 
 <PresenterNote>
-**Ekranda:** Colab — [07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb)
+**Ekranda:** Colab — [5.1-production-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/5.1-production-rag.ipynb)
 **Yapın:** 'Monitoring' ve 'Feedback' hücrelerini çalıştırın. Feedback collection ve alert threshold'larını gösterin. "Kullanıcılarınız vazgeçmeden önce sistemin ne zaman başarısız olduğunu bilmeniz gerekir."
 **Sorun:** "RAG sistemindeki en pahalı bug nedir?" (Cevap: kullanıcıların rapor etmediği yanlış cevaplar)
 **Sonra:** Site'a dönün — Multi-Tenant Architecture bölümüne geçin.
@@ -415,7 +415,7 @@ class MultiTenantRetriever:
 
 ## Exercises
 
-<ColabLink title="Capstone: Production-Ready RAG with Evaluation" notebook="/notebooks/rag/07-capstone-production.ipynb" level="Capstone" />
+<ColabLink title="Capstone: Production-Ready RAG with Evaluation" notebook="/notebooks/rag/5.1-production-rag.ipynb" level="Capstone" />
 
 Her şeyi içeren production-grade bir RAG sistemi kurun:
 
@@ -433,7 +433,7 @@ Her şeyi içeren production-grade bir RAG sistemi kurun:
 5 modülün doruk noktası. Her teknik, test edilmiş tek bir sistemde birleştirilmiş.
 
 <PresenterNote>
-**Ekranda:** Colab — [07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb)
+**Ekranda:** Colab — [5.1-production-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/5.1-production-rag.ipynb)
 **Yapın:** Capstone notebook'unu gösterin ve tüm bölümleri işaret edin. Bu notebook tüm eğitimi birleştirir. Katılımcılara 20-25 dakika verin.
 **Sorun:** "Kendi takımınızda bu RAG mimarisini nerede uygulardınız?"
 **Sonra:** Katılımcılara: Şimdi siz deneyin — notebook'un sonundaki YOUR TURN bölümlerini yapın. 10-15 dakika süre.
@@ -524,7 +524,7 @@ Module 4'teki Agentic RAG pattern'ı köprü. Retriever, re-ranker ve validator'
 </FlowDiagram>
 
 <PresenterNote>
-**Ekranda:** Colab — [07-capstone-production.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/07-capstone-production.ipynb)
+**Ekranda:** Colab — [5.1-production-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/5.1-production-rag.ipynb)
 **Yapın:** Son hücreyi çalıştırın — tüm tekniklerin birleştiği Agentic RAG demo'su. Agent Training Module 1'deki ilk demo'ya bağlayın: "O agent'ı hatırlıyor musunuz? Şimdi tüm dokümanlara, policy'lere ve tarihsel verilere RAG erişimi olduğunu düşünün." Durun. Sindirmelerini sağlayın.
 **Sorun:** "Bu mimarinin hangi parçası sizin iş probleminize en çok uygulanabilir?"
 **Sonra:** Kapanış. Tüm eğitim tamamlandı.

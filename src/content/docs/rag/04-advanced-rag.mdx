@@ -18,7 +18,7 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 Module 3 pipeline'ınız çalışıyor. Çalışmayana kadar. İleri teknikleri öğrenmeden önce, naive RAG'ın **tam olarak nasıl** başarısız olduğunu görelim — her başarısızlık modunun spesifik bir çözümü var.
 
 <PresenterNote>
-**Ekranda:** Colab — [04-hyde-comparison.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/04-hyde-comparison.ipynb)
+**Ekranda:** Colab — [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb)
 **Yapın:** 'Setup' ve 'Basic RAG Pipeline' bölümlerini çalıştırın (ilk 3 hücre). Sonra 3 sorgu çalıştırın: casual dil sorgusu, doğru dokümanın düşük sıralandığı sorgu, birden fazla doküman gerektiren sorgu. Başarısızlıkları görsünler.
 **Sorun:** "Bu 3 farklı başarısızlığın ortak noktası ne?"
 **Sonra:** Notebook'ta DURUN. Site'a dönün — Query Transformation bölümüne geçin.
@@ -174,7 +174,7 @@ results = vector_store.similarity_search_by_vector(hyde_embedding, k=5)
 Neden çalışır: varsayımsal doküman gerçek dokümanlarla **aynı kelime dağarcığını** kullanır. "PNR expired" ifadesi "PNR retrieval returns 404" ile "booking not showing up"a göre çok daha iyi eşleşir.
 
 <PresenterNote>
-**Ekranda:** Colab — [04-hyde-comparison.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/04-hyde-comparison.ipynb)
+**Ekranda:** Colab — [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb)
 **Yapın:** 'HyDE Comparison' hücrelerini çalıştırın. Similarity score'ları yan yana gösterin: direkt soru = 0.65, HyDE = 0.89. Rakamlar argümanı yapar. Ekstra LLM call'ın maliyeti: yaklaşık 1 cent ve 1-2 saniye.
 **Sorun:** "Bu ekstra LLM call'ın maliyeti ne? Değer mi?"
 **Sonra:** Notebook'ta DURUN. Site'a dönün — Multi-Query ve Step-Back bölümlerine geçin.
@@ -472,7 +472,7 @@ print(f"Answer: {result['answer']}")
 ```
 
 <PresenterNote>
-**Ekranda:** Colab — [05-reranking.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/05-reranking.ipynb)
+**Ekranda:** Colab — [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb)
 **Yapın:** 'Re-ranking' hücrelerini çalıştırarak before/after karşılaştırmasını gösterin. Sonra 3 farklı sorgu deneyin: "Merhaba" (retrieve etmemeli), "Flight API auth nasıl?" (bir kez retrieve), "Tüm API'lerin auth yöntemlerini karşılaştır" (birden fazla retrieve).
 **Sorun:** "Agent her sorguda retrieve yapmalı mı? Neden olmasın?"
 **Sonra:** Notebook'ta DURUN. Site'a dönün — Hands-On Exercises bölümüne geçin.
@@ -480,7 +480,7 @@ print(f"Answer: {result['answer']}")
 
 ## Exercises
 
-<ColabLink title="Hands-on: Naive RAG vs HyDE — Head-to-Head Comparison" notebook="/notebooks/rag/04-hyde-comparison.ipynb" level="Basic" />
+<ColabLink title="Hands-on: Naive RAG vs HyDE — Head-to-Head Comparison" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Basic" />
 
 <Steps>
 1. Naive RAG pipeline kurun (Module 3 ile aynı)
@@ -489,7 +489,7 @@ print(f"Answer: {result['answer']}")
 4. Retrieval hassasiyeti ve cevap kalitesini yan yana karşılaştırın
 </Steps>
 
-<ColabLink title="Hands-on: Add Re-Ranking and Measure the Improvement" notebook="/notebooks/rag/05-reranking.ipynb" level="Basic" />
+<ColabLink title="Hands-on: Add Re-Ranking and Measure the Improvement" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Basic" />
 
 <Steps>
 1. Module 3 pipeline'ınızla başlayın
@@ -498,7 +498,7 @@ print(f"Answer: {result['answer']}")
 4. İyileşmeyi precision metrikleriyle ölçün
 </Steps>
 
-<ColabLink title="Challenge: Build a Full Agentic RAG System" notebook="/notebooks/rag/06-agentic-rag.ipynb" level="Challenge" />
+<ColabLink title="Challenge: Build a Full Agentic RAG System" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Challenge" />
 
 LangGraph ile agentic RAG'ı sıfırdan kurun. Şunlarla test edin:
 - Basit selamlaşmalar (retrieve etmeMELİ)
@@ -506,7 +506,7 @@ LangGraph ile agentic RAG'ı sıfırdan kurun. Şunlarla test edin:
 - Karmaşık multi-doc sorular (retrieve edip yeniden formüle etmeli)
 
 <PresenterNote>
-**Ekranda:** Colab — [04-hyde-comparison.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/04-hyde-comparison.ipynb) ve [05-reranking.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/05-reranking.ipynb)
+**Ekranda:** Colab — [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb) ve [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb)
 **Yapın:** Notebook'ları gösterin ve egzersiz bölümlerini işaret edin. İlk HyDE'ı bitirenlerin re-ranking'e geçmesini söyleyin. Challenge notebook'unu erken bitirenler için gösterin.
 **Sorun:** "Hangi teknik kendi use case'iniz için en faydalı olur?"
 **Sonra:** Katılımcılara: Şimdi siz deneyin — notebook'un sonundaki YOUR TURN bölümlerini yapın. 10-15 dakika süre.

@@ -18,7 +18,7 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 Tanımlardan önce, bir agent'ın nasıl çalıştığını izleyelim.
 
 <PresenterNote>
-[02-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/02-first-chain.ipynb) notebook'unu Colab'da açın. İlk chain'i çalıştırarak bir LLM'in tool call yaparak nasıl aksiyon aldığını gösterin. Çıktıyı ekranda bırakın, 10 saniye sessizce izlemelerini sağlayın. Sonra sorun: "Bu chain'de kaç adım var ve her adımda ne oluyor?"
+[3.1-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.1-first-chain.ipynb) notebook'unu Colab'da açın. İlk chain'i çalıştırarak bir LLM'in tool call yaparak nasıl aksiyon aldığını gösterin. Çıktıyı ekranda bırakın, 10 saniye sessizce izlemelerini sağlayın. Sonra sorun: "Bu chain'de kaç adım var ve her adımda ne oluyor?"
 </PresenterNote>
 
 Slack'e bir hata raporu düşer:
@@ -54,7 +54,7 @@ Bu ayrım önemlidir çünkü neler geliştirebileceğinizi değiştirir.
 | **Örnek** | "Hava nasıl?" | "İptal edilen CDG uçuşundaki tüm yolcuları yeniden rezerve et" |
 
 <PresenterNote>
-Burada durun. Sorun: "Kaçınız ChatGPT veya Claude kullandınız?" Eller kalkar. "O bir chatbot. Siz sorarsınız, o cevaplar. Şimdi düşünün — ticket açabilse, veritabanı sorgulayabilse, email gönderebilse. İşte bugün yaptığımız sıçrama bu." [02-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/02-first-chain.ipynb) notebook'undaki chatbot vs chain karşılaştırmasını gösterin.
+Burada durun. Sorun: "Kaçınız ChatGPT veya Claude kullandınız?" Eller kalkar. "O bir chatbot. Siz sorarsınız, o cevaplar. Şimdi düşünün — ticket açabilse, veritabanı sorgulayabilse, email gönderebilse. İşte bugün yaptığımız sıçrama bu." [3.1-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.1-first-chain.ipynb) notebook'undaki chatbot vs chain karşılaştırmasını gösterin.
 </PresenterNote>
 
 Fark tek bir kelime: **agency** (özerklik). Ne yapacağına karar verebilme, yapabilme, sonucu gözlemleyebilme ve devam edebilme yeteneği.
@@ -111,7 +111,7 @@ Bu, tüm eğitim boyunca sizi taşıyacak zihinsel model:
 Sonra döngü tekrarlar. Eylemin sonucunu algıla, sıradaki hakkında düşün, tekrar harekete geç. Tamamlanana kadar.
 
 <PresenterNote>
-Tahtaya dört kutuyu çizin: Perceive, Reason, Act, Remember. Ok ve döngüyü gösterin. [02-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/02-first-chain.ipynb) notebook'undaki chain çıktısını referans verin. Sorun: "Chain demo'sunda 'perceive' adımı hangisiydi? 'Act' hangisiydi?" Cevapları notebook çıktısındaki adımlarla eşleştirin.
+Tahtaya dört kutuyu çizin: Perceive, Reason, Act, Remember. Ok ve döngüyü gösterin. [3.1-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.1-first-chain.ipynb) notebook'undaki chain çıktısını referans verin. Sorun: "Chain demo'sunda 'perceive' adımı hangisiydi? 'Act' hangisiydi?" Cevapları notebook çıktısındaki adımlarla eşleştirin.
 </PresenterNote>
 
 ## Buraya Nasıl Geldik?
@@ -228,7 +228,7 @@ Bu insanları değiştirmekle ilgili değil. Onları güçlendirmekle ilgili. Ag
 </Aside>
 
 <PresenterNote>
-Sorun: "Takımınızın günlük işlerinde, tahmin edilebilir bir pattern izleyen ama birden fazla sistem gerektirdiği için çok uzun süren bir task düşünün." 2-3 cevap alın. Bunlar onların agent fırsatları. Sonra [02-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/02-first-chain.ipynb) notebook'undaki chain yapısının bu tür problemleri nasıl çözdüğünü bağlayın.
+Sorun: "Takımınızın günlük işlerinde, tahmin edilebilir bir pattern izleyen ama birden fazla sistem gerektirdiği için çok uzun süren bir task düşünün." 2-3 cevap alın. Bunlar onların agent fırsatları. Sonra [3.1-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.1-first-chain.ipynb) notebook'undaki chain yapısının bu tür problemleri nasıl çözdüğünü bağlayın.
 </PresenterNote>
 
 ## Karmaşıklık Spektrumu
@@ -336,5 +336,5 @@ Bu, Claude, GPT-4 ve Gemini'de doğal bir yetenektir. Öğreneceğimiz framework
 
 İlk pratik soru: bir agent araçlara gerçekte nasıl bağlanır? Her AI sağlayıcısının kendine göre bir yolu var. Karmakarışık. MCP bunu düzeltiyor. **Modül 2: MCP — AI'ın USB-C'si**.
 
-<ColabLink title="Alıştırma: Bir Agent'ı İş Başında Keşfedin" notebook="/notebooks/agent-dev/02-first-chain.ipynb" level="Basic" />
-<ColabLink title="Challenge: Ekibiniz İçin Bir Agent Tasarlayın" notebook="/notebooks/agent-dev/06-multi-agent.ipynb" level="Challenge" />
+<ColabLink title="Alıştırma: Bir Agent'ı İş Başında Keşfedin" notebook="/notebooks/agent-dev/3.1-first-chain.ipynb" level="Basic" />
+<ColabLink title="Challenge: Ekibiniz İçin Bir Agent Tasarlayın" notebook="/notebooks/agent-dev/4.2-conditional-routing.ipynb" level="Challenge" />

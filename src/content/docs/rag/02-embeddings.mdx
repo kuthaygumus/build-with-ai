@@ -18,7 +18,7 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 Tanımlardan önce, izleyin.
 
 <PresenterNote>
-**Ekranda:** Colab — [01-embeddings-viz.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/01-embeddings-viz.ipynb)
+**Ekranda:** Colab — [2.1-embeddings.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/2.1-embeddings.ipynb)
 **Yapın:** 'Setup' ve 'Generate Embeddings' bölümlerini çalıştırın (ilk 3 hücre). 8-10 travel cümlesini embed edin. t-SNE plot hücresini çalıştırıp 2D görselleştirmeyi gösterin. Matematiği henüz açıklamayın — sadece anlamın geometriye dönüştüğünü görsünler.
 **Sorun:** "Bu kümelenmeyi model'a kim öğretti?"
 **Sonra:** Notebook'ta DURUN. Site'a dönün — "What Are Embeddings" bölümüne geçin.
@@ -79,7 +79,7 @@ Flight delay'leriyle ilgili iki cümle, 1536 boyutlu uzayda **birbirine yakın**
 </FlowDiagram>
 
 <PresenterNote>
-**Ekranda:** Colab — [01-embeddings-viz.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/01-embeddings-viz.ipynb)
+**Ekranda:** Colab — [2.1-embeddings.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/2.1-embeddings.ipynb)
 **Yapın:** 'Cosine Similarity' hücresini çalıştırarak similarity matrisini gösterin. Punchline: "delayed flight" keyword araması "late arrival" yazan dokümanı bulamaz — ama embedding bulur.
 **Sorun:** "Bu neden keyword search'ten daha iyi?"
 **Sonra:** Site'a dönün — Similarity Metrics bölümüne geçin.
@@ -326,7 +326,7 @@ For this training, we use **Chroma**. It's the simplest to set up and perfect fo
 
 ## Exercises
 
-<ColabLink title="Hands-on: Embed Text, Visualize Meaning, Search Semantically" notebook="/notebooks/rag/01-embeddings-viz.ipynb" level="Basic" />
+<ColabLink title="Hands-on: Embed Text, Visualize Meaning, Search Semantically" notebook="/notebooks/rag/2.1-embeddings.ipynb" level="Basic" />
 
 Bu notebook'ta:
 
@@ -337,7 +337,7 @@ Bu notebook'ta:
 4. Hangi cümlelerin kümelendiğini görün — ve nedenini anlayın
 </Steps>
 
-<ColabLink title="Hands-on: Build a Semantic Search System with ChromaDB" notebook="/notebooks/rag/02-vector-search.ipynb" level="Basic" />
+<ColabLink title="Hands-on: Build a Semantic Search System with ChromaDB" notebook="/notebooks/rag/2.2-vector-search.ipynb" level="Basic" />
 
 Bu notebook'ta:
 
@@ -349,7 +349,7 @@ Bu notebook'ta:
 </Steps>
 
 <PresenterNote>
-**Ekranda:** Colab — [01-embeddings-viz.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/01-embeddings-viz.ipynb) ve [02-vector-search.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/02-vector-search.ipynb)
+**Ekranda:** Colab — [2.1-embeddings.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/2.1-embeddings.ipynb) ve [2.2-vector-search.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/2.2-vector-search.ipynb)
 **Yapın:** İlk notebook'u adım adım gösterin. "Aha anı" t-SNE plot'unda olur. Sonra ikinci notebook'a geçerek ChromaDB ile keyword vs semantic search'ü canlı karşılaştırın.
 **Sorun:** "Model'a bu kategorileri biz mi söyledik? Keyword search 'late arrival' yazan dokümanı 'delayed flight' aramasıyla bulabilir mi?"
 **Sonra:** Katılımcılara: Şimdi siz deneyin — notebook'un sonundaki YOUR TURN bölümlerini yapın. 10-15 dakika süre.

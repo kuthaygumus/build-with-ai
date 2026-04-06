@@ -51,7 +51,7 @@ Hafta sonu prototipinden milyonlara hizmet veren prodüksiyon sistemine kadar he
 İlk iki aşama **çevrimdışı** gerçekleşir -- herhangi bir kullanıcı soru sormadan önce. Son ikisi **çevrimiçi** gerçekleşir -- sorgu zamanında. Bu ayrım performans ve maliyet açısından önemlidir.
 
 <PresenterNote>
-[03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'unu Colab'da açın. Tahtaya offline/online sınırını çizin. Notebook'taki indexing hücrelerini (Load, Chunk, Embed, Store) gösterin. Sorun: "Indexing ile querying'i neden ayırıyoruz?" Cevap: indexing pahalı (embedding hesaplama) ama bir kere yapılır. Querying ucuz (vector lookup + LLM call) ve her request'te çalışır.
+[3.1-rag-pipeline.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/3.1-rag-pipeline.ipynb) notebook'unu Colab'da açın. Tahtaya offline/online sınırını çizin. Notebook'taki indexing hücrelerini (Load, Chunk, Embed, Store) gösterin. Sorun: "Indexing ile querying'i neden ayırıyoruz?" Cevap: indexing pahalı (embedding hesaplama) ama bir kere yapılır. Querying ucuz (vector lookup + LLM call) ve her request'te çalışır.
 </PresenterNote>
 
 ## Aşama 1: Belge Yükleme
@@ -136,7 +136,7 @@ Neden chunk'lıyoruz? Üç nedeni var:
 3. Daha küçük, konusal olarak tutarlı chunk'larla retrieval daha hassas olur
 
 <PresenterNote>
-[03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'undaki chunking karşılaştırma hücrelerini çalıştırın. Tüm dokümanı embed etme vs paragraf paragraf embed etme farkını gösterin. Full-document embedding her şeyle zayıf eşleşir, paragraf embedding doğru paragrafla güçlü eşleşir. Sorun: "chunk_size=2000 ile chunk_size=500 arasındaki fark ne olur?" Notebook'ta deneyin.
+[3.1-rag-pipeline.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/3.1-rag-pipeline.ipynb) notebook'undaki chunking karşılaştırma hücrelerini çalıştırın. Tüm dokümanı embed etme vs paragraf paragraf embed etme farkını gösterin. Full-document embedding her şeyle zayıf eşleşir, paragraf embedding doğru paragrafla güçlü eşleşir. Sorun: "chunk_size=2000 ile chunk_size=500 arasındaki fark ne olur?" Notebook'ta deneyin.
 </PresenterNote>
 
 ### Strateji 1: Özyinelemeli Karakter Bölme -- Varsayılan
@@ -374,7 +374,7 @@ def format_context(docs):
 ```
 
 <PresenterNote>
-[03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'undaki generation hücresinde system prompt'u gösterin. "ONLY on the provided context" kuralını vurgulayın. Sorun: "Bu talimatı kaldırsak ne olur?" Model training data'sına geri döner ve hallucinate edebilir. Notebook'ta bu talimatı çıkarıp aynı soruyu tekrar sorun — farkı canlı gösterin.
+[3.1-rag-pipeline.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/3.1-rag-pipeline.ipynb) notebook'undaki generation hücresinde system prompt'u gösterin. "ONLY on the provided context" kuralını vurgulayın. Sorun: "Bu talimatı kaldırsak ne olur?" Model training data'sına geri döner ve hallucinate edebilir. Notebook'ta bu talimatı çıkarıp aynı soruyu tekrar sorun — farkı canlı gösterin.
 </PresenterNote>
 
 ### Tam Pipeline -- 25 Satır
@@ -433,7 +433,7 @@ client credentials flow:
 
 ## Uygulamalı: Kendiniz Kurun
 
-<ColabLink title="Eksiksiz RAG Pipeline'ı Kurun: PDF'den Yanıtlara" notebook="/notebooks/rag/03-e2e-rag.ipynb" level="Basic" />
+<ColabLink title="Eksiksiz RAG Pipeline'ı Kurun: PDF'den Yanıtlara" notebook="/notebooks/rag/3.1-rag-pipeline.ipynb" level="Basic" />
 
 Bu notebook'ta sıfırdan tam pipeline'ı kurarsınız:
 
@@ -447,7 +447,7 @@ Bu notebook'ta sıfırdan tam pipeline'ı kurarsınız:
 </Steps>
 
 <PresenterNote>
-[03-e2e-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/03-e2e-rag.ipynb) notebook'u ana hands-on egzersizi. Katılımcılara 20-25 dakika verin. Dolaşın, API key sorunlarında yardım edin. Yaygın takılma noktası chunk size — chunk_size=2000 kullananlar 500-800 kullananlara göre daha kötü retrieval alır. Sonuçları incelerken bunu öğretme fırsatı olarak kullanın. Sorun: "Chunk size'ı nasıl seçtiniz ve sonucu nasıl etkiledi?"
+[3.1-rag-pipeline.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/3.1-rag-pipeline.ipynb) notebook'u ana hands-on egzersizi. Katılımcılara 20-25 dakika verin. Dolaşın, API key sorunlarında yardım edin. Yaygın takılma noktası chunk size — chunk_size=2000 kullananlar 500-800 kullananlara göre daha kötü retrieval alır. Sonuçları incelerken bunu öğretme fırsatı olarak kullanın. Sorun: "Chunk size'ı nasıl seçtiniz ve sonucu nasıl etkiledi?"
 </PresenterNote>
 
 <DeepDive title="Chunk Overlap, Meta Veri Filtreleme ve MMR">

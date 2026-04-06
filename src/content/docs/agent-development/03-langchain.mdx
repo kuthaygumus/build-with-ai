@@ -33,7 +33,7 @@ Why does this distinction matter? Because LangChain gives you opinions. It defin
 
 **Yapın:** Sorun: "Kaçınız Django veya React kullandınız?" Eller kalkar. "Django'da HTTP server yazmadınız — framework verdi. LangChain de LLM uygulamaları için aynı şey." Ekosistem diyagramını gösterin.
 
-**Sonra Colab'a geçin:** [02-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/02-first-chain.ipynb) açın. **Sadece "1. Setup" bölümünü çalıştırın** (ilk 2 hücre: pip install + API key). Henüz devam etmeyin — site'a dönüp teori anlatımına devam edin.
+**Sonra Colab'a geçin:** [3.1-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.1-first-chain.ipynb) açın. **Sadece "1. Setup" bölümünü çalıştırın** (ilk 2 hücre: pip install + API key). Henüz devam etmeyin — site'a dönüp teori anlatımına devam edin.
 </PresenterNote>
 
 ### The Ecosystem (2026)
@@ -241,7 +241,7 @@ result = chain.invoke({"question": "What airlines fly CDG to NRT nonstop?"})
 ```
 
 <PresenterNote>
-**Ekranda:** Colab'a geçin — [02-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/02-first-chain.ipynb)
+**Ekranda:** Colab'a geçin — [3.1-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.1-first-chain.ipynb)
 
 **Yapın:** "Your First LLM Call" ve "LCEL — Chaining with the Pipe Operator" bölümlerini çalıştırın (Setup'tan sonraki 3-4 hücre). Her hücrede durun ve açıklayın:
 - Hücre 1: Basit LLM çağrısı — "Bu tek bir soru-cevap"
@@ -272,7 +272,7 @@ You write `prompt | model | parser`. You get streaming, async, batching, retries
 LCEL isn't just a pretty syntax. It's a runtime contract. Every chain you build with pipes automatically gets streaming, async, batching, retries, and observability — for free.
 </KeyInsight>
 
-<ColabLink title="Exercise: Build Your First Chain" notebook="/notebooks/agent-dev/02-first-chain.ipynb" level="Basic" />
+<ColabLink title="Exercise: Build Your First Chain" notebook="/notebooks/agent-dev/3.1-first-chain.ipynb" level="Basic" />
 
 ## Hands-On: Disruption Analysis Chain
 
@@ -373,11 +373,11 @@ full_chain = (
 </FlowDiagram>
 
 <PresenterNote>
-**Ekranda:** Colab — [02-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/02-first-chain.ipynb)
+**Ekranda:** Colab — [3.1-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.1-first-chain.ipynb)
 
 **Yapın:** "Multi-Step Chains" ve "Structured Output" bölümlerini çalıştırın. Gösterin: ilk chain analiz yapıyor → ikinci chain SMS üretiyor → structured output JSON döndürüyor. "Aynı LLM, farklı görevler, pipe ile bağlanıyor."
 
-**Sonra:** Site'a dönün, "Memory" bölümüne geçin. Memory teorisini anlattıktan sonra Colab'da [03-langchain-memory.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/03-langchain-memory.ipynb) açın.
+**Sonra:** Site'a dönün, "Memory" bölümüne geçin. Memory teorisini anlattıktan sonra Colab'da [3.2-memory.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.2-memory.ipynb) açın.
 </PresenterNote>
 
 ## Memory: Conversational Context
@@ -427,7 +427,7 @@ r2 = chain_with_memory.invoke(
 )
 ```
 
-<ColabLink title="Exercise: Build a Conversational Chain with Memory" notebook="/notebooks/agent-dev/03-langchain-memory.ipynb" level="Basic" />
+<ColabLink title="Exercise: Build a Conversational Chain with Memory" notebook="/notebooks/agent-dev/3.2-memory.ipynb" level="Basic" />
 
 ### Memory Strategies
 
@@ -503,7 +503,7 @@ This is a critical question. Not every LLM application needs a framework.
 </Tabs>
 
 <PresenterNote>
-**Ekranda:** Colab — [03-langchain-memory.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/03-langchain-memory.ipynb)
+**Ekranda:** Colab — [3.2-memory.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.2-memory.ipynb)
 
 **Yapın:** Setup'ı çalıştırın, sonra conversation hücrelerini sırayla çalıştırın. İlk mesaj gönderin, sonra ikinci mesajda önceki context'e referans veren bir soru sorun. Chain'in hatırladığını gösterin.
 
@@ -602,4 +602,4 @@ You've built linear chains — data flows in one direction. But what happens whe
 
 That's where the pipe operator hits its limits. **Module 4: LangGraph** picks up exactly where chains leave off.
 
-<ColabLink title="Challenge: Build a Multi-Step Analysis Chain" notebook="/notebooks/agent-dev/03-langchain-memory.ipynb" level="Challenge" />
+<ColabLink title="Challenge: Build a Multi-Step Analysis Chain" notebook="/notebooks/agent-dev/3.2-memory.ipynb" level="Challenge" />
