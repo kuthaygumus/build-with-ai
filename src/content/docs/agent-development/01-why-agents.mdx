@@ -18,7 +18,13 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 Before definitions, let's watch an agent work.
 
 <PresenterNote>
-[02-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/02-first-chain.ipynb) notebook'unu Colab'da açın. İlk chain'i çalıştırarak bir LLM'in tool call yaparak nasıl aksiyon aldığını gösterin. Çıktıyı ekranda bırakın, 10 saniye sessizce izlemelerini sağlayın. Sonra sorun: "Bu chain'de kaç adım var ve her adımda ne oluyor?"
+**Ekranda:** Site (bu sayfa)
+
+**Yapın:** Yukarıdaki Slack senaryosunu yüksek sesle okuyun. Her adımı (1-5) tek tek gösterin. "14 saniye, hiçbir insan dokunmadı" cümlesinde durun.
+
+**Not:** Bu modülde henüz notebook açmıyoruz. Sadece teori ve kavramlar anlatılıyor. Notebook'lar Modül 3'te başlayacak. Burada amacımız "agent nedir, chatbot'tan farkı ne" sorusunu cevaplamak.
+
+**Groq hakkında:** Notebook'lar Groq kullanıyor — açık kaynak LLM'leri (Llama 3.3) ücretsiz çalıştıran bir bulut servisi. Katılımcılar sorarsa: "Groq özel çipleri olan bir donanım şirketi. OpenAI gibi ücretli değil, Ollama gibi lokal değil — ücretsiz bir bulut API'si."
 </PresenterNote>
 
 A bug report drops in Slack:
@@ -54,7 +60,11 @@ This distinction matters because it changes what you can build.
 | **Example** | "What's the weather?" | "Rebook all passengers from the cancelled CDG flight" |
 
 <PresenterNote>
-Burada durun. Sorun: "Kaçınız ChatGPT veya Claude kullandınız?" Eller kalkar. "O bir chatbot. Siz sorarsınız, o cevaplar. Şimdi düşünün — ticket açabilse, veritabanı sorgulayabilse, email gönderebilse. İşte bugün yaptığımız sıçrama bu." [02-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/02-first-chain.ipynb) notebook'undaki chatbot vs chain karşılaştırmasını gösterin.
+**Ekranda:** Site (bu tablo)
+
+**Yapın:** Tabloyu gösterin. Sorun: "Kaçınız ChatGPT veya Claude kullandınız?" Eller kalkar. "O bir chatbot. Siz sorarsınız, o cevaplar. Şimdi düşünün — ticket açabilse, veritabanı sorgulayabilse, email gönderebilse. İşte bu eğitimde yapacağımız sıçrama bu."
+
+**Vurgulayın:** Tablodaki "Example" satırını gösterin — chatbot "Hava nasıl?" sorar, agent "CDG uçuşundaki tüm yolcuları yeniden rezerve et" der. Fark budur: agency.
 </PresenterNote>
 
 The difference is one word: **agency**. The ability to decide what to do, do it, observe the result, and keep going.
@@ -111,7 +121,11 @@ This is the mental model that carries through the entire training:
 Then it loops. Perceive the result of the action, reason about what's next, act again. Until done.
 
 <PresenterNote>
-Tahtaya dört kutuyu çizin: Perceive, Reason, Act, Remember. Ok ve döngüyü gösterin. [02-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/02-first-chain.ipynb) notebook'undaki chain çıktısını referans verin. Sorun: "Chain demo'sunda 'perceive' adımı hangisiydi? 'Act' hangisiydi?" Cevapları notebook çıktısındaki adımlarla eşleştirin.
+**Ekranda:** Site (diyagram)
+
+**Yapın:** Diyagramdaki 4 kutuyu gösterin: Perceive → Reason → Act → Remember. Her birini açıklayın. Slack bug örneğine geri dönün: "Slack mesajını okumak = Perceive. Kodu analiz etmek = Reason. Jira ticket açmak = Act. Sonucu hatırlamak = Remember."
+
+**Sorun:** "Bu döngü kaç kere tekrarlanır?" Cevap: Hedefe ulaşana kadar. Bu onu chatbot'tan ayıran şey — tek seferlik değil, döngüsel.
 </PresenterNote>
 
 ## How We Got Here
@@ -228,7 +242,13 @@ This is not about replacing people. It's about amplifying them. The agent handle
 </Aside>
 
 <PresenterNote>
-Sorun: "Takımınızın günlük işlerinde, tahmin edilebilir bir pattern izleyen ama birden fazla sistem gerektirdiği için çok uzun süren bir task düşünün." 2-3 cevap alın. Bunlar onların agent fırsatları. Sonra [02-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/02-first-chain.ipynb) notebook'undaki chain yapısının bu tür problemleri nasıl çözdüğünü bağlayın.
+**Ekranda:** Site (use case tablosu)
+
+**Yapın:** Tabloyu gösterin — her satırda agent'ın ne yaptığını, insanın ne yaptığını karşılaştırın. Pattern'i vurgulayın: "Agent ağır işi yapar, insan karar verir ve onaylar."
+
+**Sorun:** "Takımınızda hangi iş bu tabloya uyar? Tahmin edilebilir bir pattern izleyen ama birden fazla sistem gerektirdiği için uzun süren bir task düşünün." 2-3 cevap alın.
+
+**Geçiş:** "Bu use case'leri nasıl gerçekleştireceğimizi öğrenmek için önce bir şeyi çözmemiz lazım: agent araçlara nasıl bağlanır? Cevap: MCP. Bir sonraki modüle geçelim."
 </PresenterNote>
 
 ## The Complexity Spectrum
