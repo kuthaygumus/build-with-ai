@@ -182,6 +182,22 @@ json_parser = JsonOutputParser(pydantic_object=FlightAnalysis)
 Modern LangChain supports `model.with_structured_output(FlightAnalysis)` — this uses native tool calling under the hood and is more reliable than asking the model to output JSON and parsing it yourself.
 </Aside>
 
+<PresenterNote>
+**Ekranda:** Site (Core Building Blocks — 4 alt başlık: Chat Models, Messages, Prompt Templates, Output Parsers)
+
+**Yapın:** Dört yapı taşını sırayla geç. Her birinde kısa kal (~1 dk):
+- **Chat Models**: "Tek arayüz, dört vendor. Claude → GPT geçmek için sadece import değişir."
+- **Messages**: "Düz string değil, structured. SystemMessage davranış, HumanMessage soru, AIMessage cevap."
+- **Prompt Templates**: "Hard-coded string yerine değişkenli template. SQL query gibi düşün — parametrize."
+- **Output Parsers**: "LLM her zaman text döndürür. Sen structured data istiyorsan parser arada durur."
+
+**Sorun:** "Bu dördünden hangisini siz zaten yapıyorsunuz, hangisini hiç düşünmediniz?"
+
+**Vurgu:** Bunlar LCEL'in (sıradaki bölüm) yapı taşları. Hepsini sıraya koyup pipe operatörüyle birleştireceğiz — sonraki bölümün omurgası bu.
+
+**Sonra:** LCEL bölümüne geç.
+</PresenterNote>
+
 ## LCEL: The Pipe Operator
 
 **LangChain Expression Language** is how you compose building blocks into chains. If you've used Unix pipes, you already know the concept.
@@ -248,7 +264,15 @@ result = chain.invoke({"question": "What airlines fly CDG to NRT nonstop?"})
 - Hücre 2: Prompt template — "Değişkenleri dışarıdan veriyoruz"
 - Hücre 3: `prompt | model | parser` chain — "3 parça pipe ile bağlandı"
 
-**Sorun:** "Bu pipeline'a yeni bir adım eklemek istesek ne yaparız?"
+**🤝 Guided live-code moment (~3 dk):** "Şimdi birlikte bu prompt'u değiştirelim. Herkes laptop açıyor. Ben sahnede yapıyorum, siz de aynı anda kendi Colab'ınızda deniyorsunuz."
+
+1. Prompt template'in `system` mesajını "You are a helpful travel assistant." → "Sen Amadeus'ta çalışan kıdemli bir uçuş operasyon uzmanısın. Cevapların kısa ve teknik olmalı." olarak değiştir
+2. Aynı soruyu (`"What airlines fly CDG to NRT nonstop?"`) tekrar çalıştır
+3. İki çıktıyı yan yana göster — ton ve detay düzeyi farkı
+
+**Sorun:** "System mesajını değiştirmek bizim agent'ı nasıl değişti? Sadece bir cümle ile."
+
+**Cevap rehberi:** Bu, prompt engineering'in neden iş olduğunun en hızlı kanıtı. Tek satır değişimi tüm karakteri değiştirir. Modül 0'daki "prompt = LLM davranışının kaynak kodu" cümlesine geri bağla.
 
 **Sonra:** Site'a dönün, "Why the Pipe Matters" bölümüne geçin.
 </PresenterNote>

@@ -462,6 +462,63 @@ Bu notebook'ta pipeline'ı sıfırdan kurarsınız:
 **Sonra:** Katılımcılara: Şimdi siz deneyin — notebook'un sonundaki YOUR TURN bölümlerini yapın. 10-15 dakika süre.
 </PresenterNote>
 
+## Quick Eval: Did Retrieval Work?
+
+You've built a pipeline. Before moving on, ask the question every production RAG team asks every day: **how do we know if it's actually working?**
+
+The simplest possible eval: write 3 test questions whose correct source document you already know, run retrieval, check if the right document is in the top-k results.
+
+```python
+# 3 test queries with known correct source documents
+test_set = [
+    {
+        "question": "How do I authenticate against the Flight API?",
+        "expected_source": "flight-api-reference.pdf",
+    },
+    {
+        "question": "What's the cancellation policy for premium tickets?",
+        "expected_source": "fare-rules-v3.pdf",
+    },
+    {
+        "question": "How are PNR records structured?",
+        "expected_source": "pnr-data-model.pdf",
+    },
+]
+
+def did_retrieval_find_it(question: str, expected_source: str, k: int = 5) -> bool:
+    """Returns True if expected document is in top-k retrieval results."""
+    results = vector_store.similarity_search(question, k=k)
+    sources = [doc.metadata.get("source", "") for doc in results]
+    return any(expected_source in s for s in sources)
+
+# Run the eval
+hits = sum(
+    did_retrieval_find_it(q["question"], q["expected_source"])
+    for q in test_set
+)
+print(f"Retrieval recall: {hits}/{len(test_set)} ({hits / len(test_set):.0%})")
+```
+
+That's it. **Three questions, a binary metric, a single number.** It's the smallest possible RAG eval — and it's enough to tell you whether a chunking change made things better or worse.
+
+<KeyInsight>
+**You can't improve what you don't measure.** This 20-line eval is the difference between "I tweaked chunk_size and it feels better" and "I tweaked chunk_size and recall went from 33% to 100%". Module 5 expands this into RAGAS — but the principle is the same: known questions, known answers, count the hits.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (yukarıdaki eval kodu)
+
+**Yapın:** Kodu satır satır geç. Vurgula: "20 satır. 3 soru. Bir tane sayı." Sonra retorik soru: "Eğer chunk_size'i değiştirip 'daha iyi hissediyorum' derseniz bu kanıt mı?"
+
+**Sorun:** "Şimdi 5 sorulu küçük bir test set'i nasıl seçerdiniz? Hangi sorular gerçek bir RAG sistemini test eder?"
+
+**Cevap rehberi:** İyi test sorusu = (a) cevabı kesin olan, (b) cevabı bilgi tabanında olan, (c) gerçek kullanıcı sorularına benzeyen. "What is..." iyi başlangıç. "Why" ve "How" daha zor.
+
+**Vurgu:** Bu sadece başlangıç. Modül 5'te RAGAS ile bunu daha sofistike hale getireceğiz — ama prensip aynı: bilinen sorular, bilinen cevaplar, hit'leri say.
+
+**Sonra:** DeepDive (chunk overlap, MMR) opsiyonel — vakit varsa göster, yoksa Module 4'e geç.
+</PresenterNote>
+
 <DeepDive title="Chunk Overlap, Metadata Filtering, and MMR">
 
 ### Chunk Overlap

@@ -11,7 +11,7 @@ import KeyInsight from '../../../../components/KeyInsight.astro';
 import FlowDiagram from '../../../../components/FlowDiagram.astro';
 import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
 
-<ModuleHeader duration="90 min" day={2} goal="Sorgu dönüşümü, re-ranking ve agentic RAG'ı öğrenin -- retrieval kalitesini dramatik şekilde artıran teknikler." />
+<ModuleHeader duration="55 dk" day={1} goal="Naive RAG'ın nerede kırıldığını teşhis edin ve üç en yüksek-ROI çözümü uygulayın: HyDE, re-ranking ve agentic RAG (kavramsal)." />
 
 ## Başarısızlıkla Başlayın
 
@@ -309,14 +309,13 @@ top_5 = [doc for _, doc in ranked[:5]]
 Re-ranking genellikle standart karşılaştırmalarda yanıt kalitesini **%10-25** artırır. Ekleyebileceğiniz en yüksek yatırım getirili iyileştirmelerden biridir -- ve yaklaşık 10 satır kod gerektirir.
 </Aside>
 
-## Çözüm 3: Agentic RAG
+## Çözüm 3: Agentic RAG (Kavramsal)
 
-Burası RAG'ın Bölüm 1'deki Agent eğitimiyle buluştuğu noktadır.
+Burası RAG'ın Bölüm 1'deki Agent eğitimiyle buluştuğu noktadır. Basit RAG'da retrieval **her zaman ve tam olarak bir kez** gerçekleşir. Agentic RAG bir agent'a şunlara karar verme yetkisi tanır:
 
-Basit RAG'da retrieval **her zaman ve tam olarak bir kez** gerçekleşir. Agentic RAG bir agent'a şunlara karar verme yetkisi tanır:
-- Erişim yapıp **yapmayacağı** (belki yanıt zaten biliniyordur)
-- **Ne** arayacağı (şimdiye kadar bulduklarına göre yeniden formüle et)
-- **Tekrar arayıp aramayacağı** (ilk retrieval yeterli değilse)
+- Erişim yapıp **yapmayacağı**? (belki yanıt zaten biliniyor — selamlama, matematik, genel bilgi)
+- **Ne** arayacağı? (şimdiye kadar bulduklarına göre sorguyu yeniden formüle et)
+- **Tekrar arayıp aramayacağı**? (ilk retrieval yeterli değilse, max 3 iterasyon)
 
 <FlowDiagram title="Basit RAG vs Agentic RAG">
   <div class="flow-row">
@@ -356,12 +355,72 @@ Basit RAG'da retrieval **her zaman ve tam olarak bir kez** gerçekleşir. Agenti
   </div>
 </FlowDiagram>
 
-### LangGraph ile Uygulama
+### Pattern 10 satır pseudocode'da
+
+```text
+def agentic_rag(question):
+    # 1. Aramaya gerek var mı?
+    if not agent.needs_retrieval(question):
+        return llm.answer(question)              # direkt cevap
+
+    # 2. Yeterli context bulana kadar iteratif arama
+    context = []
+    for attempt in range(MAX_ITERATIONS=3):
+        results = retriever.search(question)
+        context.extend(results)
+        if agent.is_context_sufficient(question, context):
+            break
+        question = agent.reformulate(question, context)
+
+    # 3. Kanıta dayalı cevabı üret
+    return llm.answer(question, context)
+```
+
+Fikrin tamamı bu. Üç karar, hepsi router rolündeki bir LLM tarafından veriliyor: "ara?", "yeterli mi?", "yeniden formüle?". Tam LangGraph implementasyonu (≈60 satır Python) bu modülün sonundaki DeepDive'da — canlı workshop için fazla yoğun, eğitim sonrası self-study için ideal.
+
+<KeyInsight>
+**Bugün Agentic RAG kodunu ezberlemenize gerek yok.** **Karar noktalarını** ezberleyin: aramalı mıyım, yeterli mi, yeniden formüle etmeli miyim. Production'da inşa etmeniz gerektiğinde, Agent Development eğitimindeki LangGraph pattern'ları tanıdık gelecek — orada gördüğünüz aynı state + conditional routing'in aynısı.
+</KeyInsight>
+
+<PresenterNote>
+[4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb) notebook'undaki re-ranking hücrelerini çalıştırarak before/after karşılaştırmasını gösterin. Sonra agentic RAG konseptini açıklamak için 3 farklı sorgu deneyin: "Merhaba" (retrieve etmemeli), "Flight API auth nasıl?" (bir kez retrieve), "Tüm API'lerin auth yöntemlerini karşılaştır" (birden fazla retrieve). Sorun: "Agent her sorguda retrieve yapmalı mı? Neden olmasın?"
+</PresenterNote>
+
+## Uygulamalı Alıştırmalar
+
+<ColabLink title="Uygulamalı: Basit RAG vs HyDE -- Birebir Karşılaştırma" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Basic" />
+
+<Steps>
+1. Basit bir RAG pipeline'ı kurun (Modül 3 ile aynı)
+2. HyDE sorgu dönüşümü ekleyin
+3. 10 test sorgusunu her ikisinden geçirin
+4. Retrieval hassasiyetini ve yanıt kalitesini yan yana karşılaştırın
+</Steps>
+
+<ColabLink title="Uygulamalı: Re-Ranking Ekleyin ve İyileşmeyi Ölçün" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Basic" />
+
+<Steps>
+1. Modül 3 pipeline'ınızla başlayın
+2. Cohere re-ranking (veya açık kaynak cross-encoder) ekleyin
+3. 10 test sorgusunda öncesi/sonrası karşılaştırması yapın
+4. Hassasiyet metrikleriyle iyileşmeyi ölçün
+</Steps>
+
+<ColabLink title="Challenge: Tam Bir Agentic RAG Sistemi Kurun" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Challenge" />
+
+LangGraph agentic RAG'ı sıfırdan kurun. Şunlarla test edin:
+- Basit selamlamalar (retrieval YAPMAMALI)
+- Teknik sorular (bir kez erişmeli)
+- Karmaşık çoklu belge soruları (erişmeli ve yeniden formüle etmeli)
+
+<DeepDive title="İleri Düzey: Agentic RAG — Tam LangGraph İmplementasyonu">
+
+Yukarıdaki kavramsal pseudocode, bu LangGraph implementasyonuna genişler. Workshop sonrası okuyun — Agent Development eğitiminin LangGraph modülünde gördüğünüz aynı conditional-routing pattern, sadece retrieval kararlarına uygulanmış halde.
 
 ```python
 from langgraph.graph import StateGraph, END
 from typing import TypedDict
-from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
 
 class AgentState(TypedDict):
@@ -371,7 +430,7 @@ class AgentState(TypedDict):
     needs_retrieval: bool
     retrieval_count: int
 
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
 
 def should_retrieve(state: AgentState) -> AgentState:
     """Agent decides if retrieval is needed."""
@@ -421,9 +480,7 @@ def generate(state: AgentState) -> AgentState:
     ])
     state["answer"] = response.content
     return state
-```
 
-```python
 # Build the graph
 def route_retrieval(state: AgentState) -> str:
     return "retrieve" if state["needs_retrieval"] else "direct_answer"
@@ -451,50 +508,13 @@ graph.add_edge("direct_answer", END)
 agent = graph.compile()
 ```
 
-```python
-# Use it
-result = agent.invoke({
-    "question": "What authentication method does the Flight API use?",
-    "context": [],
-    "answer": "",
-    "needs_retrieval": False,
-    "retrieval_count": 0
-})
+İlginç tasarım kararları:
 
-print(f"Retrieved: {result['retrieval_count']} time(s)")
-print(f"Answer: {result['answer']}")
-```
+1. **`should_retrieve` standalone bir node** — her sorgu veritabanına ihtiyaç duymaz. Selamlamalar, matematik ve genel bilgi LLM tarafından doğrudan yanıtlanır.
+2. **`evaluate_context` bir routing fonksiyonu**, normal bir node değil — string döndürür ("generate" ya da "retrieve_more"), bu conditional edge'i sürür.
+3. **`retrieval_count` sabit bir güvenlik sınırı** — bu olmadan agent, cevabı bilgi tabanında olmayan bir sorguda sonsuza kadar döner.
 
-<PresenterNote>
-[4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb) notebook'undaki re-ranking hücrelerini çalıştırarak before/after karşılaştırmasını gösterin. Sonra agentic RAG konseptini açıklamak için 3 farklı sorgu deneyin: "Merhaba" (retrieve etmemeli), "Flight API auth nasıl?" (bir kez retrieve), "Tüm API'lerin auth yöntemlerini karşılaştır" (birden fazla retrieve). Sorun: "Agent her sorguda retrieve yapmalı mı? Neden olmasın?"
-</PresenterNote>
-
-## Uygulamalı Alıştırmalar
-
-<ColabLink title="Uygulamalı: Basit RAG vs HyDE -- Birebir Karşılaştırma" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Basic" />
-
-<Steps>
-1. Basit bir RAG pipeline'ı kurun (Modül 3 ile aynı)
-2. HyDE sorgu dönüşümü ekleyin
-3. 10 test sorgusunu her ikisinden geçirin
-4. Retrieval hassasiyetini ve yanıt kalitesini yan yana karşılaştırın
-</Steps>
-
-<ColabLink title="Uygulamalı: Re-Ranking Ekleyin ve İyileşmeyi Ölçün" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Basic" />
-
-<Steps>
-1. Modül 3 pipeline'ınızla başlayın
-2. Cohere re-ranking (veya açık kaynak cross-encoder) ekleyin
-3. 10 test sorgusunda öncesi/sonrası karşılaştırması yapın
-4. Hassasiyet metrikleriyle iyileşmeyi ölçün
-</Steps>
-
-<ColabLink title="Challenge: Tam Bir Agentic RAG Sistemi Kurun" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Challenge" />
-
-LangGraph agentic RAG'ı sıfırdan kurun. Şunlarla test edin:
-- Basit selamlamalar (retrieval YAPMAMALI)
-- Teknik sorular (bir kez erişmeli)
-- Karmaşık çoklu belge soruları (erişmeli ve yeniden formüle etmeli)
+</DeepDive>
 
 <DeepDive title="RAPTOR, GraphRAG ve Multi-Modal RAG">
 

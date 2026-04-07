@@ -1,0 +1,328 @@
+---
+title: "Modül 0: LLM ve Vektör Temelleri"
+description: "RAG'a dalmadan önce ihtiyacınız olan beş kavram — token, context window, vektör, similarity, embedding."
+---
+
+import DeepDive from '../../../../components/DeepDive.astro';
+import ModuleHeader from '../../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../../components/PresenterNote.astro';
+import KeyInsight from '../../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="20 dk" day={1} goal="Her RAG sisteminin kullandığı beş kavramı kavra: token, context window, vektör, similarity, embedding." />
+
+## Bu Modül Neden Var
+
+Embedding'lere, vector store'lara ya da retrieval'a dokunmadan önce ortak bir kelime hazinesine ihtiyacımız var. Daha önce RAG sistemi kurmuş olsanız da "embedding" kelimesini hiç duymamış olsanız da, bu 20 dakikanın sonunda bu beş kelimenin tam olarak ne anlama geldiğini bileceksiniz — ve her birinin RAG kodunda neden her satırda karşımıza çıktığını anlayacaksınız.
+
+<KeyInsight>
+Beş kelime. Herhangi bir RAG sistemini okuyup kavramak için ihtiyacınız olan tüm kelime hazinesi: **token**, **context window**, **vektör**, **similarity**, **embedding**.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (bu sayfa)
+
+**Yapın:** Modülün amacını açıklayın. "Bu modül 20 dakika ve test değil — sadece günün geri kalanını anlamak için bilmen gereken kavramlar. Beş kelime — sonra Modül 1'de RAG'ın neden var olduğuna geçeceğiz."
+
+**Sorun (kısa el kaldırma):** "Daha önce bir embedding API çağırdınız mı? Vektör veritabanı ile çalıştınız mı?" 5-10 saniye, sayma yok.
+
+**Not:** Bu modülde notebook açılmıyor. Yalnızca site + 1 kısa görsel demo (Vektör bölümünde).
+</PresenterNote>
+
+## Kavram 1: Token
+
+LLM'ler karakter okumaz. Kelime de okumaz. **Token** okurlar — modelin atomik birim olarak ele aldığı küçük metin parçaları.
+
+İngilizce için kaba bir parmak hesabı:
+
+```
+1 token  ≈  4 karakter
+1 token  ≈  bir kelimenin ¾'ü
+100 token  ≈  75 kelime  ≈  1 kısa paragraf
+```
+
+Yani 1000 kelimelik bir doküman **~1300 token** demektir. 100 sayfalık bir PDF **~50.000 token** demektir.
+
+### RAG için neden önemli
+
+Bugün her chunking ve indexing kararını tanımlayacak üç sebep:
+
+1. **Embedding modellerinin token limiti vardır** — en yaygın embedding modeli chunk başına maksimum 512 token kabul eder. Bu yüzden tüm dokümanı bir kerede embed edemezsiniz; bölmek zorundasınız.
+2. **LLM context window'ları sonludur** — 50 ilgili doc getirseniz bile, hepsinin kullanıcının sorusuyla birlikte LLM'in token bütçesine sığması gerekir.
+3. **Maliyet token başınadır** — hem embedding (ucuz) hem de generation (pahalı) için. Konuşkan bir RAG sistemi hızla para yakar.
+
+<KeyInsight>
+**Token, her RAG tasarım kararını yönlendirir.** Chunk size, retrieval sayısı (k), context bütçesi — hepsi altta token matematiğidir.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (Token bölümü)
+
+**Yapın:** "1 token ≈ 4 karakter" formülünü ekrana yazın. "100 sayfalık PDF ≈ 50.000 token" rakamını vurgulayın.
+
+**Sorun:** "Eğer GPT-4'ün context window'u 128.000 token'sa, 100 sayfalık bir PDF'i tek seferde göndererek soru sorabilir miyiz teorik olarak?"
+
+**Cevap rehberi:** Teknik olarak evet, pratikte hayır. Üç sebep: (1) çok pahalı, (2) modeli "samanlıkta iğne" tarama yapmaya zorluyor, (3) genelde daha fazlasını atmak istiyoruz. RAG bu yüzden var — sadece ilgili olanı seç ve gönder.
+</PresenterNote>
+
+## Kavram 2: Context Window
+
+Her LLM'in tek seferde "görebildiği" maksimum metin miktarı vardır. Bu **context window**'dur ve token cinsinden ölçülür.
+
+| Model | Context window |
+|---|---|
+| GPT-3.5 | 16K token (~12K kelime) |
+| GPT-4o | 128K token (~96K kelime) |
+| Claude Sonnet 4 | 200K token (~150K kelime) |
+| Gemini 1.5 Pro | 1M token (~750K kelime) |
+
+RAG'da context window'un çok spesifik bir görevi vardır: **getirilen dokümanları + kullanıcının sorusunu + system prompt'u**, hepsini aynı anda tutar.
+
+<FlowDiagram title="RAG'da Context Window'a Neler Girer">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📜</span>
+      <span class="node-label">System Prompt</span>
+      <span class="node-desc">"Sadece context'ten cevapla"</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📄</span>
+      <span class="node-label">Getirilen Doc'lar</span>
+      <span class="node-desc">Top-k ilgili chunk'lar</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Kullanıcı Sorusu</span>
+      <span class="node-desc">Asıl sorgu</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node primary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">LLM</span>
+      <span class="node-desc">Kanıta dayalı cevap</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+İşte RAG'ın "her şeyi LLM'e at" olmamasının sebebi bu. **Sadece en ilgili** birkaç chunk'ı getirip, bütçeye sığdırıp, modelin odaklanmasını sağlarsınız.
+
+### RAG ile bağlantı
+
+`k=5` (top 5 chunk getir) yerine `k=20` ayarladığınızda, context window'u yönetiyorsunuz. chunk_size=500 yerine chunk_size=2000 seçtiğinizde, context window'u yönetiyorsunuz. Modül 3'te göreceğiniz her parametre, derinde, bir context window kararıdır.
+
+<PresenterNote>
+**Ekranda:** Site (Context window tablosu + diyagram)
+
+**Yapın:** Tabloyu gösterin. Diyagramı geçin: "RAG akışında context window'a 3 şey girer — system prompt, getirilen doc'lar, kullanıcı sorusu. Hepsi tek çağrıda."
+
+**Sorun:** "Eğer 200K token'lık bir context window'unuz varsa, neden sadece 5 chunk getiriyoruz, neden 50 değil?"
+
+**Cevap rehberi:** İki sebep: (1) maliyet — getirilen her chunk parayla ödenir, (2) "lost in the middle" sorunu — model çok uzun bağlamlarda ortadaki bilgiyi gözden kaçırır. Daha fazlası her zaman daha iyi değil. Modül 5'te bunu derinlemesine konuşacağız.
+</PresenterNote>
+
+## Kavram 3: Vektör
+
+Çoğu insanı korkutan kavram bu. Korkmaması lazım.
+
+**Vektör**, bir sayı listesidir. Hepsi bu. Tanımın tamamı.
+
+```python
+vector = [0.12, -0.34, 0.87, 0.04, -0.56, 0.23, ...]
+```
+
+RAG'da bu vektörler genellikle **384, 768 ya da 1536 sayıdan** oluşur (embedding modeline göre). Her sayı bir **boyut** (dimension) olarak adlandırılır.
+
+Neden bu kadar çok boyut? Çünkü her biri anlamın ince bir yönünü yakalar. Bir boyut "bu hayvanlar hakkında mı?", bir başkası "bu resmi mi yoksa samimi mi?", bir başkası "bu soru mu yoksa ifade mi?" gibi şeyleri kodlayabilir. Her boyutun ne anlama geldiğini göremezsiniz — model bunu kendi başına öğrenir — ama hep birlikte metnin *neyle ilgili olduğunun* çok zengin bir resmini çizerler.
+
+<KeyInsight>
+**Vektör, sadece anlamı temsil eden bir sayı listesidir.** Model kelime saklamaz — benzer anlamların yakın yaşadığı yüksek boyutlu bir uzaydaki konumları saklar.
+</KeyInsight>
+
+### Bir resim yardımcı olur
+
+2D bir harita hayal edin (sadece görsel olsun diye — gerçek vektörlerin 1000+ boyutu vardır):
+
+```
+                    politika  ●
+                    
+                                          ekonomi  ●
+                    
+        yemek pişirme ●
+                                                   iş dünyası  ●
+                    tarifler  ●
+                    
+                                gıda ●
+```
+
+Yemek pişirme metinleri birbirine yakın oturur. İş dünyası metinleri birbirine yakın oturur. Yemek pişirme ve iş dünyası birbirinden uzaktır. **Vektörler tam olarak bunu yapar.** Metni koordinata çevirir, böylece "bunlar aynı şey hakkında mı?" sorusunu basit matematikle ölçebiliriz.
+
+<PresenterNote>
+**Ekranda:** Site (vektör örneği + 2D görsel)
+
+**Yapın:** "Vektör = sayı listesi" cümlesini iki kere söyleyin. Ekrandaki [0.12, -0.34, ...] örneğini gösterin. "Bu kadar. Daha karmaşık bir şey değil. Sadece bir Python list."
+
+**Sonra 2D haritayı açıklayın:** "Yemek pişirme, iş dünyası ve politika farklı bölgelerde. Aynı konudakiler komşu. Vektörler bunu yapıyor — metin → koordinat."
+
+**Sorun:** "Eğer iki paragraf neredeyse aynı anlamı taşıyorsa, vektörleri uzayda nasıl yerleşir?"
+
+**Cevap rehberi:** Birbirine çok yakın. Bu bizi sıradaki kavrama götürüyor — yakınlığı nasıl ölçeriz?
+</PresenterNote>
+
+## Kavram 4: Similarity
+
+İki vektörünüz olduktan sonra ne kadar yakın olduklarını ölçersiniz. Yakın = benzer anlam. Uzak = farklı anlam.
+
+En yaygın matematik **cosine similarity**'dir ve size -1 ile 1 arasında bir sayı verir:
+
+| Cosine | Anlam |
+|---|---|
+| **1.0** | Aynı |
+| **0.9 – 1.0** | Neredeyse aynı şey |
+| **0.7 – 0.9** | İlgili, aynı konu |
+| **0.4 – 0.7** | Gevşek ilgili |
+| **0.0** | İlgisiz |
+| **< 0.0** | Zıt anlamlı (pratikte nadir) |
+
+Formülü hatırlamanıza gerek yok. Hatırlamanız gereken tek şey: **daha yüksek cosine = daha benzer**.
+
+### RAG ile bağlantı
+
+`vector_store.similarity_search(query, k=5)` çağrısı yaptığınızda altta olan tam olarak şu:
+
+1. Sorgu vektöre çevrilir
+2. Sistem, sorgu vektörü ile veritabanındaki **her** vektör arasında cosine similarity hesaplar
+3. **En yüksek similarity skoruna sahip 5 vektörü** döndürür
+4. Bu vektörler metin chunk'larına geri eşlenir → LLM'e verilir
+
+Semantic search'ün tüm "sihri" budur. Anahtar kelime eşleşmesi yok. SQL yok. Sadece: hangi saklı metinler bu soruya anlamca en yakın?
+
+<KeyInsight>
+**Similarity = "bana aynı anlama gelen chunk'ları bul"un ardındaki matematik.** Elle hesaplamanıza gerek yok — vector store sizin için yapar. Sadece skorun ne anlama geldiğini bilmeniz yeterli.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (cosine tablosu)
+
+**Yapın:** Tabloyu gösterin. "Bu sayıları ezberlemenize gerek yok. Tek hatırlamanız gereken: yüksek cosine = daha benzer."
+
+**Vurgulayın:** "similarity_search çağrısının altında olan tam olarak bu — query'yi vektöre çevir, hepsiyle cosine hesapla, en yüksek 5'i döndür. Mucize değil, basit bir matematik."
+
+**Sonra:** Embedding kavramına geç.
+</PresenterNote>
+
+## Kavram 5: Embedding
+
+Bir metin parçası nasıl vektör *olur*? Bir **embedding modeli** aracılığıyla — tek görevi "metin gir, vektör çıkar" olan özel bir LLM türü.
+
+```python
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+vector = model.encode("CDG'de uçuş gecikti")
+# → [0.12, -0.34, 0.87, ..., 0.04]    (384 sayı)
+```
+
+Embedding modelleri devasa miktarda metin üzerinde eğitilir, böylece:
+
+- "CDG'de uçuş gecikti" ve "CDG uçuşu rötarlı" **çok benzer** vektörler üretir
+- "CDG'de uçuş gecikti" ve "Pizza tarifi fikirleri" **çok farklı** vektörler üretir
+
+Hepsi bu. Model, anlamı geometriye kodlamayı öğrenir. Metin verirsiniz, vektör alırsınız, o vektörü diğerleriyle karşılaştırabilirsiniz.
+
+### Embedding modeli ve LLM farkı
+
+İkisi de sinir ağıdır. İkisi de metinle uğraşır. Görevleri çok farklıdır:
+
+| | Embedding modeli | LLM (chat modeli) |
+|---|---|---|
+| **Input** | Metin | Metin |
+| **Output** | Bir vektör | Metin |
+| **Kullanım** | Arama, similarity, kümeleme | Generation, akıl yürütme, sohbet |
+| **Örnekler** | `text-embedding-3-small`, `all-MiniLM-L6-v2` | GPT-4, Claude, Llama 3 |
+| **Maliyet** | Çok ucuz | Pahalı |
+
+Bir RAG sisteminde **ikisini de kullanırsınız**: arama adımı için embedding modeli, generation adımı için LLM. Tamamlayıcıdırlar, rakip değil.
+
+<KeyInsight>
+**Embedding, embedding modeline metin verdiğinizde ürettiği şeydir.** Metin gir → vektör çıkar. O vektör anlam-uzayındaki adresinizdir.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (Embedding model tablosu)
+
+**Yapın:** İki sütunlu tabloyu gösterin. Vurgulayın: "İki ayrı modelden bahsediyoruz. Embedding modeli arama için, LLM cevaplama için. RAG'da ikisini de kullanıyoruz."
+
+**Sorun:** "Embedding modeli neden çok daha ucuz?"
+
+**Cevap rehberi:** Çok daha küçük (genelde milyonlarca parametre vs milyarlarca), tek bir görevi yapıyor (text → vektör), büyük çıktı üretmiyor. Pratikte: 1 milyon doc'u embed etmek $1-2 sürebilir; aynı 1 milyon doc'a soru sormak GPT-4 ile $100+'lara çıkar.
+</PresenterNote>
+
+## Hepsini Birleştirelim
+
+Beş kavramın tek bir RAG akışında nasıl yerleştiğini görelim:
+
+```python
+# 1. Indexing (offline, bir kere)
+chunks = split_document("flight-policy.pdf", chunk_size=500)  # ← Kavram 1 (token)
+vectors = embedding_model.encode(chunks)                       # ← Kavram 3, 5
+vector_store.add(vectors, chunks)
+
+# 2. Querying (online, her istekte)
+query = "İptal edilen uçuşlar için yeniden rezervasyon politikası nedir?"
+query_vector = embedding_model.encode(query)                   # ← Kavram 5
+
+results = vector_store.similarity_search(query_vector, k=5)   # ← Kavram 4
+context = "\n\n".join(results)                                 # ← Kavram 1 (token bütçesi)
+
+answer = llm.invoke(f"""Sadece bu context'i kullanarak cevapla:
+{context}
+
+Soru: {query}""")                                              # ← Kavram 2 (context window)
+```
+
+Beş kavram. Tek pipeline. Günün geri kalanına hazırız.
+
+<DeepDive title="Bonus: Neden 1536 boyut?">
+
+Sihir değil — mimari bir karar. Farklı embedding modelleri farklı vektör boyutları kullanır:
+
+| Model | Boyut | Notlar |
+|---|---|---|
+| `all-MiniLM-L6-v2` | 384 | Küçük, hızlı, ücretsiz, lokal çalışır |
+| `all-mpnet-base-v2` | 768 | Orta boy, daha iyi kalite |
+| `text-embedding-3-small` | 1536 | OpenAI, ücretli, çok yüksek kalite |
+| `text-embedding-3-large` | 3072 | OpenAI, en büyük, en pahalı |
+
+Daha fazla boyut = daha fazla nüans yakalanır = daha iyi similarity hassasiyeti = daha fazla depolama ve daha yavaş karşılaştırma. Evrensel "doğru" boyut yok. Production RAG sistemlerinin çoğu için 384 ile 1536 arası tatlı nokta.
+
+Vektör boyutunu seçmezsiniz; modeli seçersiniz, model boyutunu tanımlar.
+
+</DeepDive>
+
+<DeepDive title="Bonus: RAG için temperature notu">
+
+Temperature, modelin çıktısının ne kadar rastgele olacağını kontrol eden LLM ayarıdır (0 = deterministik, 1 = yaratıcı). RAG'da generation adımı için neredeyse her zaman **temperature=0** istersiniz çünkü:
+
+- Doğaçlama değil, getirilen kanıtlardan cevap veriyorsunuz
+- Aynı input'un aynı output'u üretmesini istersiniz (test edilebilir, debug edilebilir)
+- Bir RAG sisteminde yaratıcılık genelde kılık değiştirmiş hallucination'dır
+
+Agent Development eğitimi temperature konusunda derinleşir. RAG için tek hatırlamanız gereken: spesifik bir sebep yoksa 0'da tutun.
+
+</DeepDive>
+
+## Özet (30 saniyede)
+
+1. **Token** — metin birimi. Chunk size, retrieval sayısı ve maliyeti yönlendirir.
+2. **Context window** — tek LLM çağrısına sığacak şeylerin bütçesi. RAG bu bütçeye sığması için getirir.
+3. **Vektör** — anlamı temsil eden sayı listesi. Genelde 384–1536 sayı.
+4. **Similarity** — iki vektörü karşılaştıran matematik. Daha yüksek cosine = daha benzer anlam.
+5. **Embedding** — embedding modelinin ürettiği şey. Metin gir, vektör çıkar.
+
+## Sırada Ne Var
+
+Artık kelime hazinesine sahipsiniz. Day 2'nin asıl konusunun zamanı: **RAG** neden var ve düz LLM'lerin üç kör noktası neler? **Modül 1: Bilgi Problemi.**

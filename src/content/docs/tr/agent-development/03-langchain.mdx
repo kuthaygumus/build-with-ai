@@ -178,6 +178,22 @@ json_parser = JsonOutputParser(pydantic_object=FlightAnalysis)
 Modern LangChain `model.with_structured_output(FlightAnalysis)` destekler — bu arka planda native tool calling kullanır ve modelden JSON çıktı istemek ve kendiniz ayrıştırmaktan daha güvenilirdir.
 </Aside>
 
+<PresenterNote>
+**Ekranda:** Site (Temel Yapı Taşları — 4 alt başlık: Chat Models, Messages, Prompt Templates, Output Parsers)
+
+**Yapın:** Dört yapı taşını sırayla geç. Her birinde kısa kal (~1 dk):
+- **Chat Models**: "Tek arayüz, dört vendor. Claude → GPT geçmek için sadece import değişir."
+- **Messages**: "Düz string değil, structured. SystemMessage davranış, HumanMessage soru, AIMessage cevap."
+- **Prompt Templates**: "Hard-coded string yerine değişkenli template. SQL query gibi düşün — parametrize."
+- **Output Parsers**: "LLM her zaman text döndürür. Sen structured data istiyorsan parser arada durur."
+
+**Sorun:** "Bu dördünden hangisini siz zaten yapıyorsunuz, hangisini hiç düşünmediniz?"
+
+**Vurgu:** Bunlar LCEL'in (sıradaki bölüm) yapı taşları. Hepsini sıraya koyup pipe operatörüyle birleştireceğiz — sonraki bölümün omurgası bu.
+
+**Sonra:** LCEL bölümüne geç.
+</PresenterNote>
+
 ## LCEL: Pipe Operatörü
 
 **LangChain Expression Language**, yapı taşlarını chain'lere birleştirmenin yoludur. Unix pipe'larını kullandıysanız, konsepti zaten biliyorsunuz.
@@ -237,7 +253,21 @@ result = chain.invoke({"question": "What airlines fly CDG to NRT nonstop?"})
 ```
 
 <PresenterNote>
-[3.1-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.1-first-chain.ipynb) notebook'unda LCEL chain hücresini çalıştırın. Adım adım gösterin: "Dict prompt'a girer, template messages'a dönüşür. Messages model'a girer, AIMessage döner. AIMessage parser'a girer, text çıkar." Her adımın çıktısını ayrı ayrı gösterin. Sorun: "Bu pipeline'a yeni bir adım eklemek istesek ne yaparız?"
+**Ekranda:** Colab — [3.1-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.1-first-chain.ipynb)
+
+**Yapın:** LCEL chain hücresini çalıştırın. Adım adım gösterin: "Dict prompt'a girer, template messages'a dönüşür. Messages model'a girer, AIMessage döner. AIMessage parser'a girer, text çıkar." Her adımın çıktısını ayrı ayrı gösterin.
+
+**🤝 Guided live-code moment (~3 dk):** "Şimdi birlikte bu prompt'u değiştirelim. Herkes laptop açıyor. Ben sahnede yapıyorum, siz de aynı anda kendi Colab'ınızda deniyorsunuz."
+
+1. Prompt template'in `system` mesajını "You are a helpful travel assistant." → "Sen Amadeus'ta çalışan kıdemli bir uçuş operasyon uzmanısın. Cevapların kısa ve teknik olmalı." olarak değiştir
+2. Aynı soruyu (`"What airlines fly CDG to NRT nonstop?"`) tekrar çalıştır
+3. İki çıktıyı yan yana göster — ton ve detay düzeyi farkı
+
+**Sorun:** "System mesajını değiştirmek bizim agent'ı nasıl değiştirdi? Sadece bir cümle ile."
+
+**Cevap rehberi:** Bu, prompt engineering'in neden iş olduğunun en hızlı kanıtı. Tek satır değişimi tüm karakteri değiştirir. Modül 0'daki "prompt = LLM davranışının kaynak kodu" cümlesine geri bağla.
+
+**Sonra:** Site'a dönün, "Why the Pipe Matters" bölümüne geçin.
 </PresenterNote>
 
 ### Pipe Neden Önemli

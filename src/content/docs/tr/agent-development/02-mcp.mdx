@@ -13,6 +13,10 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 
 <ModuleHeader duration="60 min" day={1} goal="AI araç entegrasyonunda protokol standardizasyonunu anlayın ve ilk MCP sunucunuzu geliştirin." />
 
+<Aside type="note" title="Protokol nedir, 30 saniyede?">
+**Protokol**, iki sistemin birbiriyle nasıl konuşacağına dair yazılı bir anlaşmadır: hangi mesajlar var, hangi alanları taşıyor, hangi cevaplar geçerli. HTTP bir protokoldür — bu yüzden tarayıcınız her web server'ıyla, server başına özel kod yazmadan konuşabilir. MCP de aynı fikir, ama "AI client bir tool çağırmak istiyor" durumu için. İki taraf MCP üzerinde anlaştığında, birbirleri hakkında başka hiçbir şey bilmek zorunda değiller.
+</Aside>
+
 ## Entegrasyon Patlaması
 
 5 AI uygulamanız var — Claude, ChatGPT, Cursor, kendi uygulamanız, bir CI botu. Bunların 8 araca ulaşması gerekiyor — Jira, GitHub, Slack, PostgreSQL, Confluence, S3, e-posta, bir uçuş API'si.
@@ -175,6 +179,18 @@ MCP transport-agnostiktir — mesajlar nasıl iletilirse iletilsin JSON-RPC 2.0 
 Streamable HTTP, üretim için önerilen transport'tur. Yeniden bağlantıyı yönetir, hem istek-yanıt hem de streaming'i destekler ve mevcut HTTP altyapısıyla entegre olur.
 </Aside>
 
+<PresenterNote>
+**Ekranda:** Site (iki tab — stdio ve HTTP)
+
+**Yapın:** İki tab'ı sırayla aç. "stdio = MCP server senin makinende child process olarak çalışır, host onu spawn eder, stdin/stdout ile konuşur. HTTP = MCP server bir web service, internette yaşar, herhangi bir AI client erişir."
+
+**Sorun:** "Production'da hangisini tercih edersiniz, neden?" (Cevap: HTTP — load balancer, auth, tek server'a çok client.)
+
+**Vurgu:** Bu detay önemli değil — biz konsept anlıyoruz. "JSON-RPC 2.0" görürsen panik yapma; bu sadece "mesaj formatı standardı" demek. Yine HTTP analojisi: HTTP'nin başlık satırlarını ezberlemiyoruz, ne işe yaradığını biliyoruz.
+
+**Sonra:** Three Primitives bölümüne geç.
+</PresenterNote>
+
 ## Üç Temel Yapı Taşı
 
 Her MCP sunucusu yeteneklerini tam olarak üç tür üzerinden sunar:
@@ -267,6 +283,21 @@ Steps:
 <KeyInsight>
 **Araçlar** = model kontrollü (AI çağırmaya karar verir). **Kaynaklar** = uygulama kontrollü (host dahil etmeye karar verir). **Prompt'lar** = kullanıcı kontrollü (kullanıcı seçer). Üç yapı taşı, üç kontrol düzlemi.
 </KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (3 primitive bölümleri + KeyInsight)
+
+**Yapın:** Üç primitive'i tek tek geç. Her birinin "kim karar veriyor" sorusunu vurgula:
+- **Tools**: AI karar veriyor — "Bu sorgu için search_flights çağırmam lazım."
+- **Resources**: Host karar veriyor — "Bu kullanıcının context'ine flight status'ünü ekleyeyim."
+- **Prompts**: Kullanıcı karar veriyor — "Disruption analysis template'ini seçtim, buna göre yürü."
+
+**Sorun:** "Eğer bir tool'u resource yaparsanız, en büyük fark ne olur?" (Cevap: AI artık o veriyi 'çağıramaz' — sadece host'un sunduğunda görür. Daha güvenli, daha az yetki.)
+
+**Vurgu:** Bu üç ayrım MCP'nin tüm güvenlik modelinin temeli. Tool ile Resource arasındaki sınır = "AI kim karar veriyor" sınırı.
+
+**Sonra:** MCP Pratikte bölümüne geç.
+</PresenterNote>
 
 ## MCP Pratikte
 

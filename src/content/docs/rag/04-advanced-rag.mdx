@@ -11,7 +11,7 @@ import KeyInsight from '../../../components/KeyInsight.astro';
 import FlowDiagram from '../../../components/FlowDiagram.astro';
 import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
 
-<ModuleHeader duration="90 min" day={2} goal="Master query transformation, re-ranking, and agentic RAG — techniques that dramatically improve retrieval quality." />
+<ModuleHeader duration="55 min" day={1} goal="Diagnose where naive RAG breaks and apply the three highest-ROI fixes: HyDE, re-ranking, and agentic RAG (conceptually)." />
 
 ## Start with Failure
 
@@ -315,14 +315,13 @@ top_5 = [doc for _, doc in ranked[:5]]
 Re-ranking typically improves answer quality by **10-25%** on standard benchmarks. It's one of the highest-ROI improvements you can add — and it takes about 10 lines of code.
 </Aside>
 
-## Fix 3: Agentic RAG
+## Fix 3: Agentic RAG (Conceptually)
 
-RAG ile Part 1'deki Agent eğitiminin buluşma noktası.
+RAG ile Part 1'deki Agent eğitiminin buluşma noktası. Naive RAG'da retrieval **her zaman ve tam olarak bir kez** olur. Agentic RAG bir agent'ın karar vermesini sağlar:
 
-Naive RAG'da retrieval **her zaman ve tam olarak bir kez** olur. Agentic RAG bir agent'ın karar vermesini sağlar:
-- Retrieve **edilmeli mi** (belki cevap zaten biliniyor)
-- **Ne** aranmalı (şu ana kadar bulunanlara göre yeniden formüle et)
-- **Tekrar aranmalı mı** (ilk retrieval yeterli değilse)
+- Retrieve **edilmeli mi**? (belki cevap zaten biliniyor — selamlama, matematik, genel bilgi)
+- **Ne** aranmalı? (şu ana kadar bulunanlara göre sorguyu yeniden formüle et)
+- **Tekrar aranmalı mı**? (ilk retrieval yeterli değilse, max 3 iterasyon)
 
 <FlowDiagram title="Naive RAG vs Agentic RAG">
   <div class="flow-row">
@@ -362,12 +361,59 @@ Naive RAG'da retrieval **her zaman ve tam olarak bir kez** olur. Agentic RAG bir
   </div>
 </FlowDiagram>
 
-### Implementation with LangGraph
+### The pattern in 10 lines of pseudocode
+
+```text
+def agentic_rag(question):
+    # 1. Should we even search?
+    if not agent.needs_retrieval(question):
+        return llm.answer(question)              # direct answer
+
+    # 2. Iterative search until we have enough context
+    context = []
+    for attempt in range(MAX_ITERATIONS=3):
+        results = retriever.search(question)
+        context.extend(results)
+        if agent.is_context_sufficient(question, context):
+            break
+        question = agent.reformulate(question, context)
+
+    # 3. Generate the grounded answer
+    return llm.answer(question, context)
+```
+
+That's the entire idea. Three decisions, all made by an LLM acting as a router: "search?", "enough?", "rephrase?". The full LangGraph implementation (≈60 lines of Python) lives in the DeepDive at the bottom of this module — too dense for a live workshop, ideal for self-study afterwards.
+
+<KeyInsight>
+**Don't memorize the Agentic RAG code today.** Memorize the **decision points**: should I search, is it enough, should I reformulate. When you need to build it for real, the LangGraph patterns from the Agent Development course will feel familiar — it's the same state + conditional routing you saw there.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Colab — [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb)
+**Yapın:** 'Re-ranking' hücrelerini çalıştırarak before/after karşılaştırmasını gösterin. Sonra 3 farklı sorgu deneyin: "Merhaba" (retrieve etmemeli), "Flight API auth nasıl?" (bir kez retrieve), "Tüm API'lerin auth yöntemlerini karşılaştır" (birden fazla retrieve).
+**Sorun:** "Agent her sorguda retrieve yapmalı mı? Neden olmasın?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — Hands-On Exercises bölümüne geçin.
+</PresenterNote>
+
+## Exercises
+
+<ColabLink title="Exercise 4.1: HyDE, Re-Ranking & Advanced Techniques" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Basic" />
+
+<PresenterNote>
+**Ekranda:** Colab — [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb) ve [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb)
+**Yapın:** Notebook'ları gösterin ve egzersiz bölümlerini işaret edin. İlk HyDE'ı bitirenlerin re-ranking'e geçmesini söyleyin. Challenge notebook'unu erken bitirenler için gösterin.
+**Sorun:** "Hangi teknik kendi use case'iniz için en faydalı olur?"
+**Sonra:** Katılımcılara: Şimdi siz deneyin — notebook'un sonundaki YOUR TURN bölümlerini yapın. 10-15 dakika süre.
+</PresenterNote>
+
+<DeepDive title="Advanced: Agentic RAG — Full LangGraph Implementation">
+
+The conceptual pseudocode above expands into this LangGraph implementation. Read it after the workshop — it's the same conditional-routing pattern you saw in the Agent Development course's LangGraph module, just applied to retrieval decisions.
 
 ```python
 from langgraph.graph import StateGraph, END
 from typing import TypedDict
-from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
 
 class AgentState(TypedDict):
@@ -377,7 +423,7 @@ class AgentState(TypedDict):
     needs_retrieval: bool
     retrieval_count: int
 
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
 
 def should_retrieve(state: AgentState) -> AgentState:
     """Agent decides if retrieval is needed."""
@@ -427,9 +473,7 @@ def generate(state: AgentState) -> AgentState:
     ])
     state["answer"] = response.content
     return state
-```
 
-```python
 # Build the graph
 def route_retrieval(state: AgentState) -> str:
     return "retrieve" if state["needs_retrieval"] else "direct_answer"
@@ -455,9 +499,7 @@ graph.add_edge("generate", END)
 graph.add_edge("direct_answer", END)
 
 agent = graph.compile()
-```
 
-```python
 # Use it
 result = agent.invoke({
     "question": "What authentication method does the Flight API use?",
@@ -471,23 +513,13 @@ print(f"Retrieved: {result['retrieval_count']} time(s)")
 print(f"Answer: {result['answer']}")
 ```
 
-<PresenterNote>
-**Ekranda:** Colab — [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb)
-**Yapın:** 'Re-ranking' hücrelerini çalıştırarak before/after karşılaştırmasını gösterin. Sonra 3 farklı sorgu deneyin: "Merhaba" (retrieve etmemeli), "Flight API auth nasıl?" (bir kez retrieve), "Tüm API'lerin auth yöntemlerini karşılaştır" (birden fazla retrieve).
-**Sorun:** "Agent her sorguda retrieve yapmalı mı? Neden olmasın?"
-**Sonra:** Notebook'ta DURUN. Site'a dönün — Hands-On Exercises bölümüne geçin.
-</PresenterNote>
+The interesting design choices are:
 
-## Exercises
+1. **`should_retrieve` is a standalone node** — not every query needs the database. Greetings, math, and general knowledge are handled by the LLM directly.
+2. **`evaluate_context` is a routing function**, not a regular node — it returns a string ("generate" or "retrieve_more") that drives the conditional edge.
+3. **`retrieval_count` is a hard safety bound** — without it, the agent could loop forever on a query whose answer simply isn't in the knowledge base.
 
-<ColabLink title="Exercise 4.1: HyDE, Re-Ranking & Advanced Techniques" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Basic" />
-
-<PresenterNote>
-**Ekranda:** Colab — [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb) ve [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb)
-**Yapın:** Notebook'ları gösterin ve egzersiz bölümlerini işaret edin. İlk HyDE'ı bitirenlerin re-ranking'e geçmesini söyleyin. Challenge notebook'unu erken bitirenler için gösterin.
-**Sorun:** "Hangi teknik kendi use case'iniz için en faydalı olur?"
-**Sonra:** Katılımcılara: Şimdi siz deneyin — notebook'un sonundaki YOUR TURN bölümlerini yapın. 10-15 dakika süre.
-</PresenterNote>
+</DeepDive>
 
 <DeepDive title="RAPTOR, GraphRAG, and Multi-Modal RAG">
 

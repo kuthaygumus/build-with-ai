@@ -1,0 +1,308 @@
+---
+title: "Module 0: LLM Fundamentals"
+description: "The four concepts you need before everything else — token, context window, temperature, prompt."
+---
+
+import DeepDive from '../../../components/DeepDive.astro';
+import ModuleHeader from '../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../components/PresenterNote.astro';
+import KeyInsight from '../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="20 min" day={1} goal="Master the four concepts every LLM-based system uses: token, context window, temperature, and prompt." />
+
+## Why This Module Exists
+
+Before we touch agents, MCP, or LangChain, you need a shared vocabulary. Whether you've called the OpenAI API a hundred times or never opened ChatGPT, by the end of these 20 minutes you'll know exactly what these four words mean — and why each one shows up in every line of agent code.
+
+<KeyInsight>
+Four words. That's the whole vocabulary you need to understand 90% of LLM behavior: **token**, **context window**, **temperature**, **prompt**.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (bu sayfa)
+
+**Yapın:** Modülün amacını açıklayın. "Bu modül 20 dakika ve burası bir test değil — sadece geri kalan günü anlamak için bilmen gerekenler. Önce bu 4 kavramı çözeceğiz, sonra ilk gerçek konumuz olan agent'lara geçeceğiz."
+
+**Sorun (kısa el kaldırma):** "Daha önce ChatGPT veya Claude API'sini koddan çağırdınız mı?" 5-10 saniye, sayma yok.
+
+**Not:** Bu modülde notebook açılmıyor. Yalnızca site + 1 canlı demo (Temperature bölümünde Colab'dan tek hücre).
+</PresenterNote>
+
+## Concept 1: Token
+
+LLMs don't read characters. They don't read words. They read **tokens** — small chunks of text that the model treats as atomic units.
+
+A rough rule of thumb in English:
+
+```
+1 token  ≈  4 characters
+1 token  ≈  ¾ of a word
+100 tokens  ≈  75 words  ≈  1 short paragraph
+```
+
+So when you send the prompt:
+
+```
+"Book a flight from Paris to Tokyo on March 15"
+```
+
+The model sees roughly **12 tokens**, not 9 words. The exact split depends on the tokenizer, but the order of magnitude is what matters.
+
+### Why you care
+
+Three reasons, every one of which will return in this training:
+
+1. **Cost** — You pay per token. Input tokens and output tokens are billed separately. A 1000-word document is ~1300 tokens of input.
+2. **Speed** — More tokens = more compute = slower response. A 5-paragraph answer takes meaningfully longer than a 1-sentence one.
+3. **Limits** — Models have a maximum number of tokens they can process at once (we'll meet this in the next concept).
+
+<KeyInsight>
+**Tokens are the unit of everything**: cost, speed, and capacity. When you start tuning agents in production, the first question is always "how many tokens did we burn?"
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (Token bölümü)
+
+**Yapın:** Tablodaki "1 token ≈ 4 karakter" formülünü ekrana yazın. "Paris to Tokyo" örneğini yüksek sesle okuyun. "Bu cümleyi modele gönderdiğinizde 12 token yazılı bir post-it kağıdı görüyor sayılır."
+
+**Sorun:** "100 sayfalık bir PDF kaç token sizce?" Tahminleri toplayın. (Doğru cevap: ~50.000 token, yani GPT-4'ün context window'undan biraz büyük.)
+
+**Vurgulayın:** "Bu rakam Module 5'te 'cost control' konuştuğumuzda geri gelecek."
+</PresenterNote>
+
+## Concept 2: Context Window
+
+Every LLM has a maximum amount of text it can "see" at one time. This is the **context window**, measured in tokens.
+
+| Model | Context window |
+|---|---|
+| GPT-3.5 | 16K tokens (~12K words) |
+| GPT-4o | 128K tokens (~96K words) |
+| Claude Sonnet 4 | 200K tokens (~150K words) |
+| Gemini 1.5 Pro | 1M tokens (~750K words) |
+
+The context window includes **everything** the model sees in a single call:
+
+<FlowDiagram title="What Counts Toward the Context Window">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📜</span>
+      <span class="node-label">System Prompt</span>
+      <span class="node-desc">Instructions you set</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">💬</span>
+      <span class="node-label">Past Messages</span>
+      <span class="node-desc">Chat history</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📄</span>
+      <span class="node-label">Retrieved Docs</span>
+      <span class="node-desc">RAG, files, tools</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Current Input</span>
+      <span class="node-desc">The user's question</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node primary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">LLM</span>
+      <span class="node-desc">All of it, every call</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+This has one massive consequence: **the model has no memory between calls.** Every API call is stateless. If you want it to "remember" the previous conversation, you have to send the whole conversation back with every new message.
+
+### The agent connection
+
+This is exactly why Module 3 (LangChain Memory) and Module 4 (LangGraph State) exist. They're patterns for managing what gets sent in the context window, because:
+
+- Sending the entire history every time → expensive, slow, eventually overflows
+- Sending nothing → model has amnesia
+- Sending a smart summary → the right answer
+
+You'll see all three strategies before lunch.
+
+<PresenterNote>
+**Ekranda:** Site (Context window tablosu + diyagram)
+
+**Yapın:** Tabloyu gösterin. Vurgulayın: "200.000 token ≈ 150.000 kelime ≈ 'Hobbit' romanı boyu." Bu büyük rakamlar ama gerçek hayatta hızlıca dolar.
+
+**Sorun:** "Eğer LLM'in hafızası yoksa, ChatGPT bir önceki mesajı nasıl 'hatırlıyor'?"
+
+**Cevap rehberi:** Hatırlamıyor — uygulama arkada tüm geçmişi her seferinde tekrar gönderiyor. Bu çok önemli, çünkü Module 3'te memory pattern'larını gördüğümüzde "neden gerekli" sorusunun cevabı bu olacak.
+
+**Sonra:** Temperature konseptine geç.
+</PresenterNote>
+
+## Concept 3: Temperature
+
+Temperature controls **how creative** the LLM is when picking the next token. It's a number, usually between 0 and 1 (sometimes up to 2).
+
+| Temperature | Behavior | When to use |
+|---|---|---|
+| **0** | Deterministic, picks the most likely token every time | Code generation, JSON output, tool calls, math |
+| **0.3 – 0.5** | Slightly varied, mostly predictable | Customer support, document Q&A, summaries |
+| **0.7 – 1.0** | Creative, varied outputs | Brainstorming, marketing copy, creative writing |
+| **1.5 – 2.0** | Wild, often nonsensical | Almost never |
+
+### The agent connection
+
+In agent code, you'll see this constantly:
+
+```python
+llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+```
+
+That `temperature=0` is not random. When an agent has to call a tool, you want it to **always** make the same decision for the same input. You don't want creativity in the middle of a payment flow. You want determinism.
+
+When the agent is **drafting a customer email**, you might bump it to 0.5 — a bit of warmth without going off-script.
+
+<KeyInsight>
+**Default to temperature=0 for agents.** Bump it up only when the output is meant to feel human, not mechanical. Creativity is the wrong word — what you're really tuning is **predictability**.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Colab — herhangi bir notebook'ta 1 hücre açık (3.1-first-chain'in Setup'tan sonraki ilk LLM call hücresi ideal)
+
+**Yapın (canlı demo, ~2 dakika):** Aynı basit prompt'u (örn. "Tokyo'ya 3 günlük seyahat için önerin nedir?") iki kere çalıştırın:
+1. `temperature=0` → çıktıyı oku
+2. `temperature=1` → çıktıyı oku
+
+İki çıktı arasındaki farkı göster. "Aynı prompt, aynı model, farklı sıcaklık. Sol taraf hep aynı, sağ taraf her seferinde değişir."
+
+**Sorun:** "Hangisini bir agent'ın tool seçim adımında kullanırdınız?"
+
+**Sonra:** Site'a dön — Prompt konseptine geç.
+</PresenterNote>
+
+## Concept 4: Prompt
+
+A **prompt** is the exact text you send to the LLM. That's the whole definition. Why we make a fuss about it: **small changes in the prompt produce large changes in the output.**
+
+Compare these three prompts asking for the same thing:
+
+<Tabs>
+  <TabItem label="Vague">
+    ```text
+    Help me with flights.
+    ```
+    The model has no idea what you want. Will probably ask a clarifying question or generate something generic.
+  </TabItem>
+
+  <TabItem label="Specific">
+    ```text
+    I need to fly from Paris to Tokyo on March 15. 
+    Suggest 3 flight options sorted by price.
+    ```
+    The model knows the task. Will produce 3 fictional options unless you give it real data.
+  </TabItem>
+
+  <TabItem label="Specific + Constraint">
+    ```text
+    You are a flight assistant. The user wants to fly from Paris (CDG) 
+    to Tokyo (HND) on 2025-03-15. 
+    
+    Use the search_flights tool to find real options.
+    Return exactly 3 results, sorted by price.
+    Format as a numbered list with: airline, price, duration.
+    ```
+    The model knows: its role, the exact task, what tool to call, the format, and the count. This is the kind of prompt agents use under the hood.
+  </TabItem>
+</Tabs>
+
+### The agent connection
+
+Almost every framework you'll see today (LangChain, LangGraph, MCP) is in some way a **structured way to build prompts**. They give you:
+
+- **Templates** — fill-in-the-blanks for the user input
+- **Roles** — system / user / assistant / tool message types
+- **Composition** — chaining prompts together with the output of previous steps
+
+When something goes wrong with an agent, the first thing you do is **print the prompt** and read it. 90% of the time, the bug is in there.
+
+<KeyInsight>
+**Prompts are the source code of LLM behavior.** Treat them with the same care you'd treat a function signature: be explicit about inputs, outputs, constraints, and intent.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (Prompt Tabs)
+
+**Yapın:** Üç tab'ı sırayla aç. Her birinde "fark ne" sorusunu sor. Üçüncüsünü gösterirken vurgula: "Bu agent'ların altında çalışan tipik bir prompt. Module 3'te LangChain bunu daha temiz kuracak."
+
+**Sorun:** "Vague prompt'la üretilen cevap test edilebilir mi? Specific prompt'la üretilen cevap test edilebilir mi?"
+
+**Cevap rehberi:** İkincisi test edilebilir çünkü beklenti net. Bu da prompt engineering'in neden kalite ile bir ilgisi olduğunu açıklıyor.
+</PresenterNote>
+
+## Putting It Together
+
+Every LLM call you'll see today combines all four:
+
+```python
+llm = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    temperature=0,                    # ← Concept 3
+)
+
+prompt = """You are a flight assistant.   ← Concept 4
+Use the search_flights tool when asked about availability.
+"""                                    # ← consumes tokens (1)
+                                        # ← all of this lives inside
+                                        #    the context window (2)
+
+response = llm.invoke(prompt + user_message)
+```
+
+That's it. Four words, one mental model. We're ready for agents.
+
+<DeepDive title="Bonus: Streaming">
+
+Most LLM APIs support **streaming** — receiving the output token by token instead of all at once. The total cost and total time are roughly the same, but the *perceived* speed is much better, because the user sees the first word in 100ms instead of waiting 5 seconds for the whole thing.
+
+```python
+# Non-streaming: wait for the full answer
+response = llm.invoke("Explain RAG")  # 5 seconds of silence
+
+# Streaming: tokens arrive as they're generated
+for chunk in llm.stream("Explain RAG"):
+    print(chunk.content, end="", flush=True)  # types out live
+```
+
+In agent code, streaming matters when there's a human watching. For backend pipelines (no human in the loop), batch responses are simpler. We'll mention this once or twice in later modules but won't dwell on it.
+
+</DeepDive>
+
+<DeepDive title="Bonus: How Tokens Map to Cost">
+
+Every API has a price per million tokens, with different rates for input and output. Example, for a typical mid-tier model:
+
+| Item | Tokens | Rate | Cost |
+|---|---|---|---|
+| User message | 50 | $0.50/M | $0.000025 |
+| System prompt + history | 1500 | $0.50/M | $0.00075 |
+| Generated response | 300 | $1.50/M | $0.00045 |
+| **Total per call** | 1850 | — | **~$0.0012** |
+
+Looks tiny. Multiply by 10,000 user requests per day → $12/day → $360/month. Multiply by complex agent workflows that make 5–10 LLM calls per user request → $1,800–$3,600/month. That's why Module 5 has a "Cost Control" section.
+
+</DeepDive>
+
+## Recap (in 30 seconds)
+
+1. **Token** — the unit of text the model sees. Drives cost, speed, and limits.
+2. **Context window** — the maximum amount of text per call. Includes system prompt, history, retrieved docs, and current input.
+3. **Temperature** — predictability dial. 0 for tools and code, higher for human-feeling text.
+4. **Prompt** — the exact text you send. Small changes = large output differences. Treat it like source code.
+
+## Next Up
+
+You now have the vocabulary. Time for the actual subject of Day 1: what an **agent** is, and why it's the leap that makes everything we'll build possible. **Module 1: Why Agents?**

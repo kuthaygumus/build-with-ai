@@ -13,6 +13,10 @@ import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/
 
 <ModuleHeader duration="60 min" day={1} goal="Understand protocol standardization for AI tool integration and build your first MCP server." />
 
+<Aside type="note" title="What is a protocol, in 30 seconds?">
+A **protocol** is just a written agreement on how two systems talk to each other: what messages exist, what fields they have, and what answers are valid. HTTP is a protocol — that's why your browser can talk to any web server in the world without custom code per server. MCP is the same idea, but for "AI client wants to call a tool". Once both sides agree on MCP, they don't need to know anything else about each other.
+</Aside>
+
 ## The Integration Explosion
 
 You have 5 AI applications — Claude, ChatGPT, Cursor, your custom app, a CI bot. They need to reach 8 tools — Jira, GitHub, Slack, PostgreSQL, Confluence, S3, email, a flight API.
@@ -181,6 +185,18 @@ MCP is transport-agnostic — it uses JSON-RPC 2.0 regardless of how messages ar
 Streamable HTTP is the recommended transport for production. It handles reconnection, supports both request-response and streaming, and integrates with existing HTTP infrastructure.
 </Aside>
 
+<PresenterNote>
+**Ekranda:** Site (iki tab — stdio ve HTTP)
+
+**Yapın:** İki tab'ı sırayla aç. "stdio = MCP server senin makinende child process olarak çalışır, host onu spawn eder, stdin/stdout ile konuşur. HTTP = MCP server bir web service, internette yaşar, herhangi bir AI client erişir."
+
+**Sorun:** "Production'da hangisini tercih edersiniz, neden?" (Cevap: HTTP — load balancer, auth, tek server'a çok client.)
+
+**Vurgu:** Bu detay önemli değil — biz konsept anlıyoruz. "JSON-RPC 2.0" görürsen panik yapma; bu sadece "mesaj formatı standardı" demek. Yine HTTP analojisi: HTTP'nin başlık satırlarını ezberlemiyoruz, ne işe yaradığını biliyoruz.
+
+**Sonra:** Three Primitives bölümüne geç.
+</PresenterNote>
+
 ## The Three Primitives
 
 Every MCP server exposes capabilities through exactly three types:
@@ -273,6 +289,21 @@ Steps:
 <KeyInsight>
 **Tools** = model-controlled (AI decides to call them). **Resources** = application-controlled (host decides to include them). **Prompts** = user-controlled (user selects them). Three primitives, three control planes.
 </KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (3 primitive bölümleri + KeyInsight)
+
+**Yapın:** Üç primitive'i tek tek geç. Her birinin "kim karar veriyor" sorusunu vurgula:
+- **Tools**: AI karar veriyor — "Bu sorgu için search_flights çağırmam lazım."
+- **Resources**: Host karar veriyor — "Bu kullanıcının context'ine flight status'ünü ekleyeyim."
+- **Prompts**: Kullanıcı karar veriyor — "Disruption analysis template'ini seçtim, buna göre yürü."
+
+**Sorun:** "Eğer bir tool'u resource yaparsanız, en büyük fark ne olur?" (Cevap: AI artık o veriyi 'çağıramaz' — sadece host'un sunduğunda görür. Daha güvenli, daha az yetki.)
+
+**Vurgu:** Bu üç ayrım MCP'nin tüm güvenlik modelinin temeli. Tool ile Resource arasındaki sınır = "AI kim karar veriyor" sınırı.
+
+**Sonra:** MCP in the Wild bölümüne geç.
+</PresenterNote>
 
 ## MCP in the Wild
 

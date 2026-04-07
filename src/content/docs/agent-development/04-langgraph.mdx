@@ -11,7 +11,7 @@ import KeyInsight from '../../../components/KeyInsight.astro';
 import FlowDiagram from '../../../components/FlowDiagram.astro';
 import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
 
-<ModuleHeader duration="90 min" day={2} goal="Build agents with decision-making, state management, human-in-the-loop, and multi-agent collaboration." />
+<ModuleHeader duration="55 min" day={1} goal="Understand stateful agents — state, nodes, edges, and conditional routing — using a real flight disruption scenario." />
 
 ## Why Chains Aren't Enough
 
@@ -88,11 +88,11 @@ The `Annotated[list, add_messages]` pattern is key. `add_messages` is a **reduce
 Her node mevcut state'i alır, bir şey yapar ve state güncellemesi döner.
 
 ```python
-from langchain_anthropic import ChatAnthropic
+from langchain_groq import ChatGroq
 
-model = ChatAnthropic(model="claude-sonnet-4-20250514")
+model = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
 
-async def analyze_disruption(state: FlightDisruptionState) -> dict:
+def analyze_disruption(state: FlightDisruptionState) -> dict:
     """Analyze the severity of a flight disruption."""
     prompt = f"""Analyze this flight disruption:
     Flight: {state['flight_number']}
@@ -102,11 +102,11 @@ async def analyze_disruption(state: FlightDisruptionState) -> dict:
     severe (180-360 min), or critical (over 360 min).
     Respond with ONLY the severity word."""
 
-    response = await model.ainvoke([{"role": "user", "content": prompt}])
+    response = model.invoke([{"role": "user", "content": prompt}])
     return {"severity": response.content.strip().lower()}
 
 
-async def auto_resolve(state: FlightDisruptionState) -> dict:
+def auto_resolve(state: FlightDisruptionState) -> dict:
     """Handle minor disruptions automatically."""
     return {
         "rebooking_plan": f"Auto-resolved: {state['flight_number']} - "
@@ -117,19 +117,23 @@ async def auto_resolve(state: FlightDisruptionState) -> dict:
     }
 
 
-async def escalate_to_ops(state: FlightDisruptionState) -> dict:
+def escalate_to_ops(state: FlightDisruptionState) -> dict:
     """Escalate severe disruptions to operations team."""
     prompt = f"""Create a rebooking plan for flight {state['flight_number']}.
     Severity: {state['severity']}, Delay: {state['delay_minutes']} minutes.
     Consider: alternative flights, hotels, meal vouchers, premium priority."""
 
-    response = await model.ainvoke([{"role": "user", "content": prompt}])
+    response = model.invoke([{"role": "user", "content": prompt}])
     return {
         "rebooking_plan": response.content,
         "messages": [{"role": "assistant",
                       "content": "Escalated: Rebooking plan created for review."}]
     }
 ```
+
+<Aside type="tip">
+Notice these are plain `def` functions, not `async def`. LangGraph supports both. We use sync here because it's simpler to read in a workshop. In production, you'd typically make these async — but the logic is identical.
+</Aside>
 
 ### 3. Edges — Kablolama
 
@@ -179,7 +183,7 @@ from langgraph.graph import StateGraph, START, END
 from typing import Annotated
 from typing_extensions import TypedDict
 from langgraph.graph.message import add_messages
-from langchain_anthropic import ChatAnthropic
+from langchain_groq import ChatGroq
 
 class ResearchState(TypedDict):
     messages: Annotated[list, add_messages]
@@ -187,18 +191,18 @@ class ResearchState(TypedDict):
     research_notes: str
     summary: str
 
-model = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
+model = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
 
-async def research(state: ResearchState) -> dict:
-    response = await model.ainvoke([
+def research(state: ResearchState) -> dict:
+    response = model.invoke([
         {"role": "system", "content": "You are a thorough researcher. "
          "Provide detailed, factual notes about the given topic."},
         {"role": "user", "content": f"Research this topic: {state['topic']}"}
     ])
     return {"research_notes": response.content}
 
-async def summarize(state: ResearchState) -> dict:
-    response = await model.ainvoke([
+def summarize(state: ResearchState) -> dict:
+    response = model.invoke([
         {"role": "system", "content": "Condense research notes into "
          "a clear, 3-paragraph summary."},
         {"role": "user", "content": f"Summarize:\n\n{state['research_notes']}"}
@@ -218,7 +222,7 @@ workflow.add_edge("summarize", END)
 
 graph = workflow.compile()
 
-result = await graph.ainvoke({
+result = graph.invoke({
     "topic": "Impact of AI agents on airline operations",
     "messages": []
 })
@@ -285,8 +289,8 @@ class CustomerRequestState(TypedDict):
     category: str        # "rebooking", "complaint", "inquiry"
     response: str
 
-async def classify_request(state: CustomerRequestState) -> dict:
-    response = await model.ainvoke([
+def classify_request(state: CustomerRequestState) -> dict:
+    response = model.invoke([
         {"role": "system",
          "content": "Classify the customer request into exactly one category: "
                     "rebooking, complaint, or inquiry. Respond with ONLY the category."},
@@ -294,8 +298,8 @@ async def classify_request(state: CustomerRequestState) -> dict:
     ])
     return {"category": response.content.strip().lower()}
 
-async def handle_rebooking(state: CustomerRequestState) -> dict:
-    response = await model.ainvoke([
+def handle_rebooking(state: CustomerRequestState) -> dict:
+    response = model.invoke([
         {"role": "system",
          "content": "You are a rebooking specialist. Find alternative flights. "
                     "Be efficient and solution-oriented."},
@@ -303,16 +307,16 @@ async def handle_rebooking(state: CustomerRequestState) -> dict:
     ])
     return {"response": response.content}
 
-async def handle_complaint(state: CustomerRequestState) -> dict:
-    response = await model.ainvoke([
+def handle_complaint(state: CustomerRequestState) -> dict:
+    response = model.invoke([
         {"role": "system",
          "content": "Handle complaints with empathy. Acknowledge, apologize, resolve."},
         {"role": "user", "content": state["request_text"]}
     ])
     return {"response": response.content}
 
-async def handle_inquiry(state: CustomerRequestState) -> dict:
-    response = await model.ainvoke([
+def handle_inquiry(state: CustomerRequestState) -> dict:
+    response = model.invoke([
         {"role": "system",
          "content": "Answer travel inquiries. Be helpful and informative."},
         {"role": "user", "content": state["request_text"]}
@@ -386,9 +390,53 @@ graph = workflow.compile()
   </div>
 </FlowDiagram>
 
-## Human-in-the-Loop
+## Two More Patterns to Know (Conceptually)
 
-Production agent'larda, geri dönüşü olmayan aksiyonlar öncesinde insan onayı şart. LangGraph bunu `interrupt_before` ve `interrupt_after` ile first-class destekler.
+In addition to state, nodes, edges, and routing, LangGraph supports two patterns that are essential for production but too detailed to fully implement in 50 minutes. We'll cover them as **concepts** here. The full implementations are in the DeepDive below for self-study.
+
+### Human-in-the-Loop
+
+For agents that take irreversible actions (booking changes, payments, customer notifications), you almost always want a human to approve before the agent acts. LangGraph supports this as a first-class feature: the graph **pauses** at a designated node, persists its state, waits for human input, and resumes exactly where it left off.
+
+```python
+# One-line concept: pause before "execute_rebooking" node
+graph = workflow.compile(
+    checkpointer=MemorySaver(),
+    interrupt_before=["execute_rebooking"]
+)
+```
+
+That's the entire idea. The graph runs until it hits `execute_rebooking`, freezes, and waits. A human reviews the proposed plan, approves, and you call `graph.invoke(None, config)` to resume.
+
+### Multi-Agent Collaboration
+
+Sometimes one agent isn't enough. You want a **researcher** that drafts a report, a **reviewer** that critiques it, and a loop that says "revise until approved (or max 3 attempts)". This is just conditional routing with a self-loop:
+
+```
+researcher → reviewer → (approved? finalize : back to researcher)
+```
+
+The pattern is exactly the same as the customer request router above — just with an edge that goes backward. No new concepts. The full code is in the DeepDive.
+
+<KeyInsight>
+**You don't need to memorize multi-agent or human-in-the-loop code today.** You need to know they exist, that LangGraph supports them natively, and that under the hood they're just state + conditional edges. When you need them in production, the docs will be there.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (bu iki pattern bölümü)
+
+**Yapın:** İki pattern'ı kavramsal olarak özetle, ~3-4 dakika her biri. Human-in-the-loop için: "Booking değiştiren bir agent yazıyorsanız, son adımdan önce insan onayı isteyeceksiniz. LangGraph bunu çekirdek özellik olarak veriyor." Multi-agent için: "İki agent — biri yazar, biri eleştirir, döngü onaylanana kadar. Yine sadece state + conditional edge."
+
+**Sorun:** "Takımınız booking değiştiren bir agent'ı insan onayı olmadan deploy eder mi?" Cevapları toplayın, hızlıca geçin.
+
+**Tam kod:** DeepDive'da. Bugün canlı yazmıyoruz; eğitim sonrası referans olarak kalacak.
+
+**Sonra:** Exercises'a geç.
+</PresenterNote>
+
+<DeepDive title="Advanced: Human-in-the-Loop — Full Implementation">
+
+The conceptual one-liner above expands into a complete production pattern. Here's the full flow:
 
 ```python
 from langgraph.checkpoint.memory import MemorySaver
@@ -402,14 +450,14 @@ graph = workflow.compile(
 
 # Run until the interrupt
 config = {"configurable": {"thread_id": "request_001"}}
-result = await graph.ainvoke(initial_state, config)
+result = graph.invoke(initial_state, config)
 
 # Graph is paused. Show the plan to a human:
 print("Proposed rebooking plan:")
 print(result["rebooking_plan"])
 
 # Human approves... resume execution:
-result = await graph.ainvoke(None, config)
+result = graph.invoke(None, config)
 ```
 
 <FlowDiagram title="Human-in-the-Loop Pattern">
@@ -440,24 +488,13 @@ result = await graph.ainvoke(None, config)
   </div>
 </FlowDiagram>
 
-<Aside type="caution">
 `interrupt_before` and `interrupt_after` require a **checkpointer**. The checkpointer persists graph state so it can be resumed later — even in a different process. `MemorySaver` is fine for development. Production needs PostgreSQL or Redis.
-</Aside>
 
-<KeyInsight>
-Human-in-the-loop isn't a hack bolted on after the fact. It's a first-class feature of LangGraph. The graph pauses, persists its state, waits for human input, and resumes exactly where it left off. This is how you build agents people actually trust.
-</KeyInsight>
+</DeepDive>
 
-<PresenterNote>
-**Ekranda:** Colab — [4.2-conditional-routing.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/4.2-conditional-routing.ipynb)
-**Yapın:** 'Human-in-the-Loop' bölümündeki hücreleri çalıştırın. Graph'ın nasıl durduğunu, state'i sakladığını ve onay sonrası devam ettiğini canlı gösterin. "İşte production pattern'ı bu."
-**Sorun:** "Takımınız booking değiştiren bir agent'ı insan onayı olmadan deploy eder mi?"
-**Sonra:** Site'a dönün — Multi-Agent bölümüne geçin.
-</PresenterNote>
+<DeepDive title="Advanced: Multi-Agent Collaboration — Full Implementation">
 
-## Multi-Agent Collaboration
-
-LangGraph'ın en güçlü pattern'ı: kalite sağlanana kadar iterasyon yapan, uzmanlaşmış birden fazla agent.
+The conceptual idea is "researcher writes, reviewer critiques, loop until approved". The full code:
 
 ```python
 class MultiAgentState(TypedDict):
@@ -468,13 +505,13 @@ class MultiAgentState(TypedDict):
     final_report: str
     iteration: int
 
-async def researcher(state: MultiAgentState) -> dict:
+def researcher(state: MultiAgentState) -> dict:
     """Agent 1: Researches and produces a draft report."""
     context = ""
     if state.get("review_feedback"):
         context = f"\n\nPrevious feedback to address:\n{state['review_feedback']}"
 
-    response = await model.ainvoke([
+    response = model.invoke([
         {"role": "system",
          "content": "You are a thorough researcher. Produce a detailed report."},
         {"role": "user",
@@ -485,9 +522,9 @@ async def researcher(state: MultiAgentState) -> dict:
         "iteration": state.get("iteration", 0) + 1
     }
 
-async def reviewer(state: MultiAgentState) -> dict:
+def reviewer(state: MultiAgentState) -> dict:
     """Agent 2: Reviews and provides feedback or approves."""
-    response = await model.ainvoke([
+    response = model.invoke([
         {"role": "system",
          "content": "You are a critical reviewer. Evaluate for accuracy, "
                     "completeness, clarity. If good enough, say APPROVED. "
@@ -504,7 +541,7 @@ def should_continue(state: MultiAgentState) -> str:
         return "finalize"
     return "revise"
 
-async def finalize(state: MultiAgentState) -> dict:
+def finalize(state: MultiAgentState) -> dict:
     return {"final_report": state["research_output"]}
 
 # Build the multi-agent graph
@@ -524,49 +561,11 @@ workflow.add_edge("finalize", END)
 graph = workflow.compile()
 ```
 
-<FlowDiagram title="Multi-Agent Revision Loop">
-  <div class="flow-row">
-    <div class="flow-node secondary">
-      <span class="node-icon">🚀</span>
-      <span class="node-label">START</span>
-      <span class="node-desc">Task assigned</span>
-    </div>
-    <div class="flow-arrow animated">→</div>
-    <div class="flow-node secondary">
-      <span class="node-icon">🔬</span>
-      <span class="node-label">Researcher</span>
-      <span class="node-desc">Produces draft report</span>
-    </div>
-    <div class="flow-arrow animated">→</div>
-    <div class="flow-node warning">
-      <span class="node-icon">👁️</span>
-      <span class="node-label">Reviewer</span>
-      <span class="node-desc">Critiques or approves</span>
-    </div>
-  </div>
-  <div class="flow-row" style="margin-top: 0.5rem;">
-    <div class="flow-node secondary">
-      <span class="node-icon">🔄</span>
-      <span class="node-label">Revise</span>
-      <span class="node-desc">Back to researcher with feedback</span>
-    </div>
-    <div class="flow-arrow">or</div>
-    <div class="flow-node success">
-      <span class="node-icon">✅</span>
-      <span class="node-label">Finalize</span>
-      <span class="node-desc">Report approved → END</span>
-    </div>
-  </div>
-  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
-    <div class="flow-arrow" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">↩ Max 3 revision cycles before forced finalization</div>
-  </div>
-</FlowDiagram>
+This is just **conditional routing with a self-loop**. The reviewer's verdict (APPROVED or feedback) drives whether the graph re-enters the researcher node or moves to `finalize`. Max 3 iterations as a safety bound.
 
-Bu bir **revision loop** oluşturur. Researcher taslak yazar, reviewer eleştirir, researcher revize eder. Maksimum 3 döngü veya reviewer APPROVED diyene kadar. Yüksek kaliteli çıktı üretmek için son derece etkili bir pattern.
+Multi-agent isn't "more agents". It's specialized agents that critique each other's work. Draft, review, revise — consistently produces better output than a single agent working alone.
 
-<KeyInsight>
-Multi-agent daha fazla agent demek değil. Birbirinin işini eleştiren uzmanlaşmış agent'lar demek. Draft, review, revise döngüsü — tek başına çalışan bir agent'tan sürekli olarak daha iyi çıktı üretir.
-</KeyInsight>
+</DeepDive>
 
 <DeepDive title="Advanced: Subgraphs, Persistence, and LangSmith">
 
@@ -596,14 +595,14 @@ Each subgraph is independently testable. Compose complexity from simple, validat
 For production, state survives process restarts:
 
 ```python
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.checkpoint.postgres import PostgresSaver
 
-async with AsyncPostgresSaver.from_conn_string(
+with PostgresSaver.from_conn_string(
     "postgresql://user:pass@localhost:5432/agents"
 ) as checkpointer:
     graph = workflow.compile(checkpointer=checkpointer)
     config = {"configurable": {"thread_id": "disruption_AF1234"}}
-    result = await graph.ainvoke(initial_state, config)
+    result = graph.invoke(initial_state, config)
 ```
 
 ### LangSmith — See Inside Your Graph

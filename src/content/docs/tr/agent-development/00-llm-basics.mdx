@@ -1,0 +1,308 @@
+---
+title: "Modül 0: LLM Temelleri"
+description: "Her şeyden önce ihtiyacınız olan dört kavram — token, context window, temperature, prompt."
+---
+
+import DeepDive from '../../../../components/DeepDive.astro';
+import ModuleHeader from '../../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../../components/PresenterNote.astro';
+import KeyInsight from '../../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="20 dk" day={1} goal="Her LLM tabanlı sistemin kullandığı dört kavramı kavra: token, context window, temperature, prompt." />
+
+## Bu Modül Neden Var
+
+Agent'lara, MCP'ye ya da LangChain'e dokunmadan önce ortak bir kelime hazinesine ihtiyacımız var. OpenAI API'sini yüzlerce kez çağırmış olsanız da hiç ChatGPT açmamış olsanız da, bu 20 dakikanın sonunda bu dört kelimenin tam olarak ne anlama geldiğini bileceksiniz — ve her birinin agent kodunda neden her satırda karşımıza çıktığını anlayacaksınız.
+
+<KeyInsight>
+Dört kelime. LLM davranışının %90'ını anlamak için ihtiyacınız olan tüm kelime hazinesi bu: **token**, **context window**, **temperature**, **prompt**.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (bu sayfa)
+
+**Yapın:** Modülün amacını açıklayın. "Bu modül 20 dakika ve burada bir test yok — sadece günün geri kalanını anlamak için bilmen gereken şeyler. Önce bu 4 kavramı çözüyoruz, sonra ilk gerçek konumuz olan agent'lara geçiyoruz."
+
+**Sorun (kısa el kaldırma):** "Daha önce ChatGPT veya Claude API'sini koddan çağırdınız mı?" 5-10 saniye, sayma yok.
+
+**Not:** Bu modülde notebook açılmıyor. Yalnızca site + 1 canlı demo (Temperature bölümünde Colab'dan tek hücre).
+</PresenterNote>
+
+## Kavram 1: Token
+
+LLM'ler karakter okumaz. Kelime de okumaz. **Token** okurlar — modelin atomik birim olarak ele aldığı küçük metin parçaları.
+
+İngilizce için kaba bir parmak hesabı:
+
+```
+1 token  ≈  4 karakter
+1 token  ≈  bir kelimenin ¾'ü
+100 token  ≈  75 kelime  ≈  1 kısa paragraf
+```
+
+Yani şu prompt'u gönderdiğinizde:
+
+```
+"Paris'ten Tokyo'ya 15 Mart için bir uçuş ayarla"
+```
+
+Model 9 kelime değil, yaklaşık **12 token** görür. Tam bölünme tokenizer'a göre değişir, ama önemli olan büyüklük mertebesi.
+
+### Neden umursamalısınız
+
+Bu eğitimde her biri tekrar karşımıza çıkacak üç sebep:
+
+1. **Maliyet** — Token başına ödeme yaparsınız. Input token'ları ve output token'ları ayrı ayrı faturalandırılır. 1000 kelimelik bir doküman ~1300 input token demektir.
+2. **Hız** — Daha fazla token = daha fazla hesaplama = daha yavaş cevap. 5 paragraflık bir yanıt, 1 cümlelik yanıttan belirgin biçimde daha uzun sürer.
+3. **Limitler** — Modellerin tek seferde işleyebildikleri maksimum token sayısı vardır (sıradaki kavramda tanışacağız).
+
+<KeyInsight>
+**Token her şeyin birimi**: maliyet, hız ve kapasite. Production'da agent ayarlamaya başladığınızda ilk soru hep şudur: "Kaç token yaktık?"
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (Token bölümü)
+
+**Yapın:** Tablodaki "1 token ≈ 4 karakter" formülünü ekrana yazın. "Paris'ten Tokyo'ya" örneğini yüksek sesle okuyun. "Bu cümleyi modele gönderdiğinde, üzerinde 12 token yazılı bir post-it kağıdı görüyor sayılır."
+
+**Sorun:** "100 sayfalık bir PDF sizce kaç token?" Tahminleri toplayın. (Doğru cevap: ~50.000 token, yani GPT-4'ün context window'undan biraz büyük.)
+
+**Vurgulayın:** "Bu rakam Modül 5'te 'maliyet kontrolü' konuştuğumuzda geri gelecek."
+</PresenterNote>
+
+## Kavram 2: Context Window
+
+Her LLM'in tek seferde "görebildiği" maksimum metin miktarı vardır. Bu **context window**'dur ve token cinsinden ölçülür.
+
+| Model | Context window |
+|---|---|
+| GPT-3.5 | 16K token (~12K kelime) |
+| GPT-4o | 128K token (~96K kelime) |
+| Claude Sonnet 4 | 200K token (~150K kelime) |
+| Gemini 1.5 Pro | 1M token (~750K kelime) |
+
+Context window, modelin tek bir çağrıda gördüğü **her şeyi** kapsar:
+
+<FlowDiagram title="Context Window'a Neler Sayılır">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📜</span>
+      <span class="node-label">System Prompt</span>
+      <span class="node-desc">Sizin verdiğiniz talimat</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">💬</span>
+      <span class="node-label">Geçmiş Mesajlar</span>
+      <span class="node-desc">Sohbet geçmişi</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📄</span>
+      <span class="node-label">Getirilen Doc'lar</span>
+      <span class="node-desc">RAG, dosyalar, tool'lar</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Mevcut Input</span>
+      <span class="node-desc">Kullanıcının sorusu</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node primary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">LLM</span>
+      <span class="node-desc">Hepsi, her çağrıda</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+Bunun çok büyük bir sonucu var: **modelin çağrılar arası hafızası yoktur.** Her API çağrısı stateless'tır. Önceki konuşmayı "hatırlamasını" istiyorsanız, her yeni mesajla beraber tüm konuşmayı tekrar göndermek zorundasınız.
+
+### Agent ile bağlantı
+
+Modül 3 (LangChain Memory) ve Modül 4 (LangGraph State) tam olarak bu yüzden var. Bunlar context window'a ne gönderileceğini yöneten pattern'lardır. Çünkü:
+
+- Tüm geçmişi her seferinde göndermek → pahalı, yavaş, sonunda taşar
+- Hiçbir şey göndermemek → modelin hafıza kaybı olur
+- Akıllı bir özet göndermek → doğru cevap
+
+Üç stratejiyi de öğleden önce göreceksiniz.
+
+<PresenterNote>
+**Ekranda:** Site (Context window tablosu + diyagram)
+
+**Yapın:** Tabloyu gösterin. Vurgulayın: "200.000 token ≈ 150.000 kelime ≈ 'Hobbit' romanı boyu." Büyük rakamlar ama gerçek hayatta hızlıca dolar.
+
+**Sorun:** "Eğer LLM'in hafızası yoksa, ChatGPT bir önceki mesajı nasıl 'hatırlıyor'?"
+
+**Cevap rehberi:** Hatırlamıyor — uygulama arkada tüm geçmişi her seferinde tekrar gönderiyor. Bu çok önemli, çünkü Modül 3'te memory pattern'larını gördüğümüzde "neden gerekli" sorusunun cevabı bu olacak.
+
+**Sonra:** Temperature kavramına geç.
+</PresenterNote>
+
+## Kavram 3: Temperature
+
+Temperature, LLM'in sıradaki token'ı seçerken **ne kadar yaratıcı** olacağını kontrol eder. Genelde 0 ile 1 arasında bir sayıdır (bazen 2'ye kadar çıkabilir).
+
+| Temperature | Davranış | Ne zaman kullanılır |
+|---|---|---|
+| **0** | Deterministik, her seferinde en olası token'ı seçer | Kod üretimi, JSON çıktı, tool çağrısı, matematik |
+| **0.3 – 0.5** | Hafifçe değişken, çoğunlukla öngörülebilir | Müşteri desteği, doküman Q&A, özetler |
+| **0.7 – 1.0** | Yaratıcı, çeşitli çıktılar | Beyin fırtınası, pazarlama metni, yaratıcı yazı |
+| **1.5 – 2.0** | Vahşi, çoğu zaman anlamsız | Neredeyse hiç |
+
+### Agent ile bağlantı
+
+Agent kodunda bunu sürekli göreceksiniz:
+
+```python
+llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+```
+
+Buradaki `temperature=0` rastgele değil. Bir agent tool çağırması gerektiğinde, aynı input için **hep aynı kararı** vermesini istersiniz. Ödeme akışının ortasında yaratıcılık istemezsiniz. Determinizm istersiniz.
+
+Agent **müşteriye e-posta taslağı yazıyorsa**, bunu 0.5'e çekebilirsiniz — script'ten sapmadan bir miktar sıcaklık.
+
+<KeyInsight>
+**Agent'larda varsayılan olarak temperature=0 kullanın.** Çıktının mekanik değil insani hissetmesi gereken yerlerde yükseltin. Gerçekte ayarladığınız şey "yaratıcılık" değil — **öngörülebilirlik**.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Colab — herhangi bir notebook'ta 1 hücre açık (3.1-first-chain'in Setup'tan sonraki ilk LLM call hücresi ideal)
+
+**Yapın (canlı demo, ~2 dakika):** Aynı basit prompt'u (örn. "Tokyo'ya 3 günlük seyahat için önerin nedir?") iki kere çalıştırın:
+1. `temperature=0` → çıktıyı oku
+2. `temperature=1` → çıktıyı oku
+
+İki çıktı arasındaki farkı göster. "Aynı prompt, aynı model, farklı sıcaklık. Sol taraf hep aynı, sağ taraf her seferinde değişir."
+
+**Sorun:** "Hangisini bir agent'ın tool seçim adımında kullanırdınız?"
+
+**Sonra:** Site'a dön — Prompt kavramına geç.
+</PresenterNote>
+
+## Kavram 4: Prompt
+
+**Prompt**, LLM'e gönderdiğiniz tam metindir. Tanımın tamamı bu. Bu kadar önem vermemizin sebebi: **prompt'taki küçük değişiklikler çıktıda büyük değişiklikler üretir.**
+
+Aynı şeyi soran üç prompt'u karşılaştırın:
+
+<Tabs>
+  <TabItem label="Belirsiz">
+    ```text
+    Uçuş konusunda yardım et.
+    ```
+    Modelin ne istediğiniz hakkında hiçbir fikri yok. Muhtemelen netleştirici bir soru soracak ya da generic bir şey üretecek.
+  </TabItem>
+
+  <TabItem label="Spesifik">
+    ```text
+    15 Mart'ta Paris'ten Tokyo'ya uçmam gerekiyor. 
+    Fiyata göre sıralı 3 uçuş seçeneği öner.
+    ```
+    Model görevi biliyor. Gerçek veri vermezseniz 3 kurgusal seçenek üretecek.
+  </TabItem>
+
+  <TabItem label="Spesifik + Kısıt">
+    ```text
+    Sen bir uçuş asistanısın. Kullanıcı 2025-03-15 tarihinde 
+    Paris (CDG) — Tokyo (HND) uçmak istiyor.
+    
+    Gerçek seçenekler için search_flights tool'unu kullan.
+    Tam olarak 3 sonuç döndür, fiyata göre sıralı.
+    Numaralı liste olarak biçimlendir: havayolu, fiyat, süre.
+    ```
+    Model her şeyi biliyor: rolünü, tam görevi, çağıracağı tool'u, formatı ve sayıyı. Agent'ların altında çalışan tipik prompt budur.
+  </TabItem>
+</Tabs>
+
+### Agent ile bağlantı
+
+Bugün göreceğiniz neredeyse her framework (LangChain, LangGraph, MCP) bir şekilde **prompt kurmanın yapılı bir yoludur**. Size şunları sağlarlar:
+
+- **Şablonlar** — kullanıcı input'u için doldur-boşluk
+- **Roller** — system / user / assistant / tool mesaj tipleri
+- **Kompozisyon** — bir adımın çıktısını sonraki prompt'a zincirleme
+
+Agent'la ilgili bir şey ters gittiğinde ilk yapacağınız şey **prompt'u yazdırıp okumak**. %90'ında bug oradadır.
+
+<KeyInsight>
+**Prompt'lar LLM davranışının kaynak kodudur.** Bir fonksiyon imzasına gösterdiğiniz özeni gösterin: input, output, kısıt ve niyet konusunda net olun.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (Prompt Tabs)
+
+**Yapın:** Üç tab'ı sırayla aç. Her birinde "fark ne" sorusunu sor. Üçüncüsünü gösterirken vurgula: "Bu, agent'ların altında çalışan tipik bir prompt. Modül 3'te LangChain bunu daha temiz kuracak."
+
+**Sorun:** "Belirsiz prompt ile üretilen cevap test edilebilir mi? Spesifik prompt ile üretilen cevap test edilebilir mi?"
+
+**Cevap rehberi:** İkincisi test edilebilir çünkü beklenti net. Bu da prompt engineering'in neden kalite ile bir ilgisi olduğunu açıklıyor.
+</PresenterNote>
+
+## Hepsini Birleştirelim
+
+Bugün göreceğiniz her LLM çağrısı bu dördünü birleştirir:
+
+```python
+llm = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    temperature=0,                    # ← Kavram 3
+)
+
+prompt = """Sen bir uçuş asistanısın.   ← Kavram 4
+Müsaitlik soruları için search_flights tool'unu kullan.
+"""                                    # ← token tüketir (1)
+                                        # ← tüm bunlar context
+                                        #    window içinde yaşar (2)
+
+response = llm.invoke(prompt + user_message)
+```
+
+İşte bu kadar. Dört kelime, tek bir mental model. Agent'lara hazırız.
+
+<DeepDive title="Bonus: Streaming">
+
+Çoğu LLM API'si **streaming** destekler — çıktıyı bir kerede değil, token token almak. Toplam maliyet ve toplam süre kabaca aynıdır, ama *algılanan* hız çok daha iyidir; çünkü kullanıcı ilk kelimeyi 5 saniye beklemek yerine 100ms içinde görür.
+
+```python
+# Streaming değil: tüm cevabı bekle
+response = llm.invoke("RAG'ı açıkla")  # 5 saniye sessizlik
+
+# Streaming: token'lar üretildikçe gelir
+for chunk in llm.stream("RAG'ı açıkla"):
+    print(chunk.content, end="", flush=True)  # canlı yazılır
+```
+
+Agent kodunda streaming, izleyen bir insan olduğunda önemlidir. Backend pipeline'lar için (insan döngüde değilse) batch yanıt daha basittir. Sonraki modüllerde bir-iki kez bahsedeceğiz ama üzerinde durmayacağız.
+
+</DeepDive>
+
+<DeepDive title="Bonus: Token'lar Maliyete Nasıl Dönüşür">
+
+Her API'nin milyon token başına bir fiyatı vardır, input ve output için farklı oranlarla. Tipik bir orta-seviye model için örnek:
+
+| Kalem | Token | Oran | Maliyet |
+|---|---|---|---|
+| Kullanıcı mesajı | 50 | $0.50/M | $0.000025 |
+| System prompt + geçmiş | 1500 | $0.50/M | $0.00075 |
+| Üretilen yanıt | 300 | $1.50/M | $0.00045 |
+| **Çağrı başı toplam** | 1850 | — | **~$0.0012** |
+
+Çok küçük görünüyor. Günde 10.000 kullanıcı isteğiyle çarp → günde $12 → ayda $360. Kullanıcı isteği başına 5-10 LLM çağrısı yapan complex agent workflow'larıyla çarp → ayda $1,800–$3,600. Modül 5'in bir "Maliyet Kontrolü" bölümü olmasının sebebi bu.
+
+</DeepDive>
+
+## Özet (30 saniyede)
+
+1. **Token** — modelin gördüğü metin birimi. Maliyeti, hızı ve limitleri belirler.
+2. **Context window** — çağrı başı maksimum metin miktarı. System prompt, geçmiş, getirilen doc'lar ve mevcut input dahil.
+3. **Temperature** — öngörülebilirlik kadranı. Tool ve kod için 0, insani his için yüksek.
+4. **Prompt** — gönderdiğiniz tam metin. Küçük değişiklik = büyük çıktı farkı. Kaynak kod gibi davranın.
+
+## Sırada Ne Var
+
+Artık kelime hazinesine sahipsiniz. Day 1'in asıl konusunun zamanı: **agent** nedir ve geliştireceğimiz her şeyi mümkün kılan sıçrama nedir? **Modül 1: Neden Agent?**

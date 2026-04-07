@@ -77,8 +77,9 @@ export default defineConfig({
 				{
 					label: 'Agent Development',
 					translations: { tr: 'Agent Geliştirme' },
-					badge: { text: '2 Days', variant: 'tip' },
+					badge: { text: '1 Day', variant: 'tip' },
 					items: [
+						{ label: '0. LLM Fundamentals', slug: 'agent-development/00-llm-basics', translations: { tr: '0. LLM Temelleri' } },
 						{ label: '1. Why Agents?', slug: 'agent-development/01-why-agents' },
 						{ label: '2. MCP — The USB-C of AI', slug: 'agent-development/02-mcp' },
 						{ label: '3. LangChain Fundamentals', slug: 'agent-development/03-langchain' },
@@ -89,8 +90,9 @@ export default defineConfig({
 				{
 					label: 'RAG',
 					translations: { tr: 'RAG' },
-					badge: { text: '2 Days', variant: 'note' },
+					badge: { text: '1 Day', variant: 'note' },
 					items: [
+						{ label: '0. LLM & Vector Fundamentals', slug: 'rag/00-llm-basics', translations: { tr: '0. LLM ve Vektör Temelleri' } },
 						{ label: '1. The Knowledge Problem', slug: 'rag/01-knowledge-problem' },
 						{ label: '2. Embeddings & Vectors', slug: 'rag/02-embeddings' },
 						{ label: '3. The RAG Pipeline', slug: 'rag/03-rag-pipeline' },

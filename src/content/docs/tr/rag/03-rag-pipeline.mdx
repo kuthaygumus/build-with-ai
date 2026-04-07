@@ -450,6 +450,63 @@ Bu notebook'ta sıfırdan tam pipeline'ı kurarsınız:
 [3.1-rag-pipeline.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/3.1-rag-pipeline.ipynb) notebook'u ana hands-on egzersizi. Katılımcılara 20-25 dakika verin. Dolaşın, API key sorunlarında yardım edin. Yaygın takılma noktası chunk size — chunk_size=2000 kullananlar 500-800 kullananlara göre daha kötü retrieval alır. Sonuçları incelerken bunu öğretme fırsatı olarak kullanın. Sorun: "Chunk size'ı nasıl seçtiniz ve sonucu nasıl etkiledi?"
 </PresenterNote>
 
+## Hızlı Eval: Retrieval Çalıştı mı?
+
+Bir pipeline kurdunuz. Devam etmeden önce, her production RAG ekibinin her gün sorduğu soruyu sorun: **gerçekten çalışıp çalışmadığını nasıl bileceğiz?**
+
+Mümkün olan en basit eval: doğru kaynak dokümanını zaten bildiğiniz 3 test sorusu yazın, retrieval'ı çalıştırın, doğru dokümanın top-k sonuçlarda olup olmadığını kontrol edin.
+
+```python
+# Doğru kaynak dokümanları bilinen 3 test sorgusu
+test_set = [
+    {
+        "question": "Flight API'ye karşı nasıl authenticate ediyorum?",
+        "expected_source": "flight-api-reference.pdf",
+    },
+    {
+        "question": "Premium biletler için iptal politikası nedir?",
+        "expected_source": "fare-rules-v3.pdf",
+    },
+    {
+        "question": "PNR kayıtları nasıl yapılandırılır?",
+        "expected_source": "pnr-data-model.pdf",
+    },
+]
+
+def did_retrieval_find_it(question: str, expected_source: str, k: int = 5) -> bool:
+    """Beklenen doküman top-k retrieval sonuçlarındaysa True döner."""
+    results = vector_store.similarity_search(question, k=k)
+    sources = [doc.metadata.get("source", "") for doc in results]
+    return any(expected_source in s for s in sources)
+
+# Eval'i çalıştır
+hits = sum(
+    did_retrieval_find_it(q["question"], q["expected_source"])
+    for q in test_set
+)
+print(f"Retrieval recall: {hits}/{len(test_set)} ({hits / len(test_set):.0%})")
+```
+
+İşte bu kadar. **Üç soru, ikili bir metric, tek bir sayı.** Mümkün olan en küçük RAG eval — ve bir chunking değişikliğinin işleri daha iyi mi yoksa daha kötü mü yaptığını söylemek için yeterli.
+
+<KeyInsight>
+**Ölçemediğiniz şeyi iyileştiremezsiniz.** Bu 20 satırlık eval, "chunk_size'ı değiştirdim, daha iyi hissettim" ile "chunk_size'ı değiştirdim, recall %33'ten %100'e çıktı" arasındaki farktır. Modül 5 bunu RAGAS'a genişletir — ama prensip aynı: bilinen sorular, bilinen cevaplar, hit'leri say.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (yukarıdaki eval kodu)
+
+**Yapın:** Kodu satır satır geç. Vurgula: "20 satır. 3 soru. Bir tane sayı." Sonra retorik soru: "Eğer chunk_size'i değiştirip 'daha iyi hissediyorum' derseniz bu kanıt mı?"
+
+**Sorun:** "Şimdi 5 sorulu küçük bir test set'i nasıl seçerdiniz? Hangi sorular gerçek bir RAG sistemini test eder?"
+
+**Cevap rehberi:** İyi test sorusu = (a) cevabı kesin olan, (b) cevabı bilgi tabanında olan, (c) gerçek kullanıcı sorularına benzeyen. "What is..." iyi başlangıç. "Why" ve "How" daha zor.
+
+**Vurgu:** Bu sadece başlangıç. Modül 5'te RAGAS ile bunu daha sofistike hale getireceğiz — ama prensip aynı: bilinen sorular, bilinen cevaplar, hit'leri say.
+
+**Sonra:** DeepDive (chunk overlap, MMR) opsiyonel — vakit varsa göster, yoksa Modül 4'e geç.
+</PresenterNote>
+
 <DeepDive title="Chunk Overlap, Meta Veri Filtreleme ve MMR">
 
 ### Chunk Overlap
