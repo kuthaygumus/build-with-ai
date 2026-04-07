@@ -334,8 +334,6 @@ Artık editörünüzdeki AI asistanı veritabanınızı sorgulayabiliyor ve GitH
 
 Sıfırdan bir uçuş bilgi sunucusu geliştirelim. Bu, Flight API'lerini herhangi bir AI istemcisine sunmak için geliştireceğiniz türde bir sunucu.
 
-<ColabLink title="Alıştırma: İlk MCP Sunucunuzu Geliştirin" notebook="/notebooks/agent-dev/2.1-mcp-concepts.ipynb" level="Basic" />
-
 ```python
 # flight_mcp_server.py
 import json
@@ -431,8 +429,6 @@ npx @modelcontextprotocol/inspector
 # Or test with the MCP CLI
 mcp dev flight_mcp_server.py
 ```
-
-<ColabLink title="Challenge: Sunucunuza Kaynaklar ve Prompt'lar Ekleyin" notebook="/notebooks/agent-dev/2.1-mcp-concepts.ipynb" level="Challenge" />
 
 ## MCP'nin Yığındaki Yeri
 
@@ -534,6 +530,10 @@ async def query_database(sql_query: str) -> str:
 <KeyInsight>
 MCP, agent yığınının bağlantı katmanıdır. Bir kez öğrenin, her şeyi bağlayın. Protokol kimlik doğrulama, transport ve keşfi yönetir — siz aracınızın gerçekte ne yaptığına odaklanın.
 </KeyInsight>
+
+## Egzersizler
+
+<ColabLink title="Egzersiz 2.1: MCP Kavramları & Tool Tanımlama" notebook="/notebooks/agent-dev/2.1-mcp-concepts.ipynb" level="Basic" />
 
 ## Sırada
 

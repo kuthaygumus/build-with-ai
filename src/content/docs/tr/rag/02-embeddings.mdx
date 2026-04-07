@@ -318,33 +318,14 @@ results = index.query(
 Bu eğitimde **Chroma** kullanıyoruz. Kurulumu en basit olanıdır ve öğrenmek için idealdir. Her kavram doğrudan herhangi bir başka vektör veritabanına aktarılabilir.
 </Aside>
 
-## Uygulamalı Çalışma
+## Egzersizler
 
-<ColabLink title="Uygulamalı: Metin Embedding'le, Anlamı Görselleştir, Semantik Ara" notebook="/notebooks/rag/2.1-embeddings.ipynb" level="Basic" />
-
-Bu notebook'ta şunları yapacaksınız:
-
-<Steps>
-1. Farklı alanlardaki seyahatle ilgili cümleler için embedding'ler oluşturun
-2. Tüm çiftler arasında kosinüs benzerliğini hesaplayın
-3. t-SNE kullanarak embedding uzayını 2D olarak görselleştirin
-4. Hangi cümlelerin bir arada kümelendiğini görün -- ve nedenini anlayın
-</Steps>
+<ColabLink title="Egzersiz 2.1: Metin Embedding'le ve Anlamı Görselleştir" notebook="/notebooks/rag/2.1-embeddings.ipynb" level="Basic" />
+<ColabLink title="Egzersiz 2.2: ChromaDB ile Semantik Arama Geliştirin" notebook="/notebooks/rag/2.2-vector-search.ipynb" level="Basic" />
 
 <PresenterNote>
 [2.1-embeddings.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/2.1-embeddings.ipynb) notebook'unu canlı olarak adım adım geçin. "Aha anı" t-SNE plot çıktığında olur — flight cümleleri hotel cümlelerinden ayrı kümelenir. Sorun: "Model'a bu kategorileri biz mi söyledik?" Hayır. Dili anlayarak kendisi çıkardı. Sonra [2.2-vector-search.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/2.2-vector-search.ipynb) notebook'una geçin ve ChromaDB ile semantic search yapın.
 </PresenterNote>
-
-<ColabLink title="Uygulamalı: ChromaDB ile Semantik Arama Sistemi Oluşturun" notebook="/notebooks/rag/2.2-vector-search.ipynb" level="Basic" />
-
-Bu notebook'ta şunları yapacaksınız:
-
-<Steps>
-1. ChromaDB'yi yerel olarak kurun
-2. Travel API'leri hakkındaki belgeleri meta verilerle birlikte indeksleyin
-3. Semantik arama yapın ve anahtar kelime aramasıyla karşılaştırın
-4. Meta veri filtreleme ile deney yapın (yalnızca uçuşlar, yalnızca oteller)
-</Steps>
 
 <DeepDive title="ANN Algoritmaları -- HNSW, IVF ve Quantization">
 

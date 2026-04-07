@@ -386,32 +386,9 @@ Fikrin tamamı bu. Üç karar, hepsi router rolündeki bir LLM tarafından veril
 [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb) notebook'undaki re-ranking hücrelerini çalıştırarak before/after karşılaştırmasını gösterin. Sonra agentic RAG konseptini açıklamak için 3 farklı sorgu deneyin: "Merhaba" (retrieve etmemeli), "Flight API auth nasıl?" (bir kez retrieve), "Tüm API'lerin auth yöntemlerini karşılaştır" (birden fazla retrieve). Sorun: "Agent her sorguda retrieve yapmalı mı? Neden olmasın?"
 </PresenterNote>
 
-## Uygulamalı Alıştırmalar
+## Egzersizler
 
-<ColabLink title="Uygulamalı: Basit RAG vs HyDE -- Birebir Karşılaştırma" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Basic" />
-
-<Steps>
-1. Basit bir RAG pipeline'ı kurun (Modül 3 ile aynı)
-2. HyDE sorgu dönüşümü ekleyin
-3. 10 test sorgusunu her ikisinden geçirin
-4. Retrieval hassasiyetini ve yanıt kalitesini yan yana karşılaştırın
-</Steps>
-
-<ColabLink title="Uygulamalı: Re-Ranking Ekleyin ve İyileşmeyi Ölçün" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Basic" />
-
-<Steps>
-1. Modül 3 pipeline'ınızla başlayın
-2. Cohere re-ranking (veya açık kaynak cross-encoder) ekleyin
-3. 10 test sorgusunda öncesi/sonrası karşılaştırması yapın
-4. Hassasiyet metrikleriyle iyileşmeyi ölçün
-</Steps>
-
-<ColabLink title="Challenge: Tam Bir Agentic RAG Sistemi Kurun" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Challenge" />
-
-LangGraph agentic RAG'ı sıfırdan kurun. Şunlarla test edin:
-- Basit selamlamalar (retrieval YAPMAMALI)
-- Teknik sorular (bir kez erişmeli)
-- Karmaşık çoklu belge soruları (erişmeli ve yeniden formüle etmeli)
+<ColabLink title="Egzersiz 4.1: HyDE, Re-Ranking & İleri Teknikler" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Basic" />
 
 <DeepDive title="İleri Düzey: Agentic RAG — Tam LangGraph İmplementasyonu">
 
