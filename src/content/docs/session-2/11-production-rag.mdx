@@ -1,0 +1,615 @@
+---
+title: "Module 11: Production RAG"
+description: "Evaluation, scaling, monitoring, and the grand finale — Agent + RAG = Agentic RAG."
+---
+
+import DeepDive from '../../../components/DeepDive.astro';
+import ColabLink from '../../../components/ColabLink.astro';
+import ModuleHeader from '../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../components/PresenterNote.astro';
+import KeyInsight from '../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="45 min" day={1} goal="Become aware of the RAG production landscape — evaluation (RAGAS), three classic pitfalls, and the Agent + RAG capstone story that ties Day 2 together." />
+
+<Aside type="tip">
+**Workshop note**: This module is the closing walkthrough of the RAG day. We run RAGAS as a quick demo, scan the three production pitfalls, and end with the Agent + RAG = Agentic RAG capstone story. We do NOT type production scaling/monitoring/multi-tenant code from scratch — those live in the DeepDives below for self-study.
+</Aside>
+
+## The Gap
+
+RAG demo'nuz notebook'ta harika çalışır. Sonra deploy edersiniz.
+
+<PresenterNote>
+**Ekranda:** Colab — [5.1-production-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/5.1-production-rag.ipynb)
+**Yapın:** Notebook'u açın. 4 failure senaryosunu sırayla okuyun. Her birinden sonra durun — bunlar gerçek, varsayımsal değil. "Demo ile production arasındaki boşluk — bu modül onu kapatıyor."
+**Sorun:** "Kim bir demo deploy edip beklemediği şekilde başarısız olmasını izledi?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — RAGAS bölümüne geçin.
+</PresenterNote>
+
+Kullanıcı bir soru sorar, **çelişen dokümanlar** retrieve edilir ve çelişkili bir cevap alır. Sistem 10 chunk alır ama cevap sadece 1'inden gelir — geri kalanı kaliteyi **sulandırır**. Latency 8 saniyeye fırlar. Ve geçen Salı sistemin neden yanlış cevap verdiğini **bilmiyorsunuz**.
+
+Dört problem. Bu modül hepsini çözmek için araçları verir.
+
+<KeyInsight>
+Demo kalitesi RAG happy path'i cevaplar. Production kalitesi RAG edge case'leri yönetir, kendi kalitesini ölçer ve ne zaman başarısız olduğunu söyler.
+</KeyInsight>
+
+## Evaluation with RAGAS
+
+Ölçemediğinizi iyileştiremezsiniz. **RAGAS** (Retrieval Augmented Generation Assessment) RAG sistemlerini değerlendirmek için standart framework.
+
+### The Four Metrics
+
+<FlowDiagram title="RAGAS: What It Measures">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Retrieval Quality</span>
+      <span class="node-desc">Did we find the right docs?</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📊</span>
+      <span class="node-label">Context Precision</span>
+      <span class="node-desc">Are retrieved chunks relevant?</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.25rem;">
+    <div class="flow-node secondary" style="visibility: hidden;">
+      <span class="node-label">hidden</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📊</span>
+      <span class="node-label">Context Recall</span>
+      <span class="node-desc">Did we find ALL needed info?</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.75rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">✍️</span>
+      <span class="node-label">Generation Quality</span>
+      <span class="node-desc">Is the answer good?</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">📊</span>
+      <span class="node-label">Faithfulness</span>
+      <span class="node-desc">Is answer grounded in context?</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.25rem;">
+    <div class="flow-node secondary" style="visibility: hidden;">
+      <span class="node-label">hidden</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">📊</span>
+      <span class="node-label">Answer Relevancy</span>
+      <span class="node-desc">Does answer address the question?</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+| Metric | What It Asks | Low Score Means |
+|--------|-------------|-----------------|
+| **Context Precision** | Are the retrieved chunks relevant? | Too much noise in retrieval. Reduce k or add re-ranking. |
+| **Context Recall** | Did we find all needed information? | Missing relevant docs. Improve chunking or add multi-query. |
+| **Faithfulness** | Is the answer supported by the context? | Model is hallucinating beyond the context. Fix the prompt. |
+| **Answer Relevancy** | Does the answer address the question? | Model is going off-topic. Focus the system prompt. |
+
+### Implementation
+
+```python
+from ragas import evaluate
+from ragas.metrics import (
+    faithfulness,
+    answer_relevancy,
+    context_precision,
+    context_recall,
+)
+from datasets import Dataset
+
+eval_data = {
+    "question": [
+        "How do I authenticate with the Flight Offers API?",
+        "What is the baggage allowance for economy?",
+        "Can I modify a booking after ticketing?"
+    ],
+    "answer": [
+        "Use OAuth 2.0 client credentials flow with /v1/security/oauth2/token.",
+        "Economy baggage allowance is typically 23kg for checked bags.",
+        "Yes, modifications are possible through the Booking Management API."
+    ],
+    "contexts": [
+        ["The Flight API uses OAuth 2.0. Send credentials to /v1/security/oauth2/token..."],
+        ["Baggage policies vary by airline. Standard economy: 23kg checked, 8kg carry-on..."],
+        ["Post-ticketing changes require the Booking Management API. Some changes incur fees..."]
+    ],
+    "ground_truth": [
+        "OAuth 2.0 client credentials flow via /v1/security/oauth2/token endpoint.",
+        "23kg for checked luggage, varies by airline and fare class.",
+        "Yes, via Booking Management API, subject to airline rules and possible fees."
+    ]
+}
+
+results = evaluate(
+    Dataset.from_dict(eval_data),
+    metrics=[faithfulness, answer_relevancy, context_precision, context_recall],
+)
+print(results)
+# {'faithfulness': 0.92, 'answer_relevancy': 0.88,
+#  'context_precision': 0.65, 'context_recall': 0.90}
+```
+
+### Reading the Scores
+
+```text
+Faithfulness:       0.92  — Answers are well-grounded
+Answer Relevancy:   0.88  — Answers address the questions
+Context Precision:  0.65  — Too many irrelevant chunks retrieved
+Context Recall:     0.90  — Important info is being found
+
+Diagnosis: Retrieval finds the right stuff but also too much noise.
+Action: Add re-ranking or reduce k.
+```
+
+<PresenterNote>
+**Ekranda:** Colab — [5.1-production-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/5.1-production-rag.ipynb)
+**Yapın:** 'RAGAS Evaluation' hücrelerini çalıştırın. Context Precision 0.65 = %35 gürültü. Cross-encoder ekleyip tekrar çalıştırın — precision'ın 0.85+'e çıktığını gösterin. Tekniğin işe yaradığının canlı kanıtı.
+**Sorun:** "Module 10'dan hangi teknik bunu düzeltir?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — Golden Test Sets bölümüne geçin.
+</PresenterNote>
+
+<Aside type="tip">
+Run RAGAS on **every change** to your pipeline — new chunking strategy, different embedding model, added re-ranking. This is your regression test suite.
+</Aside>
+
+## Golden Test Sets
+
+Otomatik metrikler şart. Ama en önemli sorgularınızı temsil eden **insan tarafından hazırlanmış test case'lere** de ihtiyacınız var.
+
+```python
+golden_tests = [
+    {
+        "id": "auth-001",
+        "question": "How do I authenticate with the Flight Offers API?",
+        "expected_answer": "OAuth 2.0 client credentials via /v1/security/oauth2/token",
+        "expected_sources": ["flight-api-reference.pdf"],
+        "category": "authentication",
+        "difficulty": "easy",
+    },
+    {
+        "id": "error-001",
+        "question": "What does error code 4812 mean in Hotel Search?",
+        "expected_answer": "Invalid property code format",
+        "expected_sources": ["hotel-api-errors.md"],
+        "category": "error-handling",
+        "difficulty": "medium",
+    },
+    {
+        "id": "complex-001",
+        "question": "Can I change my flight to a different airline after check-in?",
+        "expected_answer": "Requires cancellation and rebooking. Cross-airline changes not supported.",
+        "expected_sources": ["booking-modifications.pdf", "check-in-rules.md"],
+        "category": "complex-workflow",
+        "difficulty": "hard",
+    },
+    # Aim for 50-100 tests covering all categories
+]
+```
+
+```python
+def run_golden_tests(rag_chain, tests, run_name="baseline"):
+    results = []
+    for test in tests:
+        answer = rag_chain.invoke(test["question"])
+        sources = [doc.metadata["source"] for doc in retriever.invoke(test["question"])]
+        source_hit = any(s in sources for s in test["expected_sources"])
+        results.append({"id": test["id"], "source_hit": source_hit, "answer": answer})
+
+    hits = sum(1 for r in results if r["source_hit"])
+    print(f"Run: {run_name} | Source Hit Rate: {hits}/{len(results)} ({hits/len(results)*100:.0f}%)")
+    return results
+
+# Compare pipeline versions
+run_golden_tests(rag_chain_v1, golden_tests, "v1_baseline")
+run_golden_tests(rag_chain_v2, golden_tests, "v2_with_reranking")
+```
+
+## Production Pitfalls
+
+Production RAG sistemlerini öldüren üç pattern. Her birinin spesifik çözümü var.
+
+### Pitfall 1: Lost in the Middle
+
+LLM'ler context'in **başına ve sonuna** daha fazla dikkat eder. Kritik chunk ortadaysa görmezden gelebilir.
+
+<FlowDiagram title="Lost in the Middle">
+  <div class="flow-row">
+    <div class="flow-node success">
+      <span class="node-icon">👁️</span>
+      <span class="node-label">Chunk 1</span>
+      <span class="node-desc">LLM pays attention</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node danger">
+      <span class="node-icon">😶</span>
+      <span class="node-label">Chunk 3: THE ANSWER</span>
+      <span class="node-desc">LLM might miss this!</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">👁️</span>
+      <span class="node-label">Chunk 5</span>
+      <span class="node-desc">LLM pays attention</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+**Fixes**: Reduce k (fewer chunks = less "middle"), re-rank so best chunk is always first, or use the bookend pattern — place the most relevant chunks at positions 1 and last.
+
+### Pitfall 2: Conflicting Sources
+
+Bilgi tabanınızda 2023 dokümanı "rate limit: 100/min" diyor, 2024 dokümanı "500/min." RAG ikisini de alır. LLM rastgele birini seçer.
+
+**Fixes**: Add `version` and `date` metadata, filter for latest during retrieval, include "prefer the most recent source" in the prompt, and remove outdated docs during indexing.
+
+```python
+# Metadata-aware retrieval
+results = vector_store.similarity_search(
+    "rate limit for flight API",
+    k=5,
+    filter={"version": "v2"}  # only latest
+)
+```
+
+### Pitfall 3: Over-Retrieval
+
+Sadece 2'si ilgili olan 20 chunk retrieve etmek. Sinyal gürültüde boğulur.
+
+**Fixes**: Retrieve broadly (k=20), then re-rank and keep top 5. Or use MMR for diverse, relevant results.
+
+```python
+# Retrieve 20, re-rank, keep 5
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain_cohere import CohereRerank
+
+retriever = ContextualCompressionRetriever(
+    base_compressor=CohereRerank(top_n=5),
+    base_retriever=vector_store.as_retriever(search_kwargs={"k": 20})
+)
+```
+
+## Scaling for Production
+
+### Multi-Level Caching
+
+Gereksiz hesaplamayı önlemek için üç seviyede cache'leyin:
+
+```python
+from cachetools import TTLCache
+
+# Level 1: Don't re-embed the same query
+embedding_cache = TTLCache(maxsize=5000, ttl=86400)  # 24h
+
+# Level 2: Same query = same retrieved chunks
+retrieval_cache = TTLCache(maxsize=1000, ttl=3600)   # 1h
+
+# Level 3: Exact same question = same answer
+answer_cache = TTLCache(maxsize=500, ttl=1800)       # 30min
+```
+
+### Async Processing
+
+Sıralı işlemlerde bloklamayın. Dense ve sparse retrieval'ı paralel çalıştırın:
+
+```python
+import asyncio
+
+async def async_rag(question: str) -> dict:
+    # Dense + sparse retrieval in parallel
+    dense_task = asyncio.create_task(
+        vector_store.asimilarity_search(question, k=10)
+    )
+    sparse_task = asyncio.create_task(
+        bm25_retriever.ainvoke(question)
+    )
+    dense_results, sparse_results = await asyncio.gather(dense_task, sparse_task)
+
+    # Merge, re-rank, generate
+    all_results = dense_results + sparse_results
+    reranked = reranker.compress_documents(all_results, question)
+    answer = await llm.ainvoke(prompt.format(
+        context="\n\n".join(d.page_content for d in reranked[:5]),
+        question=question
+    ))
+    return {"answer": answer.content, "sources": reranked[:5]}
+```
+
+### Cost Optimization
+
+| Component | Cost Driver | Optimization |
+|-----------|------------|--------------|
+| **Embedding** | Tokens embedded | Use `text-embedding-3-small` ($0.02/1M) over `large` ($0.13/1M) |
+| **LLM** | Context tokens | Reduce k, compress context, use `gpt-4o-mini` for simple queries |
+| **Vector DB** | Storage + queries | Dimension reduction, quantization |
+| **Re-ranking** | API calls | Only re-rank when initial confidence is low |
+
+```python
+# Cost-aware model routing
+def choose_model(context_length: int) -> str:
+    if context_length < 2000:
+        return "gpt-4o-mini"   # $0.15/1M input tokens
+    return "gpt-4o"             # $2.50/1M — handles long context better
+```
+
+## Monitoring
+
+Production'da önemli olanı takip edin:
+
+```python
+class RAGMonitor:
+    def track_query(self, question: str, rag_fn):
+        start = time.time()
+        result = rag_fn(question)
+        latency = time.time() - start
+
+        self.log({
+            "question": question,
+            "latency_ms": latency * 1000,
+            "num_chunks": len(result.get("sources", [])),
+            "model": result.get("model", "unknown"),
+        })
+
+        if latency > 5.0:
+            logger.warning(f"High latency: {latency:.1f}s for: {question[:50]}")
+
+        return result
+```
+
+Ve en değerli sinyal: **kullanıcı feedback'i.**
+
+```python
+def collect_feedback(query_id: str, helpful: bool, comment: str = ""):
+    feedback_store.append({
+        "query_id": query_id,
+        "helpful": helpful,
+        "comment": comment,
+    })
+
+    # Alert on negative feedback trends
+    recent_negative = sum(1 for f in feedback_store[-100:] if not f["helpful"])
+    if recent_negative > 20:
+        logger.warning(f"High negative feedback: {recent_negative}/100")
+```
+
+<PresenterNote>
+**Ekranda:** Colab — [5.1-production-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/5.1-production-rag.ipynb)
+**Yapın:** 'Monitoring' ve 'Feedback' hücrelerini çalıştırın. Feedback collection ve alert threshold'larını gösterin. "Kullanıcılarınız vazgeçmeden önce sistemin ne zaman başarısız olduğunu bilmeniz gerekir."
+**Sorun:** "RAG sistemindeki en pahalı bug nedir?" (Cevap: kullanıcıların rapor etmediği yanlış cevaplar)
+**Sonra:** Site'a dönün — Multi-Tenant Architecture bölümüne geçin.
+</PresenterNote>
+
+## Multi-Tenant Architecture
+
+Enterprise'da farklı kullanıcılar farklı dokümanları görür. Bunu **retrieval** seviyesinde zorunlu kılın, generation seviyesinde değil.
+
+```python
+class MultiTenantRetriever:
+    def retrieve(self, query: str, user_id: str, user_roles: list[str]):
+        return self.vector_store.similarity_search(
+            query,
+            k=10,
+            filter={
+                "$or": [
+                    {"access": "public"},
+                    {"owner": user_id},
+                    {"allowed_roles": {"$in": user_roles}},
+                ]
+            }
+        )
+```
+
+<Aside type="caution">
+**Security**: Always filter at retrieval, not generation. If a restricted document makes it into the LLM context, the model might reveal it regardless of system prompt instructions. The context window is the trust boundary.
+</Aside>
+
+## Exercises
+
+<ColabLink title="Capstone 5.1: Production-Ready RAG with Evaluation" notebook="/notebooks/rag/5.1-production-rag.ipynb" level="Capstone" />
+
+Her şeyi içeren production-grade bir RAG sistemi kurun:
+
+<Steps>
+1. Metadata korumalı doküman yükleme
+2. Optimize parametrelerle recursive chunking
+3. Hybrid retrieval (dense + BM25)
+4. Cross-encoder re-ranking
+5. Citation gereksinimleri olan prompt
+6. Golden test set üzerinde RAGAS evaluation
+7. Latency takibi ve error monitoring
+8. Sorgu başına maliyet tahmini
+</Steps>
+
+5 modülün doruk noktası. Her teknik, test edilmiş tek bir sistemde birleştirilmiş.
+
+<PresenterNote>
+**Ekranda:** Colab — [5.1-production-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/5.1-production-rag.ipynb)
+**Yapın:** Capstone notebook'unu gösterin ve tüm bölümleri işaret edin. Bu notebook tüm eğitimi birleştirir. Katılımcılara 20-25 dakika verin.
+**Sorun:** "Kendi takımınızda bu RAG mimarisini nerede uygulardınız?"
+**Sonra:** Katılımcılara: Şimdi siz deneyin — notebook'un sonundaki YOUR TURN bölümlerini yapın. 10-15 dakika süre.
+</PresenterNote>
+
+## Grand Finale: Agent + RAG = Tam Resim
+
+İki eğitim serisini de tamamladık. Birlikte nasıl göründüklerine bakalım.
+
+<FlowDiagram title="The Convergence">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🤖</span>
+      <span class="node-label">Part 1: Agents</span>
+      <span class="node-desc">Reason, decide, act</span>
+    </div>
+    <div class="flow-arrow animated">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📚</span>
+      <span class="node-label">Part 2: RAG</span>
+      <span class="node-desc">Retrieve, ground, cite</span>
+    </div>
+    <div class="flow-arrow animated">=</div>
+    <div class="flow-node success">
+      <span class="node-icon">⚡</span>
+      <span class="node-label">Agentic RAG</span>
+      <span class="node-desc">The gold standard</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<CardGrid>
+  <Card title="Agent Without RAG" icon="warning">
+    Can act, but hallucinates facts. Makes decisions on possibly wrong information. Dangerous in production.
+  </Card>
+  <Card title="RAG Without Agent" icon="warning">
+    Always retrieves, even when unnecessary. Single-pass, no reasoning loop. Can't handle complex questions.
+  </Card>
+  <Card title="Agentic RAG" icon="approve-check-circle">
+    Reasons about what it knows vs. what to look up. Retrieves strategically. Validates its own answers. Calls tools when knowledge isn't enough. The gold standard for enterprise AI.
+  </Card>
+</CardGrid>
+
+Module 10'daki Agentic RAG pattern'ı köprü. Retriever, re-ranker ve validator'ı tool olarak kullanan bir agent — her adımda arayıp aramayacağına, yeniden formüle edip etmeyeceğine, cevap verip vermeyeceğine karar verir. API tool'ları ekleyin — artık sadece soru cevaplamıyor, dayanaklı bilgiye göre aksiyon alıyor.
+
+<FlowDiagram title="The Complete Agentic RAG Architecture">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">👤</span>
+      <span class="node-label">User Goal</span>
+      <span class="node-desc">"Rebook passengers from cancelled AF1234"</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">Agent Reasons</span>
+      <span class="node-desc">What do I need to know?</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">📚</span>
+      <span class="node-label">RAG: Retrieve Policy</span>
+      <span class="node-desc">Rebooking rules, priority tiers</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">⚡</span>
+      <span class="node-label">Tool: Flight API</span>
+      <span class="node-desc">Find alternatives</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">⚡</span>
+      <span class="node-label">Tool: Booking API</span>
+      <span class="node-desc">Execute rebookings</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Goal Achieved</span>
+      <span class="node-desc">Passengers rebooked per policy</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow animated" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">↩ loop: reason → retrieve/act → evaluate → next step</div>
+  </div>
+</FlowDiagram>
+
+<PresenterNote>
+**Ekranda:** Colab — [5.1-production-rag.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/5.1-production-rag.ipynb)
+**Yapın:** Son hücreyi çalıştırın — tüm tekniklerin birleştiği Agentic RAG demo'su. Agent Training Module 1'deki ilk demo'ya bağlayın: "O agent'ı hatırlıyor musunuz? Şimdi tüm dokümanlara, policy'lere ve tarihsel verilere RAG erişimi olduğunu düşünün." Durun. Sindirmelerini sağlayın.
+**Sorun:** "Bu mimarinin hangi parçası sizin iş probleminize en çok uygulanabilir?"
+**Sonra:** Kapanış. Tüm eğitim tamamlandı.
+</PresenterNote>
+
+<KeyInsight>
+Agent ne yapacağına karar verir. RAG gerçekleri bilmesini sağlar. Tool'lar bunlara göre aksiyon almasını sağlar. Bu üçlü — reasoning, knowledge, action — enterprise AI'ın mimari pattern'ı. Artık üçüne de sahipsiniz.
+</KeyInsight>
+
+<DeepDive title="Advanced RAG Architecture Patterns at Scale">
+
+### Pattern 1: Router RAG
+
+Route queries to specialized pipelines based on domain:
+
+```python
+router_prompt = """Classify: flights, hotels, payments, or general.
+Query: {query}
+Category:"""
+
+pipelines = {
+    "flights": flight_rag_chain,
+    "hotels": hotel_rag_chain,
+    "payments": payment_rag_chain,
+    "general": general_rag_chain,
+}
+
+category = llm.invoke(router_prompt.format(query=question)).strip()
+answer = pipelines[category].invoke(question)
+```
+
+### Pattern 2: Corrective RAG (CRAG)
+
+After retrieval, evaluate whether the documents are actually relevant. If not, fall back to web search or acknowledge ignorance:
+
+```python
+def corrective_rag(question: str) -> str:
+    docs = retriever.invoke(question)
+    score = evaluate_relevance(question, docs)  # LLM-as-judge
+
+    if score >= 4:
+        return generate_from_context(question, docs)
+    elif score >= 2:
+        web_docs = web_search(question)
+        return generate_from_context(question, docs + web_docs)
+    else:
+        return "I don't have reliable information for this question."
+```
+
+### Pattern 3: Self-Reflective RAG
+
+Generate, then critique, then refine. Loop until the answer is fully supported:
+
+```python
+def self_reflective_rag(question: str, max_iterations: int = 3) -> str:
+    for i in range(max_iterations):
+        docs = retriever.invoke(question)
+        answer = generate_from_context(question, docs)
+        critique = llm.invoke(f"Is this answer fully supported by context? {answer}")
+
+        if "fully supported" in critique.content.lower():
+            return answer
+        question = llm.invoke(f"Refine query based on: {critique.content}").content
+
+    return answer  # best effort
+```
+
+These patterns compose. A Router RAG where each sub-pipeline uses Corrective RAG with Self-Reflection. Architecture follows requirements: accuracy needs, latency budget, cost constraints.
+
+</DeepDive>
+
+## Özet
+
+Bu modülden — ve tüm RAG serisinden:
+
+1. **Her şeyi ölçün.** Otomatik evaluation için RAGAS, regression testing için golden test set'ler. Ölçemiyorsanız iyileştiremezsiniz — ve ne zaman bozulduğunu bilemezsiniz.
+
+2. **Production edge case'lerle ilgili.** Lost-in-the-middle, çelişen kaynaklar, over-retrieval, multi-tenant güvenlik. Her birinin spesifik, uygulanabilir çözümü var.
+
+3. **Agent + RAG + Tools = Enterprise AI.** Agent düşünür. RAG dayanaklı bilgi sağlar. Tool'lar aksiyon almayı mümkün kılar. Bu üçlü, production sistemlerinizi üzerine kuracağınız mimari pattern.
+
+## Next Up
+
+Production RAG'ınız hazır — değerlendirme metrikleri, monitoring, scaling pattern'ları. Ama bir parça eksik: tüm bunları Gün 1-2'de kurduğunuz agent ile birleştirmek. **Module 12: Agentic RAG — Grand Finale.** Agent ne zaman arayacağına kendisi karar verir, yeterliliği değerlendirir ve kaynaklı cevaplar üretir. 4 günün zirvesi.

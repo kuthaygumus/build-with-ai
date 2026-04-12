@@ -1,0 +1,300 @@
+---
+title: "Modül 1: LLM Nedir?"
+description: "Büyük Dil Modeli (LLM) gerçekte nedir, kaputun altında nasıl çalışır ve LLM davranışının %90'ını açıklayan dört temel kavram."
+---
+
+import DeepDive from '../../../../components/DeepDive.astro';
+import ModuleHeader from '../../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../../components/PresenterNote.astro';
+import KeyInsight from '../../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="30 min" day={1} goal="LLM'in gerçekte ne olduğunu anlayın, ham bir API çağrısıyla çalıştığını görün ve tüm LLM davranışını yöneten dört temel kavramı öğrenin." />
+
+## Kimsenin Sormadığı Soru
+
+Herkes "yapay zeka" ve "LLM" kelimelerini kullanıyor. Çoğu kişi bunların gerçekte ne anlama geldiğini açıklayamıyor. Bir şey inşa etmeden önce tek bir soruyu yanıtlamamız gerekiyor: **bu şey ne?**
+
+<PresenterNote>
+**Ekranda:** Site (bu sayfa)
+
+**Yapın:** "Yapay zeka nedir diye sorduğumuzda çoğumuz ChatGPT'yi düşünürüz. Ama ChatGPT bir ürün — altında çalışan şey bir LLM. Bugün o LLM'in ne olduğunu, nasıl çalıştığını, ve neden böyle davrandığını anlayacağız."
+
+**Sorun (kısa el kaldırma):** "Daha önce ChatGPT veya Claude API'sini koddan çağırdınız mı?" 5-10 saniye.
+
+**Not:** Bu modülde notebook açılmıyor. İlk notebook Modül 2'de açılacak.
+</PresenterNote>
+
+## LLM Gerçekte Nedir?
+
+**Büyük Dil Modeli** (Large Language Model), bir dizideki sonraki token'ı tahmin eden bir programdır.
+
+Hepsi bu. Geri kalan her şey — konuşmalar, kod üretimi, akıl yürütme — tek bir mekanizmadan ortaya çıkar: **şimdiye kadar olan her şeye bakarak, sıradaki kelime ne?**
+
+```
+Girdi:  "Fransa'nın başkenti"
+Model:  P("Paris") = 0.97, P("Lyon") = 0.01, P("bir") = 0.005, ...
+Çıktı:  "Paris"
+```
+
+Model, Paris'in Fransa'nın başkenti olduğunu sizin bildiğiniz gibi "bilmiyor." Milyarlarca metin örneğinden, "Fransa'nın başkenti" ifadesinden sonra neredeyse her zaman "Paris" token'ının geldiğini öğrenmiştir. Akıl almaz ölçekte örüntü eşleştirme.
+
+<KeyInsight>
+Bir LLM, **sonraki-token tahmin motorudur**. İnsanlar gibi anlamaz, hatırlamaz veya akıl yürütmez. Sıradaki token'ın ne olacağını tahmin eder — ve bunda o kadar iyidir ki sonuçlar anlama gibi görünür.
+</KeyInsight>
+
+### Ne Olmadığı
+
+Bunu yanlış anlamak kötü agent tasarımına yol açar:
+
+| LLM Şunlar DEĞİLDİR | İnsanların neden öyle sandığı | Gerçek |
+|---|---|---|
+| Bir **veritabanı** | Olgusal yanıtlar veriyor | Olası metni tahmin eder — bazen gerçekler, bazen kurgu |
+| Bir **arama motoru** | Soruları yanıtlıyor | Canlı veriden değil, örüntülerden üretir |
+| Bir **akıl yürütme motoru** | Mantığını açıklıyor | Akıl yürütmeye benzeyen metin üretir — gerçek çıkarım değil |
+| **Bilinçli** | "Düşünüyorum" diyor | "Düşünüyorum" ifadesinin yaygın bir metin kalıbı olduğunu öğrenmiştir |
+
+<PresenterNote>
+**Ekranda:** Site (tablo)
+
+**Yapın:** Tabloyu gösterin. "Bu tabloyu sindirelim. LLM bir veritabanı DEĞİL — bazen doğru cevap verir çünkü eğitim verisinde görmüştür, bazen uydurur. Bu fark gün boyunca bizi takip edecek."
+
+**Sorun:** "LLM bir veritabanı değilse, şirketinizin iç dokümanlarını nasıl bilebilir?" Birkaç saniye bekleyin. Cevap: bilemez. Bu Gün 3-4'teki RAG konusunun tohumu.
+</PresenterNote>
+
+## Çalışmasını Görün: Ham Bir API Çağrısı
+
+Framework yok. Sihir yok. Sadece bir HTTP isteği ve bir JSON yanıtı.
+
+```python
+import requests
+
+response = requests.post(
+    "https://api.groq.com/openai/v1/chat/completions",
+    headers={
+        "Authorization": "Bearer YOUR_GROQ_API_KEY",
+        "Content-Type": "application/json"
+    },
+    json={
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "What is the IATA code for Istanbul Airport?"}
+        ],
+        "temperature": 0
+    }
+)
+
+data = response.json()
+print(data["choices"][0]["message"]["content"])
+# → "IST"
+print(f"Tokens used: {data['usage']['total_tokens']}")
+# → "Tokens used: 42"
+```
+
+Hepsi bu kadar. JSON gönderiyorsunuz, JSON geri alıyorsunuz. Bu hafta inşa edeceğimiz her şey — LangChain, LangGraph, MCP — **bu çağrının üzerine kurulmuş katmanlardır.**
+
+<PresenterNote>
+**Ekranda:** Site (kod bloğu)
+
+**Yapın:** Kodu gösterin. "Bakın — requests.post. HTTP isteği. JSON gönderiyoruz, JSON dönüyor. Bu eğitimde öğreneceğimiz her framework, her araç, sonunda bu çağrıyı yapıyor. Büyünün altında bu var."
+
+**Vurgulayın:** `usage.total_tokens` satırı — "Bu sayıyı hatırlayın. Token kavramı her yerde karşımıza çıkacak."
+
+**Sorun:** "Bu kodda memory var mı? Yani ikinci bir soru sorsam, birincisini hatırlar mı?" Cevap: hayır. Her çağrı bağımsız. Bu kavram birazdan gelecek.
+</PresenterNote>
+
+<KeyInsight>
+Her LLM etkileşimi bir HTTP isteğidir: JSON girer, JSON çıkar. Öğreneceğimiz tüm framework ve araçlar, bu temel çağrının üzerine kurulmuş sofistike sarmalayıcılardır (wrapper).
+</KeyInsight>
+
+## Dört Temel Kavram
+
+Artık LLM'in ne olduğunu biliyorsunuz. Dört kavram, davranışının %90'ını açıklar. Bu hafta yazacağınız her satır kod, bunlardan en az birini içerir.
+
+### 1. Token — Her Şeyin Birimi
+
+LLM'ler karakter veya kelime okumaz. **Token** okurlar — modelin atomik birim olarak ele aldığı küçük metin parçaları.
+
+```
+1 token  ≈  4 karakter  ≈  bir kelimenin ¾'ü
+"Paris'ten Tokyo'ya 15 Mart'ta uçuş rezervasyonu yap"  ≈  12 token
+```
+
+**Neden önemli**: Token üç şeyi belirler:
+1. **Maliyet** — Token başına ödeme yaparsınız. Girdi ve çıktı ayrı faturalanır.
+2. **Hız** — Daha fazla token = daha fazla hesaplama = daha yavaş yanıt.
+3. **Limitler** — Modellerin çağrı başına maksimum token sınırı vardır.
+
+<PresenterNote>
+**Yapın:** "1 token ≈ 4 karakter" formülünü vurgulayın.
+
+**Sorun:** "100 sayfalık bir PDF kaç token sizce?" Tahminleri toplayın. (~50.000 token.)
+</PresenterNote>
+
+### 2. Bağlam Penceresi (Context Window) — Modelin Tüm Dünyası
+
+Her LLM'in tek bir çağrıda işleyebildiği maksimum token sayısı vardır. Bu, **bağlam penceresidir** (context window).
+
+| Model | Bağlam Penceresi |
+|---|---|
+| GPT-4o | 128K token (~96K kelime) |
+| Claude Sonnet 4 | 200K token (~150K kelime) |
+| Llama 3.3 70B | 128K token (~96K kelime) |
+
+Kritik nokta: bağlam penceresi **her şeyi** kapsar:
+
+<FlowDiagram title="Bağlam Penceresini Ne Doldurur?">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📜</span>
+      <span class="node-label">Sistem Prompt'u</span>
+      <span class="node-desc">Talimatlarınız</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">💬</span>
+      <span class="node-label">Sohbet Geçmişi</span>
+      <span class="node-desc">Önceki tüm mesajlar</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📄</span>
+      <span class="node-label">Getirilen Dokümanlar</span>
+      <span class="node-desc">RAG, dosyalar, araç sonuçları</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Güncel Girdi</span>
+      <span class="node-desc">Kullanıcının sorusu</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node primary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">LLM</span>
+      <span class="node-desc">Her çağrıda HEPSİNİ görür</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+**Neden önemli**: Modelin **çağrılar arasında hafızası yoktur.** Her API çağrısı durumsuz (stateless) çalışır. Önceki bir konuşmayı "hatırlamasını" istiyorsanız, tüm konuşmayı her seferinde tekrar göndermeniz gerekir. Bu yüzden hafıza yönetimine ihtiyacımız var — Modül 4'te göreceksiniz.
+
+<PresenterNote>
+**Sorun:** "Eğer LLM'in hafızası yoksa, ChatGPT bir önceki mesajı nasıl 'hatırlıyor'?"
+
+**Cevap rehberi:** Hatırlamıyor — uygulama tüm geçmişi her seferinde tekrar gönderiyor. Bu, Module 4'te LangChain memory pattern'larını neden öğreneceğimizin cevabı.
+</PresenterNote>
+
+### 3. Sıcaklık (Temperature) — Öngörülebilirlik Ayarı
+
+Temperature, modelin sonraki token'ı seçerken ne kadar "yaratıcı" olduğunu kontrol eder. Teknik olarak: olası token'lar üzerindeki olasılık dağılımını kontrol eder.
+
+| Temperature | Davranış | Ne Zaman Kullanılır |
+|---|---|---|
+| **0** | Her zaman en olası token'ı seçer. Deterministik. | Araç çağrıları, JSON çıktısı, kod, sınıflandırma |
+| **0.3–0.5** | Hafif çeşitlilik, çoğunlukla öngörülebilir | Müşteri desteği, özetler, Soru-Cevap |
+| **0.7–1.0** | Yaratıcı, her seferinde farklı çıktılar | Beyin fırtınası, pazarlama metni |
+
+**Neden önemli**: Agent kodunda neredeyse her zaman `temperature=0` görürsünüz. Bir agent hangi aracı çağıracağına karar verirken **determinizm** istersiniz — aynı girdi aynı kararı üretmelidir. Ödeme akışında yaratıcılık bir hata (bug) demektir.
+
+<PresenterNote>
+**Yapın (canlı demo, ~2 dk):** Site'tan gösterin — iki `temperature` değerini karşılaştırın. "Aynı prompt, aynı model. temperature=0 hep aynı çıktı, temperature=1 her seferinde farklı."
+
+**Sorun:** "Hangisini bir agent'ın tool seçim adımında kullanırdınız?" Cevap: 0.
+</PresenterNote>
+
+### 4. Prompt — LLM Davranışının Kaynak Kodu
+
+**Prompt**, LLM'e gönderdiğiniz tam metindir. Küçük değişiklikler, çıktıda büyük farklara yol açar.
+
+<Tabs>
+  <TabItem label="Belirsiz">
+    ```text
+    Uçuşlar konusunda yardım et.
+    ```
+    Model ne istediğinizi bilmiyor. Genel bir çıktı.
+  </TabItem>
+
+  <TabItem label="Belirli">
+    ```text
+    15 Mart'ta Paris'ten Tokyo'ya uçmam gerekiyor. 
+    Fiyata göre sıralanmış 3 uçuş seçeneği öner.
+    ```
+    Net görev, ama model uçuş verilerini uydurur.
+  </TabItem>
+
+  <TabItem label="Agent Kalitesinde">
+    ```text
+    Sen bir uçuş asistanısın. Kullanıcı 2025-03-15
+    tarihinde CDG'den HND'ye uçmak istiyor.
+    
+    Gerçek seçenekleri bulmak için search_flights aracını kullan.
+    Tam olarak 3 sonuç döndür, fiyata göre sırala.
+    Format: havayolu, fiyat, süre içeren numaralı liste.
+    ```
+    Rol, görev, araç talimatı, format, kısıtlamalar. Agent'ların kullandığı budur.
+  </TabItem>
+</Tabs>
+
+**Neden önemli**: Öğreneceğimiz her framework — LangChain, LangGraph, MCP — aslında **prompt oluşturmanın yapılandırılmış bir yoludur.** Bir agent'ta bir şey yanlış gittiğinde, ilk yapacağınız şey prompt'u yazdırıp okumaktır. Hataların %90'ı orada yaşar.
+
+<KeyInsight>
+**Prompt'lar, LLM davranışının kaynak kodudur.** Onlara bir fonksiyon imzasına göstereceğiniz özeni gösterin: açık girdiler, çıktılar, kısıtlamalar ve niyet.
+</KeyInsight>
+
+## Hepsini Bir Araya Getirmek
+
+Bu hafta göreceğiniz her LLM çağrısı dört kavramı birleştirir:
+
+```python
+response = requests.post(url, json={
+    "model": "llama-3.3-70b-versatile",  # ← model seçimi
+    "temperature": 0,                      # ← Kavram 3: öngörülebilirlik
+    "messages": [                          # ← Kavram 4: prompt
+        {"role": "system", "content": "You are a flight assistant."},
+        {"role": "user", "content": user_question}
+    ]                                      # ← tüm bunlar token tüketir (1)
+})                                         # ← bağlam penceresine sığar (2)
+```
+
+Dört kavram. Tek bir zihinsel model. İnşa edeceğimiz her şey bu temelin üzerinde durur.
+
+<DeepDive title="Bonus: Token'ların Maliyete Dönüşümü">
+
+Her API'nin milyon token başına fiyatı vardır; girdi ve çıktı için farklı oranlar uygulanır:
+
+| Kalem | Token | Oran | Maliyet |
+|---|---|---|---|
+| Sistem prompt'u + geçmiş | 1.500 | $0,50/M | $0,00075 |
+| Kullanıcı mesajı | 50 | $0,50/M | $0,000025 |
+| Üretilen yanıt | 300 | $1,50/M | $0,00045 |
+| **Çağrı başına toplam** | 1.850 | — | **~$0,0012** |
+
+Küçük görünüyor. 10.000 istek/gün ile çarpın → $12/gün. Agent iş akışlarının istek başına 5-10 LLM çağrısı yaptığını hesaba katın → $60-120/gün → $1.800-3.600/ay. Bu yüzden Modül 6'da bir "Maliyet Kontrolü" bölümü var.
+
+</DeepDive>
+
+<DeepDive title="Bonus: Streaming">
+
+Çoğu LLM API'si **streaming** destekler — token'lar tek seferde değil, birer birer gelir. Toplam maliyet aynıdır, ancak kullanıcı 5 saniye beklemek yerine ilk kelimeyi 100ms'de görür.
+
+```python
+# Streaming olmadan: tam yanıtı bekle
+response = llm.invoke("Explain RAG")  # 5 saniye sessizlik
+
+# Streaming ile: token'lar üretildikçe akar
+for chunk in llm.stream("Explain RAG"):
+    print(chunk.content, end="", flush=True)  # canlı olarak yazar
+```
+
+Streaming, bir insan izlediğinde önemlidir. Arka plan agent iş hatları için toplu yanıtlar daha basittir.
+
+</DeepDive>
+
+## Sırada Ne Var?
+
+LLM'in ne olduğunu biliyorsunuz. Ham bir API çağrısıyla çalıştığını gördünüz. Dört kavramı anlıyorsunuz.
+
+Şimdi **yapamadıklarını** keşfedelim — ve bu sınırlamaların, bu hafta inşa edeceğimiz her şeye neden ihtiyaç duyulduğunu nasıl yarattığını görelim. **Modül 2: Çıplak Bir LLM'in Sınırları.**

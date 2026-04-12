@@ -1,0 +1,609 @@
+---
+title: "Modül 4: LangChain Temelleri"
+description: "LangChain ile fonksiyonel chain'ler geliştirin — chat modellerinden prompt şablonlarına, bellekten LCEL pipe operatörüne."
+---
+
+import DeepDive from '../../../../components/DeepDive.astro';
+import ColabLink from '../../../../components/ColabLink.astro';
+import ModuleHeader from '../../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../../components/PresenterNote.astro';
+import KeyInsight from '../../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="75 min" day={1} goal="LangChain ile fonksiyonel chain'ler geliştirin — prompt'lar, modeller, parser'lar, bellek, hepsi LCEL pipe'larıyla birleştirilmiş." />
+
+## LangChain Gerçekte Ne?
+
+LangChain, LLM uygulamaları geliştirmek için bir **framework'tür**. Bu kelime — framework — önemli. Çağırdığınız bir kütüphane değil. Sizin kodunuzu çağıran bir mimari.
+
+<CardGrid>
+  <Card title="Kütüphane" icon="seti:json">
+    Çağırdığınız fonksiyonlar koleksiyonu. Akışı siz kontrol edersiniz. Örnek: `requests`, `numpy`.
+  </Card>
+  <Card title="Framework" icon="setting">
+    Sizin kodunuzu çağıran bir mimari. Akışı o kontrol eder, siz parçaları doldurursunuz. Örnek: Django, React, LangChain.
+  </Card>
+</CardGrid>
+
+Bu ayrım neden önemli? Çünkü LangChain size yaklaşım dayatır. Prompt'ların modellere nasıl bağlandığını, modellerin parser'lara nasıl bağlandığını, belleğin chain'ler arasında nasıl aktığını tanımlar. Tesisatı yeniden icat etmezsiniz — mantığınızı takarsınız.
+
+<PresenterNote>
+[3.1-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.1-first-chain.ipynb) notebook'unu Colab'da açın. İlk hücredeki import'ları gösterin. Sorun: "Kaçınız Django veya React kullandınız?" "Django'da HTTP server, URL router yazmadınız — framework verdi. LangChain de LLM uygulamaları için aynı şey." Notebook'taki ilk chain tanımını göstererek `prompt | model | parser` yapısını açıklayın.
+</PresenterNote>
+
+### Ekosistem (2026)
+
+<FlowDiagram title="LangChain Ekosistemi">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🧱</span>
+      <span class="node-label">langchain-core</span>
+      <span class="node-desc">Temel soyutlamalar, LCEL</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔗</span>
+      <span class="node-label">langchain</span>
+      <span class="node-desc">Chain'ler, agent'lar, retrieval</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🌐</span>
+      <span class="node-label">langchain-community</span>
+      <span class="node-desc">Üçüncü taraf entegrasyonlar</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node warning">
+      <span class="node-icon">📊</span>
+      <span class="node-label">langgraph</span>
+      <span class="node-desc">Durumlu agent grafları (Modül 4)</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">langsmith</span>
+      <span class="node-desc">Gözlemlenebilirlik ve değerlendirme</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📦</span>
+      <span class="node-label">Sağlayıcı paketleri</span>
+      <span class="node-desc">langchain-anthropic, langchain-openai</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<Aside type="caution">
+LangChain 2023'ten bu yana büyük ölçüde evrildi. Eski öğreticiler kullanımdan kaldırılmış API'ler kullanıyor — `LLMChain`, `ConversationChain`, `initialize_agent`. Bunları çevrimiçi örneklerde görürseniz, eski kalıplardır. Bu eğitim güncel API yüzeyini kullanır (langchain-core 0.3+).
+</Aside>
+
+## Temel Yapı Taşları
+
+### Chat Modelleri
+
+Giriş noktası. LangChain size sağlayıcılar arasında birleşik bir arayüz sunar — Claude, GPT, Gemini, yerel modeller. Aynı API, farklı beyin.
+
+```python
+from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
+
+# Same interface, different provider
+claude = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
+gpt = ChatOpenAI(model="gpt-4o", temperature=0)
+
+# This works identically with either model
+response = claude.invoke("What is the IATA code for Tokyo Narita?")
+print(response.content)  # "NRT"
+```
+
+Temel fayda: **uygulama mantığını değiştirmeden model değiştirin.** Chain'iniz bugün Claude ile, yarın GPT ile, gelecek hafta yerel bir modelle çalışır. Sıfır kod değişikliği.
+
+### Mesajlar
+
+LLM'ler ham string'lerle değil, yapılandırılmış mesajlarla çalışır. Dört tür:
+
+```python
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+
+messages = [
+    SystemMessage(content="You are a travel industry expert."),
+    HumanMessage(content="Explain the difference between GDS and NDC."),
+]
+
+response = claude.invoke(messages)
+```
+
+| Mesaj Türü | Rol | Amaç |
+|---|---|---|
+| `SystemMessage` | system | Davranışı, kişiliği, kısıtlamaları belirler |
+| `HumanMessage` | user | Kullanıcının girdisi |
+| `AIMessage` | assistant | Modelin yanıtı |
+| `ToolMessage` | tool | Bir araç çağrısının sonucu |
+
+### Prompt Şablonları
+
+Prompt'ları sabit kodlamak SQL'i sabit kodlamak gibidir. İşe yarar — yaramayıncaya kadar. Şablonlar size yapı, yeniden kullanılabilirlik ve birleştirilebilirlik sağlar.
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+analysis_prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are an airline operations analyst. Be concise and data-driven."),
+    ("human", """Analyze the following flight disruption:
+
+Flight: {flight_number}
+Route: {origin} → {destination}
+Delay: {delay_minutes} minutes
+Affected passengers: {passenger_count}
+
+Provide:
+1. Severity classification (minor/moderate/severe/critical)
+2. Recommended immediate actions
+3. Estimated cost impact"""),
+])
+
+# Variables are filled at runtime
+formatted = analysis_prompt.invoke({
+    "flight_number": "AF1234",
+    "origin": "CDG",
+    "destination": "NRT",
+    "delay_minutes": 180,
+    "passenger_count": 287
+})
+```
+
+### Çıktı Parser'ları
+
+LLM'ler metin döndürür. Uygulamanızın yapılandırılmış veriye ihtiyacı var. Parser'lar bu köprüyü kurar.
+
+```python
+from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
+from pydantic import BaseModel, Field
+
+# Simple: extract the text content
+str_parser = StrOutputParser()
+
+# Structured: parse into a Pydantic model
+class FlightAnalysis(BaseModel):
+    severity: str = Field(description="minor, moderate, severe, or critical")
+    actions: list[str] = Field(description="List of recommended actions")
+    estimated_cost_eur: float = Field(description="Estimated cost impact in EUR")
+
+json_parser = JsonOutputParser(pydantic_object=FlightAnalysis)
+```
+
+<Aside type="tip">
+Modern LangChain `model.with_structured_output(FlightAnalysis)` destekler — bu arka planda native tool calling kullanır ve modelden JSON çıktı istemek ve kendiniz ayrıştırmaktan daha güvenilirdir.
+</Aside>
+
+<PresenterNote>
+**Ekranda:** Site (Temel Yapı Taşları — 4 alt başlık: Chat Models, Messages, Prompt Templates, Output Parsers)
+
+**Yapın:** Dört yapı taşını sırayla geç. Her birinde kısa kal (~1 dk):
+- **Chat Models**: "Tek arayüz, dört vendor. Claude → GPT geçmek için sadece import değişir."
+- **Messages**: "Düz string değil, structured. SystemMessage davranış, HumanMessage soru, AIMessage cevap."
+- **Prompt Templates**: "Hard-coded string yerine değişkenli template. SQL query gibi düşün — parametrize."
+- **Output Parsers**: "LLM her zaman text döndürür. Sen structured data istiyorsan parser arada durur."
+
+**Sorun:** "Bu dördünden hangisini siz zaten yapıyorsunuz, hangisini hiç düşünmediniz?"
+
+**Vurgu:** Bunlar LCEL'in (sıradaki bölüm) yapı taşları. Hepsini sıraya koyup pipe operatörüyle birleştireceğiz — sonraki bölümün omurgası bu.
+
+**Sonra:** LCEL bölümüne geç.
+</PresenterNote>
+
+## LCEL: Pipe Operatörü
+
+**LangChain Expression Language**, yapı taşlarını chain'lere birleştirmenin yoludur. Unix pipe'larını kullandıysanız, konsepti zaten biliyorsunuz.
+
+```bash
+# Unix pipes
+cat log.txt | grep ERROR | wc -l
+```
+
+```python
+# LCEL pipes — same concept, different domain
+chain = prompt | model | parser
+```
+
+`|` operatörü **Runnable**'ları bağlar — `.invoke()`, `.stream()`, `.batch()` ve `.ainvoke()` metodlarına sahip nesneler. Her LangChain bileşeni bir Runnable'dır.
+
+<FlowDiagram title="LCEL Chain: Veri Soldan Sağa Akar">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📝</span>
+      <span class="node-label">Prompt</span>
+      <span class="node-desc">Şablon + değişkenler → mesajlar</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">Model</span>
+      <span class="node-desc">Mesajlar → AIMessage</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📊</span>
+      <span class="node-label">Parser</span>
+      <span class="node-desc">AIMessage → yapılandırılmış veri</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+```python
+from langchain_anthropic import ChatAnthropic
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful travel assistant."),
+    ("human", "{question}")
+])
+
+model = ChatAnthropic(model="claude-sonnet-4-20250514")
+parser = StrOutputParser()
+
+# Compose with pipes
+chain = prompt | model | parser
+
+# Invoke — data flows through the entire chain
+result = chain.invoke({"question": "What airlines fly CDG to NRT nonstop?"})
+```
+
+<PresenterNote>
+**Ekranda:** Colab — [3.1-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.1-first-chain.ipynb)
+
+**Yapın:** LCEL chain hücresini çalıştırın. Adım adım gösterin: "Dict prompt'a girer, template messages'a dönüşür. Messages model'a girer, AIMessage döner. AIMessage parser'a girer, text çıkar." Her adımın çıktısını ayrı ayrı gösterin.
+
+**🤝 Guided live-code moment (~3 dk):** "Şimdi birlikte bu prompt'u değiştirelim. Herkes laptop açıyor. Ben sahnede yapıyorum, siz de aynı anda kendi Colab'ınızda deniyorsunuz."
+
+1. Prompt template'in `system` mesajını "You are a helpful travel assistant." → "Sen Amadeus'ta çalışan kıdemli bir uçuş operasyon uzmanısın. Cevapların kısa ve teknik olmalı." olarak değiştir
+2. Aynı soruyu (`"What airlines fly CDG to NRT nonstop?"`) tekrar çalıştır
+3. İki çıktıyı yan yana göster — ton ve detay düzeyi farkı
+
+**Sorun:** "System mesajını değiştirmek bizim agent'ı nasıl değiştirdi? Sadece bir cümle ile."
+
+**Cevap rehberi:** Bu, prompt engineering'in neden iş olduğunun en hızlı kanıtı. Tek satır değişimi tüm karakteri değiştirir. Modül 0'daki "prompt = LLM davranışının kaynak kodu" cümlesine geri bağla.
+
+**Sonra:** Site'a dönün, "Why the Pipe Matters" bölümüne geçin.
+</PresenterNote>
+
+### Pipe Neden Önemli
+
+Pipe operatörü sözdizimsel şeker değil. Her LCEL chain otomatik olarak şunları kazanır:
+
+| Özellik | Bedavaya Elde Ettiğiniz |
+|---|---|
+| **Streaming** | `chain.stream(input)` — token'lar tüm chain boyunca akar |
+| **Async** | `await chain.ainvoke(input)` — engellemesiz yürütme |
+| **Batching** | `chain.batch([input1, input2])` — paralel yürütme |
+| **Yeniden deneme** | `chain.with_retry(stop_after_attempt=3)` — otomatik yeniden deneme |
+| **Yedekleme** | `chain.with_fallback(backup_chain)` — zarif degradasyon |
+| **İzleme** | Her adım LangSmith'te otomatik izlenir |
+
+`prompt | model | parser` yazarsınız. Streaming, async, batching, yeniden deneme, yedekleme ve izleme elde edersiniz. Framework hak ettiğini böyle kanıtlar.
+
+<KeyInsight>
+LCEL sadece güzel bir sözdizimi değil. Bir çalışma zamanı sözleşmesidir. Pipe'larla oluşturduğunuz her chain otomatik olarak streaming, async, batching, yeniden deneme ve gözlemlenebilirlik kazanır — bedavaya.
+</KeyInsight>
+
+## Uygulamalı: Aksama Analizi Chain'i
+
+Gerçek bir şey geliştirelim — uçuş aksamalarını analiz eden ve yolcu bildirimleri üreten bir chain.
+
+```python
+from langchain_anthropic import ChatAnthropic
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+# Step 1: Disruption analysis prompt
+disruption_prompt = ChatPromptTemplate.from_messages([
+    ("system", """You are an airline operations analyst. 
+Analyze flight disruptions concisely. Always include:
+- Severity level
+- Passenger impact summary  
+- Top 3 recommended actions
+Format your response with clear headers."""),
+    ("human", """Flight {flight} on route {route} is experiencing a {delay_min}-minute delay.
+There are {pax} passengers on board, including {premium_pax} premium passengers.
+Reason for delay: {reason}
+
+Analyze this disruption."""),
+])
+
+model = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
+
+# Step 2: Compose the chain
+disruption_chain = disruption_prompt | model | StrOutputParser()
+
+# Step 3: Run it
+result = disruption_chain.invoke({
+    "flight": "AF1234",
+    "route": "CDG → NRT",
+    "delay_min": 180,
+    "pax": 287,
+    "premium_pax": 42,
+    "reason": "Technical issue — hydraulic system check required"
+})
+```
+
+### Çok Adımlı Chain'leme
+
+Gerçek uygulamalar çok adımlı iş akışlarına ihtiyaç duyar. LCEL bunu doğal kılar:
+
+```python
+from langchain_core.runnables import RunnablePassthrough
+
+# Chain 1: Analyze the disruption
+analyze_chain = disruption_prompt | model | StrOutputParser()
+
+# Chain 2: Generate passenger SMS from the analysis
+comms_prompt = ChatPromptTemplate.from_messages([
+    ("system", "You write empathetic, professional passenger communications for airlines."),
+    ("human", """Based on this disruption analysis:
+
+{analysis}
+
+Write a brief SMS notification for affected passengers. 
+Keep it under 160 characters. Include flight number and new estimated time."""),
+])
+
+comms_chain = comms_prompt | model | StrOutputParser()
+
+# Combined: analyze THEN generate communication
+full_chain = (
+    {"analysis": analyze_chain, "original_input": RunnablePassthrough()}
+    | comms_chain
+)
+```
+
+<FlowDiagram title="Çok Adımlı Chain">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📥</span>
+      <span class="node-label">Uçuş Verisi</span>
+      <span class="node-desc">Aksama detayları</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Analiz</span>
+      <span class="node-desc">Ciddiyet, etki, eylemler</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">✉️</span>
+      <span class="node-label">SMS Oluştur</span>
+      <span class="node-desc">Yolcu bildirimi</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">📤</span>
+      <span class="node-label">Çıktı</span>
+      <span class="node-desc">Gönderime hazır mesaj</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<PresenterNote>
+[3.1-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.1-first-chain.ipynb) notebook'undaki multi-step chain hücrelerini sırayla çalıştırın. Önce analiz çıktısını, sonra SMS çıktısını gösterin. Sorun: "Bu chain'den sonra başka hangi adımları ekleyebiliriz? SMS'i uluslararası yolcular için otomatik çevirmek?" [3.2-memory.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.2-memory.ipynb) notebook'unda memory ile bu chain'in nasıl genişlediğini preview olarak gösterin.
+</PresenterNote>
+
+## Bellek: Konuşma Bağlamı
+
+Chain'ler varsayılan olarak durumsuz (stateless) çalışır. Her çağrı bağımsızdır — chain çağrılar arasında her şeyi unutur. Bellek bunu değiştirir.
+
+```python
+from langchain_core.chat_history import InMemoryChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
+
+# Base chain (no memory)
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful flight booking assistant."),
+    ("placeholder", "{history}"),
+    ("human", "{input}"),
+])
+
+chain = prompt | model | StrOutputParser()
+
+# Add memory
+message_store = {}
+
+def get_session_history(session_id: str):
+    if session_id not in message_store:
+        message_store[session_id] = InMemoryChatMessageHistory()
+    return message_store[session_id]
+
+chain_with_memory = RunnableWithMessageHistory(
+    chain,
+    get_session_history,
+    input_messages_key="input",
+    history_messages_key="history",
+)
+
+# Conversation — the chain remembers
+config = {"configurable": {"session_id": "user_123"}}
+
+r1 = chain_with_memory.invoke(
+    {"input": "I need a flight from Paris to Tokyo on September 15th"},
+    config=config
+)
+
+# It knows we're talking about CDG→NRT on Sep 15
+r2 = chain_with_memory.invoke(
+    {"input": "Make it business class, and I prefer morning departures"},
+    config=config
+)
+```
+
+### Bellek Stratejileri
+
+Tüm konuşmalar aynı değil. Konuşma uzunluğuna ve maliyet hassasiyetine göre stratejinizi seçin:
+
+| Strateji | Nasıl Çalışır | En Uygun |
+|---|---|---|
+| **Buffer** | Tüm mesajları olduğu gibi saklar | Kısa konuşmalar (20 turdan az) |
+| **Window** | Son N mesajı tutar | Yakın bağlamlı daha uzun konuşmalar |
+| **Summary** | LLM eski mesajları özetler | Çok uzun konuşmalar, maliyet hassas |
+| **Token Buffer** | Mesajları bir token limiti dahilinde tutar | Öngörülebilir maliyetli üretim |
+
+```python
+# Summary memory approach — when conversations get long
+from langchain_core.messages import SystemMessage
+
+def summarize_if_needed(messages, max_messages=20):
+    if len(messages) <= max_messages:
+        return messages
+
+    old_messages = messages[:-10]
+    recent_messages = messages[-10:]
+
+    summary = model.invoke([
+        SystemMessage(content="Summarize this conversation concisely:"),
+        *old_messages
+    ])
+
+    return [
+        SystemMessage(content=f"Previous conversation summary: {summary.content}"),
+        *recent_messages
+    ]
+```
+
+<KeyInsight>
+Bellek varsayılan değil, tercihle eklenir. Chain'ler durumsuz çalışır. Konuşma sürekliliğine ihtiyaç duyduğunuzda `RunnableWithMessageHistory` eklersiniz. Bellek stratejinizi konuşma uzunluğuna ve maliyete göre seçin — kısa için buffer, uzun için summary.
+</KeyInsight>
+
+## LangChain'i Ne Zaman Atlamalı
+
+Bu kritik bir soru. Her LLM uygulaması bir framework'e ihtiyaç duymaz.
+
+<Tabs>
+  <TabItem label="LangChain Kullanın">
+    - **Model değiştirmeniz** gerekiyorsa (Claude ↔ GPT ↔ yerel)
+    - Yeniden kullanılabilir bileşenlerle **çok adımlı chain'ler** geliştiriyorsanız
+    - Kutudan çıkan **gözlemlenebilirlik** istiyorsanız (LangSmith)
+    - **Bellek** ve **konuşma yönetimine** ihtiyacınız varsa
+    - Uygulamanız karmaşıklık olarak büyüyecekse
+    - LLM özellikleri üzerinde birden fazla kişi çalışıyorsa
+
+    LangChain'in değeri uygulama karmaşıklığıyla orantılı artar. Bugün basit, yarın karmaşık mı? Framework ile başlayın.
+  </TabItem>
+  <TabItem label="LangChain Atlayın">
+    - Tek bir modele **basit API çağrıları** yapıyorsanız
+    - Her HTTP isteği üzerinde **tam kontrol** istiyorsanız
+    - Soyutlama kaldırdığından daha fazla karmaşıklık ekliyorsa
+    - **Atılacak bir prototip** geliştiriyorsanız
+
+    ```python
+    # Sometimes this is all you need:
+    import anthropic
+    
+    client = anthropic.Anthropic()
+    response = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "What is IATA code for Paris CDG?"}]
+    )
+    print(response.content[0].text)
+    ```
+  </TabItem>
+</Tabs>
+
+<PresenterNote>
+[3.2-memory.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.2-memory.ipynb) notebook'unu açın ve memory'li conversation hücrelerini gösterin. İki mesaj gönderin, chain'in önceki context'i hatırladığını kanıtlayın. Sorun: "LangChain ekibi bile basit şeyler için LangChain gerekmediğini söylüyor. Framework ne zaman karşılığını verir?" Cevap: composability, model swap, ve Module 4'te yapacağımız graph'lar.
+</PresenterNote>
+
+<DeepDive title="İleri Düzey: Özel Runnable'lar, Paralel Yürütme ve Callback'ler">
+
+### Özel Runnable'lar
+
+Herhangi bir fonksiyon pipe-uyumlu bir bileşene dönüşebilir:
+
+```python
+from langchain_core.runnables import RunnableLambda
+
+def enrich_with_flight_data(input_dict: dict) -> dict:
+    """Look up additional flight data and add it to the context."""
+    flight_number = input_dict.get("flight_number")
+    flight_data = flight_api.get_details(flight_number)
+    return {**input_dict, "flight_data": flight_data}
+
+enrichment_step = RunnableLambda(enrich_with_flight_data)
+
+# Use in a chain — enrichment runs before the prompt
+chain = enrichment_step | prompt | model | parser
+```
+
+### RunnableParallel — Eşzamanlı Yürütme
+
+Birden fazla chain'i aynı anda çalıştırın ve sonuçları birleştirin:
+
+```python
+from langchain_core.runnables import RunnableParallel
+
+parallel_chain = RunnableParallel(
+    analysis=disruption_analysis_chain,
+    sentiment=passenger_sentiment_chain,
+    cost_estimate=cost_estimation_chain,
+)
+
+# All three run concurrently — massive latency reduction
+results = parallel_chain.invoke({"flight": "AF1234", "delay": 180})
+# results = {"analysis": "...", "sentiment": "...", "cost_estimate": "..."}
+```
+
+### Gözlemlenebilirlik İçin Callback'ler
+
+Chain'in her adımına izleme amaçlı bağlanın:
+
+```python
+from langchain_core.callbacks import BaseCallbackHandler
+
+class CostTracker(BaseCallbackHandler):
+    def __init__(self):
+        self.total_tokens = 0
+        self.total_cost = 0.0
+
+    def on_llm_end(self, response, **kwargs):
+        usage = response.llm_output.get("usage", {})
+        input_tokens = usage.get("input_tokens", 0)
+        output_tokens = usage.get("output_tokens", 0)
+        self.total_tokens += input_tokens + output_tokens
+        self.total_cost += (input_tokens * 0.003 + output_tokens * 0.015) / 1000
+
+tracker = CostTracker()
+result = chain.invoke(input_data, config={"callbacks": [tracker]})
+print(f"Tokens: {tracker.total_tokens}, Cost: ${tracker.total_cost:.4f}")
+```
+
+</DeepDive>
+
+## Temel Çıkarımlar
+
+<CardGrid>
+  <Card title="Framework, kütüphane değil" icon="setting">
+    LangChain mimari ve konvansiyonlar sağlar. Akışı o kontrol eder — siz mantığı doldurursunuz.
+  </Card>
+  <Card title="LCEL pipe'ları birleştirir" icon="right-arrow">
+    `prompt | model | parser` — bileşenler birbirine oturur. Her chain bedavaya streaming, async ve izleme kazanır.
+  </Card>
+  <Card title="Bellek tercihle eklenir" icon="document">
+    Chain'ler varsayılan olarak durumsuz çalışır. Konuşma sürekliliğine ihtiyaç duyduğunuzda `RunnableWithMessageHistory` ekleyin.
+  </Card>
+  <Card title="Ne zaman atlayacağını bilin" icon="warning">
+    Basit API çağrıları framework'e ihtiyaç duymaz. LangChain'in değeri karmaşıklıkla birlikte artar.
+  </Card>
+</CardGrid>
+
+## Sırada
+
+Doğrusal chain'ler geliştirdiniz — veri tek yönde akar. Ama 3. adım, sonuca göre 4A veya 4B'ye gitmeli olsa? Döngülere, dallanmaya, insan onayına ihtiyacınız olsa?
+
+Pipe operatörü burada sınırlarına ulaşır. **Modül 4: LangGraph** tam olarak chain'lerin kaldığı yerden devam eder.
+
+## Egzersizler
+
+<ColabLink title="Egzersiz 3.1: İlk Chain'inizi Geliştirin" notebook="/notebooks/agent-dev/3.1-first-chain.ipynb" level="Basic" />
+<ColabLink title="Egzersiz 3.2: Bellekli Konuşma Chain'i Geliştirin" notebook="/notebooks/agent-dev/3.2-memory.ipynb" level="Basic" />

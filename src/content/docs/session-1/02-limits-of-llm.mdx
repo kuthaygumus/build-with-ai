@@ -1,0 +1,364 @@
+---
+title: "Module 2: The Limits of a Bare LLM"
+description: "Four things an LLM cannot do — and why each limitation creates the need for tools, memory, RAG, and orchestration."
+---
+
+import DeepDive from '../../../components/DeepDive.astro';
+import ModuleHeader from '../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../components/PresenterNote.astro';
+import KeyInsight from '../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="35 min" day={1} goal="Experience the four fundamental limitations of a bare LLM — each one maps directly to a technology you'll learn this week." />
+
+## Why This Module Exists
+
+Module 1 showed you what an LLM can do. Now you'll see what it **can't** do. This isn't academic — each limitation is the reason a specific technology exists:
+
+<FlowDiagram title="Four Limits → Four Solutions">
+  <div class="flow-row">
+    <div class="flow-node danger">
+      <span class="node-icon">🚫</span>
+      <span class="node-label">Can't Act</span>
+      <span class="node-desc">Text only, no tools</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">🔌</span>
+      <span class="node-label">MCP & Tools</span>
+      <span class="node-desc">Module 3, today</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.25rem;">
+    <div class="flow-node danger">
+      <span class="node-icon">🚫</span>
+      <span class="node-label">No Memory</span>
+      <span class="node-desc">Every call is stateless</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">🔗</span>
+      <span class="node-label">LangChain Memory</span>
+      <span class="node-desc">Module 4, today</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.25rem;">
+    <div class="flow-node danger">
+      <span class="node-icon">🚫</span>
+      <span class="node-label">No Private Data</span>
+      <span class="node-desc">Only training data</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">📚</span>
+      <span class="node-label">RAG</span>
+      <span class="node-desc">Days 3-4</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.25rem;">
+    <div class="flow-node danger">
+      <span class="node-icon">🚫</span>
+      <span class="node-label">Can't Decide</span>
+      <span class="node-desc">No branching or loops</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">📊</span>
+      <span class="node-label">LangGraph</span>
+      <span class="node-desc">Module 5, Day 2</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+By the end of this module, you'll know the **roadmap for the entire training** — because every module exists to solve one of these four problems.
+
+<PresenterNote>
+**Ekranda:** Site (diyagram)
+
+**Yapın:** "Bu diyagram eğitimin haritası. 4 limit, 4 çözüm. Bugün ve yarın ilk, ikinci ve dördüncü limitleri çözeceğiz. Üçüncü limit — private data — ise gelecek oturumun tamamını kaplayacak."
+
+**Not:** Bu modülde ilk defa katılımcılarla etkileşimli demo yapılacak. Her limit için kısa canlı gösterim var.
+</PresenterNote>
+
+## Limit 1: It Can't Act
+
+An LLM generates text. That's **all** it does. It cannot call an API, query a database, send an email, or check the weather. Watch:
+
+```python
+messages = [
+    {"role": "user", "content": "What's the weather in Istanbul right now?"}
+]
+response = call_llm(messages)
+# → "As of my last update, Istanbul typically has mild weather in April,
+#    with temperatures around 12-18°C..."
+```
+
+That's not the actual weather. The model has no way to check. It **generated plausible text** based on patterns it learned during training. This is a hallucination disguised as a helpful answer.
+
+Now compare with an agent that has tools:
+
+```python
+# Agent with a weather tool
+agent.run("What's the weather in Istanbul right now?")
+# Agent thinks: "I need real-time data. I'll call the weather API."
+# → calls weather_api("Istanbul")
+# → "Currently 16°C in Istanbul, partly cloudy, 65% humidity."
+```
+
+The difference: the second system can **act in the real world**. The first can only generate text about it.
+
+<KeyInsight>
+An LLM without tools is like a brilliant advisor locked in a room with no phone, no computer, and no door. Great at thinking. Completely unable to **do** anything.
+</KeyInsight>
+
+**The solution**: Give the LLM the ability to call tools. This is what **MCP** (Module 3) standardizes — a protocol for connecting AI to external systems.
+
+<PresenterNote>
+**Ekranda:** Site (kod blokları)
+
+**Yapın:** İki kodu yan yana gösterin. "Birincisi uydurma — modelin hava durumunu kontrol etme yolu yok. İkincisi gerçek — çünkü bir tool var."
+
+**Sorun:** "Kendi işinizde hangi sistem bir LLM'in erişmesi gereken bir dış kaynak? Jira? Veritabanı? Email?"
+</PresenterNote>
+
+## Limit 2: It Has No Memory
+
+Remember Module 1: every API call is **stateless**. The LLM has zero memory between calls.
+
+```python
+# Call 1
+response = call_llm([
+    {"role": "user", "content": "I'm planning a trip to Tokyo next month."}
+])
+# → "Great! Tokyo is wonderful in spring..."
+
+# Call 2 — a NEW, independent request
+response = call_llm([
+    {"role": "user", "content": "What airlines fly there from Istanbul?"}
+])
+# → "Could you clarify which destination you're asking about?"
+```
+
+The model doesn't know "there" means Tokyo. Each call is a fresh start. The conversation doesn't exist.
+
+ChatGPT seems to remember because the **application** re-sends the entire conversation history with every call:
+
+```python
+# What ChatGPT actually does behind the scenes
+response = call_llm([
+    {"role": "user", "content": "I'm planning a trip to Tokyo next month."},
+    {"role": "assistant", "content": "Great! Tokyo is wonderful in spring..."},
+    {"role": "user", "content": "What airlines fly there from Istanbul?"}
+])
+# → "Turkish Airlines (TK), ANA (NH), and JAL (JL) fly IST→NRT nonstop."
+```
+
+Now it works — because the full history is in the context window. But this approach has a problem: conversations get long, context windows have limits, and sending everything costs money.
+
+<KeyInsight>
+The LLM doesn't remember. The application **pretends** it remembers by resending history. Managing this efficiently — what to keep, what to summarize, what to discard — is a core engineering problem. LangChain solves it with **memory patterns** (Module 4).
+</KeyInsight>
+
+**The solution**: Frameworks that manage conversation history intelligently. **LangChain** (Module 4) provides memory strategies: store everything, keep last N messages, summarize old ones, or respect a token budget.
+
+<PresenterNote>
+**Ekranda:** Site (3 kod bloğu)
+
+**Yapın:** Birinci çağrıyı gösterin, ikinci çağrıyı gösterin — "there" kelimesini anlayamadığını gösterin. Üçüncü çağrıyı gösterin — "bakın, tüm geçmişi gönderdik, şimdi anlıyor." Sorun: "Konuşma 100 mesaja ulaşırsa ne olur?"
+
+**Cevap rehberi:** Context window dolar. Ya para ödersiniz, ya summarize edersiniz, ya da eski mesajları atarsınız. Module 4'te tam bunu çözeceğiz.
+</PresenterNote>
+
+## Limit 3: It Doesn't Know Your Data
+
+An LLM was trained on public internet data, months or years ago. It knows nothing about:
+
+- Your company's internal policies
+- Yesterday's incident report
+- Your API documentation
+- Customer contracts
+- The email your CEO sent this morning
+
+```python
+response = call_llm([
+    {"role": "user", "content": "What is Amadeus's refund policy for GDS bookings?"}
+])
+# → "Amadeus typically offers refunds within 24 hours of booking for most
+#    GDS reservations, subject to airline and fare rules..."
+```
+
+That answer **sounds right**. It might even be partially correct. But the model is generating plausible text, not quoting your actual policy. If the policy changed last week, the model has no way to know.
+
+This is the most dangerous limitation: **confident-sounding hallucination about your specific data.**
+
+<Aside type="caution">
+This is where real business risk lives. An agent that confidently quotes the wrong refund policy, the wrong SLA terms, or the wrong compliance requirements can cause more damage than one that says "I don't know."
+</Aside>
+
+**The solution**: **RAG — Retrieval-Augmented Generation** (Days 3-4). Instead of relying on what the model memorized during training, you:
+1. Store your documents in a searchable database
+2. When a question comes in, find the relevant documents
+3. Include those documents in the prompt
+4. The model answers **based on your actual data**
+
+```python
+# With RAG (preview — you'll build this in Session 2)
+docs = search_your_documents("Amadeus refund policy GDS")
+# → finds: refund-policy-v3.2.pdf, page 14
+
+response = call_llm([
+    {"role": "system", "content": f"Answer based ONLY on this context:\n{docs}"},
+    {"role": "user", "content": "What is Amadeus's refund policy for GDS bookings?"}
+])
+# → "According to refund-policy-v3.2.pdf: GDS bookings are eligible for
+#    full refund within 48 hours. After that, a €75 processing fee applies..."
+```
+
+Same question, but now the answer comes from your actual document — with a citation.
+
+<PresenterNote>
+**Ekranda:** Site (iki kod bloğu)
+
+**Yapın:** "Bu iki cevap arasındaki farkı görüyor musunuz? Biri 'sanırım böyledir' diyor, diğeri 'v3.2.pdf sayfa 14'e göre böyledir' diyor. İşte RAG'ın gücü bu."
+
+**Vurgulayın:** "Bu konuyu bugün detaylı işlemeyeceğiz — Gün 3-4'ün tamamı buna ayrılmış. Ama tohumu şimdi ekiyoruz: agent'ınız akıllı olacak ama bilgisiz. Bilgiyi eklemek Session 2'nin işi."
+</PresenterNote>
+
+## Limit 4: It Can't Make Decisions
+
+A single LLM call is a straight line: question in, answer out. It cannot branch, loop, or choose between paths.
+
+Real workflows need decisions:
+
+```
+If the flight disruption is severe:
+    → escalate to operations team
+    → notify premium passengers first
+    → search for alternative flights
+
+If it's minor:
+    → auto-resolve with standard rebooking
+    → send notification to all passengers
+
+If it's critical:
+    → trigger emergency protocol
+    → notify airport management
+    → hold all connecting flights
+```
+
+You can't express this with a single API call. You can't even express it with a chain of calls — because a chain runs in one direction, and this requires **branching** and potentially **looping back**.
+
+```python
+# This does NOT work with a simple chain
+chain = analyze | classify | handle_severe | notify
+# What if classify says "minor"? Chain still runs handle_severe.
+# Chains are linear. Real workflows are graphs.
+```
+
+**The solution**: **LangGraph** (Module 5, Day 2). It models your workflow as a graph — nodes do work, edges control flow, conditional edges make decisions. You can branch, loop, wait for human approval, and retry failed steps.
+
+<KeyInsight>
+Chains go in one direction. Real workflows have forks, loops, and checkpoints. LangGraph gives you graph-based orchestration — the same conditional logic you use in traditional programming, but for LLM workflows.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (pseudocode bloğu)
+
+**Yapın:** if/else yapısını gösterin. "Bu mantığı tek bir LLM çağrısıyla yapamazsınız. Bir chain ile de yapamazsınız — chain düz çizgidir. Graph lazım. İşte LangGraph Gün 2'de tam bunu yapacak."
+
+**Sorun:** "Takımınızda hangi iş akışı birden fazla karar noktası içeriyor? Düşünün — 'eğer X ise A yap, değilse B yap' gibi."
+</PresenterNote>
+
+## The Complete Picture: What Is an Agent?
+
+An **agent** is a system that overcomes all four limitations:
+
+<FlowDiagram title="Agent = LLM + Solutions to All Four Limits">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">LLM</span>
+      <span class="node-desc">Reasoning engine</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔌</span>
+      <span class="node-label">Tools</span>
+      <span class="node-desc">Can act (MCP)</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">💾</span>
+      <span class="node-label">Memory</span>
+      <span class="node-desc">Can remember (LangChain)</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📊</span>
+      <span class="node-label">Orchestration</span>
+      <span class="node-desc">Can decide (LangGraph)</span>
+    </div>
+    <div class="flow-arrow animated">=</div>
+    <div class="flow-node primary">
+      <span class="node-icon">🤖</span>
+      <span class="node-label">Agent</span>
+      <span class="node-desc">Autonomous system</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+An agent runs a loop:
+
+1. **Perceive**: Input arrives — message, event, trigger
+2. **Reason**: LLM evaluates the situation and decides what to do
+3. **Act**: Calls a tool, queries a database, sends a notification
+4. **Remember**: Stores the result, updates state
+5. **Loop**: Back to step 1 until the goal is reached
+
+| | Chatbot | Agent |
+|---|---|---|
+| **Interaction** | You ask, it answers | You set a goal, it works toward it |
+| **Actions** | Text only | Calls APIs, reads files, writes data |
+| **Memory** | None between calls | Remembers context across steps |
+| **Control** | Human drives every step | Agent decides next steps autonomously |
+| **Example** | "What's the weather?" | "Rebook all passengers from the cancelled flight" |
+
+<PresenterNote>
+**Ekranda:** Site (diyagram + tablo)
+
+**Yapın:** "4 limit, 4 çözüm, 1 agent. Bu eğitimin tüm hikayesi bu diyagramda. Bugün tools ve memory öğreniyoruz. Yarın orchestration. Gelecek ay knowledge."
+
+**Sorun:** "Bu tablodaki en büyük fark hangisi sizce?" 2-3 cevap toplayın.
+
+**Sonra:** "İlk limiti çözelim — LLM'e eller verelim. Bu bizi MCP'ye götürüyor."
+</PresenterNote>
+
+## Your Roadmap
+
+Now you know where we're going:
+
+| Module | Solves | What You Build |
+|---|---|---|
+| **3. MCP** (today, 60 min) | Can't Act | A tool server that gives the LLM hands |
+| **4. LangChain** (today, 70 min) | No Memory | Chains with conversation memory |
+| **5. LangGraph** (tomorrow, 80 min) | Can't Decide | A graph with branching and loops |
+| **6. Production** (tomorrow, 50 min) | All together | A production-ready agent |
+| **7-12. RAG** (Session 2) | No Private Data | Knowledge-powered agent with citations |
+
+<DeepDive title="Historical Context: How We Got Here">
+
+Four eras of automation. Each solved a limitation of the previous:
+
+1. **Rules (1970s–2000s)**: Hand-coded `if/else`. Perfect for the 50 cases you thought of. Case 51 crashes.
+2. **ML (2010s)**: Learns from data. But narrow — one model per task, no reasoning.
+3. **LLMs (2023)**: General-purpose reasoning. Handles ambiguity, explains itself. But: text in, text out. Can't act.
+4. **Agents (2024+)**: LLM + tools + memory + orchestration. Reasons AND acts. This is where we are now.
+
+Each era solved one limitation: rules couldn't scale, ML couldn't reason, LLMs couldn't act. Agents combine reasoning + action.
+
+</DeepDive>
+
+## Next Up
+
+Time to solve Limit 1. The LLM can't act? **Let's give it hands.** Module 3 introduces MCP — the open standard that connects any AI client to any tool. You'll build your first tool server in 60 minutes.

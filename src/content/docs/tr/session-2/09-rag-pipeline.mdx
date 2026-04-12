@@ -1,0 +1,565 @@
+---
+title: "Modül 9: RAG Pipeline'ı"
+description: "Sıfırdan eksiksiz bir RAG sistemi kurun -- belge yükleme, chunking stratejileri, retrieval ve kaynak gösterimli dayanaklı üretim."
+---
+
+import DeepDive from '../../../../components/DeepDive.astro';
+import ColabLink from '../../../../components/ColabLink.astro';
+import ModuleHeader from '../../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../../components/PresenterNote.astro';
+import KeyInsight from '../../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="75 min" day={3} goal="Sıfırdan eksiksiz bir RAG pipeline'ı kurun -- yükle, chunk'la, eriş, üret." />
+
+## Pipeline'a Genel Bakış
+
+Hafta sonu prototipinden milyonlara hizmet veren prodüksiyon sistemine kadar her RAG sistemi aynı dört aşamayı takip eder:
+
+<FlowDiagram title="RAG'ın Dört Aşaması">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📄</span>
+      <span class="node-label">Yükle</span>
+      <span class="node-desc">PDF, web, markdown, API</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">✂️</span>
+      <span class="node-label">Chunk'la</span>
+      <span class="node-desc">Odaklı parçalara böl</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Eriş (Retrieve)</span>
+      <span class="node-desc">İlgili chunk'ları bul</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Üret (Generate)</span>
+      <span class="node-desc">Dayanaklı yanıt + kaynaklar</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">← ÇEVRİMDIŞI (indeksleme) → ← ÇEVRİMİÇİ (sorgu zamanı) →</div>
+  </div>
+</FlowDiagram>
+
+İlk iki aşama **çevrimdışı** gerçekleşir -- herhangi bir kullanıcı soru sormadan önce. Son ikisi **çevrimiçi** gerçekleşir -- sorgu zamanında. Bu ayrım performans ve maliyet açısından önemlidir.
+
+<PresenterNote>
+[3.1-rag-pipeline.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/3.1-rag-pipeline.ipynb) notebook'unu Colab'da açın. Tahtaya offline/online sınırını çizin. Notebook'taki indexing hücrelerini (Load, Chunk, Embed, Store) gösterin. Sorun: "Indexing ile querying'i neden ayırıyoruz?" Cevap: indexing pahalı (embedding hesaplama) ama bir kere yapılır. Querying ucuz (vector lookup + LLM call) ve her request'te çalışır.
+</PresenterNote>
+
+## Aşama 1: Belge Yükleme
+
+Bilgi tabanınız her yerden gelebilir. LangChain hepsine uygun yükleyicilere sahiptir:
+
+<Tabs>
+  <TabItem label="PDF">
+```python
+from langchain_community.document_loaders import PyPDFLoader
+
+loader = PyPDFLoader("flight-api-reference.pdf")
+documents = loader.load()
+
+print(f"Loaded {len(documents)} pages")
+print(f"Metadata: {documents[0].metadata}")
+# {'source': 'flight-api-reference.pdf', 'page': 0}
+```
+  </TabItem>
+  <TabItem label="Web Sayfaları">
+```python
+from langchain_community.document_loaders import WebBaseLoader
+
+loader = WebBaseLoader([
+    "https://api.example.com/self-service/apis-docs",
+    "https://api.example.com/blog"
+])
+documents = loader.load()
+```
+  </TabItem>
+  <TabItem label="Markdown">
+```python
+from langchain_community.document_loaders import DirectoryLoader, TextLoader
+
+loader = DirectoryLoader(
+    "./docs/",
+    glob="**/*.md",
+    loader_cls=TextLoader,
+    show_progress=True
+)
+documents = loader.load()
+```
+  </TabItem>
+  <TabItem label="API / JSON">
+```python
+from langchain_core.documents import Document
+import requests
+
+response = requests.get("https://api.example.com/travel/articles")
+articles = response.json()
+
+documents = [
+    Document(
+        page_content=article["body"],
+        metadata={
+            "title": article["title"],
+            "author": article["author"],
+            "source": f"api/articles/{article['id']}"
+        }
+    )
+    for article in articles
+]
+```
+  </TabItem>
+</Tabs>
+
+<Aside type="tip">
+Yükleme sırasında her zaman **meta verileri** koruyun -- kaynak, sayfa, tarih, kategori. Kaynak gösterimi, filtreleme ve hata ayıklama için bunlara ihtiyacınız olacak. Meta veri, "işte yanıtınız" ile "işte yanıtınız, API referansının 14. sayfasından, geçen Salı güncellendi" arasındaki farktır.
+</Aside>
+
+## Aşama 2: Chunking -- Belirleyici Karar
+
+Bu, RAG pipeline'ınızdaki en etkili tek karardır. **Kötü chunking her şeyi mahveder.** Mükemmel retrieval, cümleleri düşüncenin ortasından bölen chunk'ları düzeltemez. Mükemmel prompt'lar, üç alakasız konuyu karıştıran chunk'ları düzeltemez.
+
+<KeyInsight>
+Chunking, retrieval kalitesini belirler. Retrieval kalitesi, yanıt kalitesini belirler. Bunu yanlış yaparsanız, sonrasında hiçbir şey sizi kurtaramaz.
+</KeyInsight>
+
+Neden chunk'lıyoruz? Üç nedeni var:
+1. LLM'lerin bağlam sınırları vardır -- tüm bilgi tabanını prompt'a tıkamazsınız
+2. Embedding modelleri 50 sayfalık belgeler yerine odaklı pasajlarda en iyi çalışır
+3. Daha küçük, konusal olarak tutarlı chunk'larla retrieval daha hassas olur
+
+<PresenterNote>
+[3.1-rag-pipeline.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/3.1-rag-pipeline.ipynb) notebook'undaki chunking karşılaştırma hücrelerini çalıştırın. Tüm dokümanı embed etme vs paragraf paragraf embed etme farkını gösterin. Full-document embedding her şeyle zayıf eşleşir, paragraf embedding doğru paragrafla güçlü eşleşir. Sorun: "chunk_size=2000 ile chunk_size=500 arasındaki fark ne olur?" Notebook'ta deneyin.
+</PresenterNote>
+
+### Strateji 1: Özyinelemeli Karakter Bölme -- Varsayılan
+
+Önce doğal sınırları dener (paragraflar, sonra cümleler, sonra kelimeler), gerektiğinde daha küçük ayırıcılara geri döner:
+
+```python
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=200,
+    separators=[
+        "\n\n",    # First: paragraph breaks
+        "\n",      # Then: line breaks
+        ". ",      # Then: sentence endings
+        ", ",      # Then: clause breaks
+        " ",       # Then: word boundaries
+        ""         # Last resort: character by character
+    ]
+)
+
+chunks = splitter.split_documents(documents)
+print(f"Created {len(chunks)} chunks from {len(documents)} documents")
+```
+
+**Bu başlangıç noktanızdır.** Kullanmamak için özel bir nedeniniz olana kadar bunu kullanın.
+
+### Strateji 2: Semantik Chunking
+
+Konu sınırlarını tespit etmek için embedding'leri kullanır. Ardışık cümleler arasındaki semantik benzerlik bir eşiğin altına düştüğünde böler:
+
+```python
+from langchain_experimental.text_splitter import SemanticChunker
+from langchain_openai import OpenAIEmbeddings
+
+splitter = SemanticChunker(
+    embeddings=OpenAIEmbeddings(model="text-embedding-3-small"),
+    breakpoint_threshold_type="percentile",
+    breakpoint_threshold_amount=75
+)
+
+chunks = splitter.split_documents(documents)
+# Chunks follow natural topic boundaries
+```
+
+**Artılar**: Konusal olarak tutarlı chunk'lar. **Eksiler**: Değişken boyutlar, daha yavaş (indeksleme sırasında embedding gerektirir).
+
+### Strateji 3: Belge Yapısına Duyarlı
+
+Belgenin kendi yapısını -- başlıklar, bölümler -- chunk'ları tanımlamak için kullanır:
+
+```python
+from langchain.text_splitter import MarkdownHeaderTextSplitter
+
+headers_to_split_on = [
+    ("#", "h1"),
+    ("##", "h2"),
+    ("###", "h3"),
+]
+
+splitter = MarkdownHeaderTextSplitter(
+    headers_to_split_on=headers_to_split_on
+)
+
+# Each chunk inherits its header hierarchy as metadata
+chunks = splitter.split_text(markdown_text)
+# Headers: {'h1': 'Flight Offers API', 'h2': 'Search Endpoint'}
+# Content: The search endpoint accepts origin, destination, and date...
+```
+
+**İdeal kullanım alanı**: Markdown belgeler, API referansları, yapılandırılmış kılavuzlar.
+
+### Chunk Boyutunun Etkisi
+
+<FlowDiagram title="Chunk Boyutu Dengesi">
+  <div class="flow-row">
+    <div class="flow-node danger">
+      <span class="node-icon">🔬</span>
+      <span class="node-label">Çok Küçük (200)</span>
+      <span class="node-desc">Hassas ama bağlam kaybeder</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">🎯</span>
+      <span class="node-label">İdeal Aralık (500-1000)</span>
+      <span class="node-desc">Odaklı ve eksiksiz</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node danger">
+      <span class="node-icon">🔭</span>
+      <span class="node-label">Çok Büyük (2000+)</span>
+      <span class="node-desc">Yanıt gürültüde kaybolur</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<Aside type="caution">
+**Temel kural**: `chunk_size=500-1000` ve `chunk_overlap=100-200` ile başlayın. Sonra deneyler yapın. Doğru boyut içeriğinize ve sorgularınıza bağlıdır -- evrensel bir cevap yoktur. Tahmin etmeyin, karşılaştırmalı test yapın.
+</Aside>
+
+## Aşama 3: Retrieval
+
+Kullanıcı bir soru sorar. En ilgili chunk'ları bulmanız gerekir. Üç yaklaşım:
+
+### Dense Retrieval (Semantik Arama)
+
+Sorguyu embedding'leyin, en yakın vektörleri bulun. Bu, Modül 2'de oluşturduğunuz şeydir:
+
+```python
+from langchain_openai import OpenAIEmbeddings
+from langchain_chroma import Chroma
+
+embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+vector_store = Chroma(
+    persist_directory="./chroma_db",
+    embedding_function=embeddings
+)
+
+retriever = vector_store.as_retriever(search_kwargs={"k": 5})
+results = retriever.invoke("How do I authenticate with the Flight API?")
+```
+
+**Güçlü yanı**: Anlamı kavrar. "How do I log in?" ifadesi "authentication" hakkındaki belgelerle eşleşir.
+**Zayıf yanı**: Tam terimleri, kodları, kısaltmaları kaçırır.
+
+### Sparse Retrieval (BM25 / Anahtar Kelime)
+
+Geleneksel anahtar kelime araması. Embedding yok. Anlam yok. Yalnızca terim eşleştirme:
+
+```python
+from langchain_community.retrievers import BM25Retriever
+
+bm25_retriever = BM25Retriever.from_documents(chunks, k=5)
+results = bm25_retriever.invoke("PNR AMAXTK error code 4812")
+```
+
+**Güçlü yanı**: Tam terim eşleştirme. Hata kodları, PNR locator'ları, kısaltmalar.
+**Zayıf yanı**: "delayed flight" ifadesi "late arrival" ile eşleşmez.
+
+### Hibrit Retrieval -- Her İkisinin En İyisi
+
+Bu prodüksiyon varsayılanıdır. Dense ve sparse'ı birleştirin, sonuçları birleştirin:
+
+```python
+from langchain.retrievers import EnsembleRetriever
+
+hybrid_retriever = EnsembleRetriever(
+    retrievers=[
+        vector_store.as_retriever(search_kwargs={"k": 5}),
+        BM25Retriever.from_documents(chunks, k=5)
+    ],
+    weights=[0.5, 0.5]
+)
+
+results = hybrid_retriever.invoke("OAuth2 credentials for flight-offers v2")
+# Finds results matching semantically AND by keyword
+```
+
+<FlowDiagram title="Hibrit Retrieval">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Kullanıcı Sorgusu</span>
+      <span class="node-desc">"OAuth2 for flight-offers v2"</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">Dense Arama</span>
+      <span class="node-desc">Semantik anlam</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.25rem;">
+    <div class="flow-node secondary" style="visibility: hidden;">
+      <span class="node-label">hidden</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">🔤</span>
+      <span class="node-label">BM25 Arama</span>
+      <span class="node-desc">Tam anahtar kelimeler</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow animated">↓ birleştir + tekrarları kaldır</div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.25rem;">
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">En İyi Sonuçlar</span>
+      <span class="node-desc">Semantik + anahtar kelime kapsamı</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<KeyInsight>
+Hibrit retrieval prodüksiyon varsayılanıdır. Saf semantik arama tam terimleri kaçırır. Saf anahtar kelime araması anlamı kaçırır. İkisini birleştirin. 50/50 ağırlıkla başlayın ve oradan ayarlayın.
+</KeyInsight>
+
+## Aşama 4: Üretim (Generation)
+
+İlgili chunk'larınız var. Şimdi dayanaklı bir yanıt üretin.
+
+```python
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", """You are a travel technology support assistant.
+Answer based ONLY on the provided context.
+If the context doesn't contain the answer, say "I don't have enough information."
+
+Rules:
+- Be precise and technical
+- Cite sources using [Source: filename, page X] format
+- If sources conflict, mention the discrepancy
+
+Context:
+{context}"""),
+    ("human", "{question}")
+])
+
+def format_context(docs):
+    return "\n\n---\n\n".join([
+        f"[Source: {doc.metadata.get('source', 'unknown')}, "
+        f"Page: {doc.metadata.get('page', 'N/A')}]\n"
+        f"{doc.page_content}"
+        for doc in docs
+    ])
+```
+
+<PresenterNote>
+[3.1-rag-pipeline.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/3.1-rag-pipeline.ipynb) notebook'undaki generation hücresinde system prompt'u gösterin. "ONLY on the provided context" kuralını vurgulayın. Sorun: "Bu talimatı kaldırsak ne olur?" Model training data'sına geri döner ve hallucinate edebilir. Notebook'ta bu talimatı çıkarıp aynı soruyu tekrar sorun — farkı canlı gösterin.
+</PresenterNote>
+
+### Tam Pipeline -- 25 Satır
+
+Her şey bir arada:
+
+```python
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_chroma import Chroma
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+
+# OFFLINE: Load, Chunk, Embed, Store
+docs = PyPDFLoader("flight-api-guide.pdf").load()
+chunks = RecursiveCharacterTextSplitter(
+    chunk_size=800, chunk_overlap=150
+).split_documents(docs)
+db = Chroma.from_documents(chunks, OpenAIEmbeddings(model="text-embedding-3-small"))
+
+# ONLINE: Retrieve + Generate
+retriever = db.as_retriever(search_kwargs={"k": 4})
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "Answer from context only. Cite sources.\n\nContext:\n{context}"),
+    ("human", "{question}")
+])
+
+chain = (
+    {"context": retriever | (lambda docs: "\n\n".join(d.page_content for d in docs)),
+     "question": RunnablePassthrough()}
+    | prompt | llm | StrOutputParser()
+)
+
+# Ask anything
+print(chain.invoke("How do I authenticate with the Flight Offers API?"))
+```
+
+Çıktı:
+
+```text
+To authenticate with the Flight Offers API, use OAuth 2.0
+client credentials flow:
+
+1. POST to /v1/security/oauth2/token with your API Key and Secret
+2. Receive an access token (valid for 30 minutes)
+3. Include as Bearer token in the Authorization header
+
+[Source: flight-api-reference.pdf, Page: 12]
+```
+
+25 satır. PDF'den dayanaklı, kaynak gösterimli yanıtlara.
+
+## Uygulamalı: Kendiniz Kurun
+
+<ColabLink title="Egzersiz 3.1: Eksiksiz RAG Pipeline'ı Kurun" notebook="/notebooks/rag/3.1-rag-pipeline.ipynb" level="Basic" />
+
+Bu notebook'ta sıfırdan tam pipeline'ı kurarsınız:
+
+<Steps>
+1. Bir PDF belgesi yükleyin (sağlanmıştır)
+2. Farklı chunking stratejileriyle deney yapın
+3. Embedding'ler oluşturun ve ChromaDB'ye depolayın
+4. Dense retrieval uygulayın
+5. Dayanaklı üretim için bir LLM'e bağlayın
+6. Birden fazla sorguyla test edin ve kaliteyi değerlendirin
+</Steps>
+
+<PresenterNote>
+[3.1-rag-pipeline.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/3.1-rag-pipeline.ipynb) notebook'u ana hands-on egzersizi. Katılımcılara 20-25 dakika verin. Dolaşın, API key sorunlarında yardım edin. Yaygın takılma noktası chunk size — chunk_size=2000 kullananlar 500-800 kullananlara göre daha kötü retrieval alır. Sonuçları incelerken bunu öğretme fırsatı olarak kullanın. Sorun: "Chunk size'ı nasıl seçtiniz ve sonucu nasıl etkiledi?"
+</PresenterNote>
+
+## Hızlı Eval: Retrieval Çalıştı mı?
+
+Bir pipeline kurdunuz. Devam etmeden önce, her production RAG ekibinin her gün sorduğu soruyu sorun: **gerçekten çalışıp çalışmadığını nasıl bileceğiz?**
+
+Mümkün olan en basit eval: doğru kaynak dokümanını zaten bildiğiniz 3 test sorusu yazın, retrieval'ı çalıştırın, doğru dokümanın top-k sonuçlarda olup olmadığını kontrol edin.
+
+```python
+# Doğru kaynak dokümanları bilinen 3 test sorgusu
+test_set = [
+    {
+        "question": "Flight API'ye karşı nasıl authenticate ediyorum?",
+        "expected_source": "flight-api-reference.pdf",
+    },
+    {
+        "question": "Premium biletler için iptal politikası nedir?",
+        "expected_source": "fare-rules-v3.pdf",
+    },
+    {
+        "question": "PNR kayıtları nasıl yapılandırılır?",
+        "expected_source": "pnr-data-model.pdf",
+    },
+]
+
+def did_retrieval_find_it(question: str, expected_source: str, k: int = 5) -> bool:
+    """Beklenen doküman top-k retrieval sonuçlarındaysa True döner."""
+    results = vector_store.similarity_search(question, k=k)
+    sources = [doc.metadata.get("source", "") for doc in results]
+    return any(expected_source in s for s in sources)
+
+# Eval'i çalıştır
+hits = sum(
+    did_retrieval_find_it(q["question"], q["expected_source"])
+    for q in test_set
+)
+print(f"Retrieval recall: {hits}/{len(test_set)} ({hits / len(test_set):.0%})")
+```
+
+İşte bu kadar. **Üç soru, ikili bir metric, tek bir sayı.** Mümkün olan en küçük RAG eval — ve bir chunking değişikliğinin işleri daha iyi mi yoksa daha kötü mü yaptığını söylemek için yeterli.
+
+<KeyInsight>
+**Ölçemediğiniz şeyi iyileştiremezsiniz.** Bu 20 satırlık eval, "chunk_size'ı değiştirdim, daha iyi hissettim" ile "chunk_size'ı değiştirdim, recall %33'ten %100'e çıktı" arasındaki farktır. Modül 5 bunu RAGAS'a genişletir — ama prensip aynı: bilinen sorular, bilinen cevaplar, hit'leri say.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (yukarıdaki eval kodu)
+
+**Yapın:** Kodu satır satır geç. Vurgula: "20 satır. 3 soru. Bir tane sayı." Sonra retorik soru: "Eğer chunk_size'i değiştirip 'daha iyi hissediyorum' derseniz bu kanıt mı?"
+
+**Sorun:** "Şimdi 5 sorulu küçük bir test set'i nasıl seçerdiniz? Hangi sorular gerçek bir RAG sistemini test eder?"
+
+**Cevap rehberi:** İyi test sorusu = (a) cevabı kesin olan, (b) cevabı bilgi tabanında olan, (c) gerçek kullanıcı sorularına benzeyen. "What is..." iyi başlangıç. "Why" ve "How" daha zor.
+
+**Vurgu:** Bu sadece başlangıç. Modül 5'te RAGAS ile bunu daha sofistike hale getireceğiz — ama prensip aynı: bilinen sorular, bilinen cevaplar, hit'leri say.
+
+**Sonra:** DeepDive (chunk overlap, MMR) opsiyonel — vakit varsa göster, yoksa Modül 4'e geç.
+</PresenterNote>
+
+<DeepDive title="Chunk Overlap, Meta Veri Filtreleme ve MMR">
+
+### Chunk Overlap
+
+Metni böldüğünüzde, sınırdaki bilgiler kesilir. Overlap süreklilik sağlar. Overlap'i chunk_size'ın %10-20'si olarak ayarlayın. Çok fazlası depolamayı israf eder ve tekrarlı retrieval'a neden olur.
+
+### Meta Veri Filtreleme
+
+Vektör benzerliğinden önce arama alanını daraltın:
+
+```python
+# Search only flight docs, only version 2+
+results = vector_store.similarity_search(
+    "authentication flow",
+    k=5,
+    filter={
+        "$and": [
+            {"category": "api-reference"},
+            {"version": {"$gte": "v2"}}
+        ]
+    }
+)
+```
+
+Çok kiracılı RAG ve büyük bilgi tabanları için kritik öneme sahiptir.
+
+### MMR (Maximal Marginal Relevance)
+
+Standart benzerlik araması, hepsi aynı şeyi söyleyen 5 chunk döndürebilir. MMR, ilgililik ile çeşitliliği dengeler:
+
+```python
+results = vector_store.max_marginal_relevance_search(
+    "flight search",
+    k=5,
+    fetch_k=20,       # fetch 20 candidates
+    lambda_mult=0.7    # 0 = max diversity, 1 = max relevance
+)
+```
+
+Algoritma: İlk 20'yi getir, en ilgili olanı seç, sonra kalan her yuva için sorguya en ilgili ama zaten seçilenlerden en farklı chunk'ı seç. Tekrarı ortadan kaldırır.
+
+</DeepDive>
+
+## Önemli Çıkarımlar
+
+Üç şey:
+
+1. **Chunking en yüksek kaldıraçlı karardır.** `RecursiveCharacterTextSplitter`, chunk_size 500-1000, overlap 100-200 ile başlayın. Sonra karşılaştırmalı test yapın ve iyileştirin.
+
+2. **Hibrit retrieval saf semantik aramayı geçer.** Dense (anlam) ile sparse (anahtar kelime) birleştirin. Prodüksiyon sistemleri neredeyse her zaman ikisini birden kullanır.
+
+3. **Prompt güvenlik bariyerinizdir.** "YALNIZCA bağlama dayanarak yanıtla" ifadesi, üretim aşamasında halüsinasyonu önleyen tek talimattır. Asla atlamayın.
+
+## Sıradaki
+
+Pipeline'ınız çalışıyor. Ama uç durumlarda başarısız oluyor -- teknik belgelere uymayan günlük sorgular, çok düşük sıralanan ilgili chunk'lar, birden fazla belge gerektiren yanıtlar. **Modül 4: Gelişmiş RAG** bunların hepsini düzeltir.

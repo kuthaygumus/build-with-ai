@@ -1,6 +1,6 @@
 ---
 title: AI Training Series
-description: A two-part hands-on workshop on Agent Development and RAG. Build real AI systems, not slide decks.
+description: A four-day hands-on workshop. From "What is an LLM?" to building autonomous, knowledge-powered agents.
 template: splash
 hero:
   title: |
@@ -8,11 +8,11 @@ hero:
     That Actually Work
   tagline: A hands-on engineering workshop. You write code from minute one. You leave with working systems you built yourself.
   actions:
-    - text: Start with Agents
-      link: /agent-development/01-why-agents/
+    - text: Start Session 1
+      link: /session-1/01-what-is-llm/
       icon: right-arrow
-    - text: Jump to RAG
-      link: /rag/01-knowledge-problem/
+    - text: Jump to Session 2
+      link: /session-2/07-knowledge-problem/
       variant: minimal
 ---
 
@@ -20,22 +20,22 @@ import { Card, CardGrid, Steps, Aside } from '@astrojs/starlight/components';
 
 ## What This Is
 
-A **two-part workshop** where you build real AI systems from scratch. Not a lecture. Not a demo you watch. You write code, break things, fix them, and walk away with working systems you understand inside out.
+A **four-day workshop** where you build real AI systems from scratch. Not a lecture. Not a demo you watch. You write code, break things, fix them, and walk away with working systems you understand inside out.
 
 <CardGrid>
-  <Card title="Part 1: Agent Development" icon="rocket">
-    **Duration: 2 Days**
+  <Card title="Session 1: LLM to Agent" icon="rocket">
+    **Days 1-2**
 
-    Build an autonomous agent that reasons, makes decisions, calls tools, and completes tasks without human intervention.
+    Start with "What is an LLM?" and build up to a production-ready agent that reasons, makes decisions, calls tools, and handles errors.
 
-    By the end: a working multi-step agent with MCP tool integration, conditional logic, and human-in-the-loop approval.
+    By the end: a working LangGraph agent with MCP tool integration, conditional logic, and guardrails.
   </Card>
-  <Card title="Part 2: RAG" icon="open-book">
-    **Duration: 2 Days**
+  <Card title="Session 2: Knowledge-Powered Agents" icon="open-book">
+    **Days 3-4**
 
-    Build a system that answers questions from your own documents — accurately, with citations, at production quality.
+    Give your agent knowledge. Build a RAG pipeline, master advanced retrieval, and combine everything into **Agentic RAG**.
 
-    By the end: a RAG pipeline with advanced retrieval, re-ranking, evaluation metrics, and a caching layer.
+    By the end: an autonomous agent that decides when to search, evaluates sufficiency, and generates cited answers from your documents.
   </Card>
 </CardGrid>
 
@@ -43,61 +43,61 @@ A **two-part workshop** where you build real AI systems from scratch. Not a lect
 
 You're a developer. Maybe you've used ChatGPT. Maybe you haven't touched AI at all. Doesn't matter. Everything is explained from scratch, but we move fast and go deep.
 
-- **New to AI?** Follow the main path. Every concept is built up from zero with real code.
+- **New to AI?** Follow the main path. Every concept starts with "What is this?" and "Why do I need it?"
 - **Already familiar?** Look for the **Deep Dive** sections and tackle the **Challenge** exercises.
-- **Senior/Architect?** The production patterns, security considerations, and architectural decisions are where you'll get the most value.
+- **Senior/Architect?** Production patterns, security considerations, and architectural decisions are where you'll get the most value.
 
 ## How It Works
 
-Each part takes 2 days. Here's the rhythm:
+Every module follows the same rhythm:
 
 <Steps>
-1. **See it work** — Every module opens with the finished result. You see what you're building before writing a single line.
+1. **Feel the problem** — See what doesn't work. Experience the limitation firsthand.
 
-2. **Understand why** — Short, focused explanation. No filler. Exactly what you need to build it yourself.
+2. **Understand why** — Short, focused explanation. Why this technology exists. What problem it solves.
 
-3. **Build it yourself** — Open the Colab notebook, run the code, modify it, break it, understand it. This is where learning happens.
+3. **Build the solution** — Open the Colab notebook, write the code, see it work.
 
-4. **Push further** — Challenge exercises for those who want to go deeper. No hand-holding — just a goal and some hints.
+4. **Push further** — Challenge exercises for those who want to go deeper.
 </Steps>
 
 ### The Tools
 
 | Tool | What It Does | Why |
 |------|-------------|-----|
-| **This site** | Theory, diagrams, architecture, reference | Navigate during the workshop, revisit later at your own pace |
-| **Google Colab** | Run Python code in your browser | Zero setup. Click a link, start coding immediately |
+| **This site** | Theory, diagrams, architecture, reference | Navigate during the workshop, revisit later |
+| **Google Colab** | Run Python code in your browser | Zero setup. Click a link, start coding |
 
 <Aside type="tip">
-You don't need to install anything on your machine. Every exercise runs in Google Colab — just a browser and a Google account.
+You don't need to install anything. Every exercise runs in Google Colab — just a browser and a Google account.
 </Aside>
 
 ## What You'll Build
 
-### Part 1: Agents
+### Session 1: LLM to Agent (Days 1-2)
 
 | Day | You Start With | You End With |
 |-----|---------------|-------------|
-| **Day 1** | "What's an agent?" | A working LangChain pipeline with memory and structured output |
-| **Day 2** | A chain that runs linearly | A LangGraph agent with conditional routing, tool use, and human approval |
+| **Day 1** | "What is an LLM?" | Chains with memory, MCP tool integration |
+| **Day 2** | A chain that runs linearly | A LangGraph agent with conditional routing and production guardrails |
 
-### Part 2: RAG
+### Session 2: Knowledge-Powered Agents (Days 3-4)
 
 | Day | You Start With | You End With |
 |-----|---------------|-------------|
-| **Day 1** | "What's an embedding?" | A full RAG pipeline: PDF in, accurate answers out, with citations |
-| **Day 2** | A naive pipeline that sometimes fails | Production RAG with HyDE, re-ranking, and evaluation metrics |
+| **Day 3** | "My agent hallucinates on company data" | A full RAG pipeline: documents in, cited answers out |
+| **Day 4** | A naive pipeline that sometimes fails | **Agentic RAG** — an autonomous agent with advanced retrieval and evaluation |
 
 ## The Arc
 
-These aren't two separate workshops. They're one story:
+This isn't two separate workshops. It's one story with a single narrative thread:
 
 <CardGrid>
-  <Card title="Part 1: What can AI do?" icon="rocket">
+  <Card title="Session 1: What can AI do?" icon="rocket">
     Build agents that **reason and act** autonomously. By the end: "This is powerful, but it only knows what it was trained on."
   </Card>
-  <Card title="Part 2: What can AI know?" icon="open-book">
-    Give agents access to **your data**. By the end: combine both into **Agentic RAG** — an agent that decides when to search, what to search, and generates cited answers.
+  <Card title="Session 2: What can AI know?" icon="open-book">
+    Give agents access to **your data**. By the end: **Agentic RAG** — an agent that decides when to search, retrieves your documents, and generates cited answers.
   </Card>
 </CardGrid>
 
@@ -132,16 +132,16 @@ Groq's free tier gives you 30 requests per minute with Llama 3.3 70B — a power
 ## Quick Links
 
 <CardGrid>
-  <Card title="Agent Dev — Day 1" icon="right-arrow">
-    [Why Agents?](/agent-development/01-why-agents/) | [MCP](/agent-development/02-mcp/) | [LangChain](/agent-development/03-langchain/)
+  <Card title="Session 1 — Day 1" icon="right-arrow">
+    [What Is an LLM?](/session-1/01-what-is-llm/) | [Limits](/session-1/02-limits-of-llm/) | [MCP](/session-1/03-mcp/) | [LangChain](/session-1/04-langchain/)
   </Card>
-  <Card title="Agent Dev — Day 2" icon="right-arrow">
-    [LangGraph](/agent-development/04-langgraph/) | [Integration](/agent-development/05-integration/)
+  <Card title="Session 1 — Day 2" icon="right-arrow">
+    [LangGraph](/session-1/05-langgraph/) | [Production Agent](/session-1/06-production-agent/)
   </Card>
-  <Card title="RAG — Day 1" icon="right-arrow">
-    [Knowledge Problem](/rag/01-knowledge-problem/) | [Embeddings](/rag/02-embeddings/) | [Pipeline](/rag/03-rag-pipeline/)
+  <Card title="Session 2 — Day 3" icon="right-arrow">
+    [Knowledge Problem](/session-2/07-knowledge-problem/) | [Embeddings](/session-2/08-embeddings/) | [RAG Pipeline](/session-2/09-rag-pipeline/)
   </Card>
-  <Card title="RAG — Day 2" icon="right-arrow">
-    [Advanced RAG](/rag/04-advanced-rag/) | [Production](/rag/05-production-rag/)
+  <Card title="Session 2 — Day 4" icon="right-arrow">
+    [Advanced RAG](/session-2/10-advanced-rag/) | [Production RAG](/session-2/11-production-rag/) | [Agentic RAG](/session-2/12-agentic-rag/)
   </Card>
 </CardGrid>

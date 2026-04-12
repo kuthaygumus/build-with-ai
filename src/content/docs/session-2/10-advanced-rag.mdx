@@ -1,0 +1,554 @@
+---
+title: "Module 10: Advanced RAG"
+description: "Query transformation, re-ranking, and agentic RAG — the techniques that turn a demo into a production-grade system."
+---
+
+import DeepDive from '../../../components/DeepDive.astro';
+import ColabLink from '../../../components/ColabLink.astro';
+import ModuleHeader from '../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../components/PresenterNote.astro';
+import KeyInsight from '../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="55 min" day={1} goal="Diagnose where naive RAG breaks and apply the three highest-ROI fixes: HyDE, re-ranking, and agentic RAG (conceptually)." />
+
+## Start with Failure
+
+Module 9 pipeline'ınız çalışıyor. Çalışmayana kadar. İleri teknikleri öğrenmeden önce, naive RAG'ın **tam olarak nasıl** başarısız olduğunu görelim — her başarısızlık modunun spesifik bir çözümü var.
+
+<PresenterNote>
+**Ekranda:** Colab — [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb)
+**Yapın:** 'Setup' ve 'Basic RAG Pipeline' bölümlerini çalıştırın (ilk 3 hücre). Sonra 3 sorgu çalıştırın: casual dil sorgusu, doğru dokümanın düşük sıralandığı sorgu, birden fazla doküman gerektiren sorgu. Başarısızlıkları görsünler.
+**Sorun:** "Bu 3 farklı başarısızlığın ortak noktası ne?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — Query Transformation bölümüne geçin.
+</PresenterNote>
+
+### Failure 1: Query-Document Mismatch
+
+Kullanıcı günlük dille sorar. Dokümanlar teknik. Aralarındaki semantic similarity düşük — doküman cevabı içermesine rağmen.
+
+```text
+User query:   "Why is my booking not showing up?"
+Document:     "The PNR retrieval endpoint returns 404 when the record
+               locator has expired or when the booking was created in
+               a different office ID context."
+
+Problem: casual language vs. technical documentation.
+The embedding vectors are far apart. The right doc isn't retrieved.
+```
+
+### Failure 2: Relevant but Buried
+
+Retriever doğru dokümanı bulur — ama 8. sıraya koyar. Pipeline'ınız LLM'e sadece ilk 5'i geçirir:
+
+```text
+Rank 1: [0.82] General booking API overview      ← too broad
+Rank 2: [0.81] Flight booking creation guide      ← wrong topic
+...
+Rank 8: [0.72] PNR retrieval troubleshooting      ← THIS IS THE ANSWER
+```
+
+### Failure 3: Answer Spans Multiple Documents
+
+Cevap üç doküman gerektirir. Naive RAG ikisini bulur, üçüncüsünü kaçırır. Cevap eksik — ya da daha kötüsü, yanlış:
+
+```text
+Query: "Can I change my flight after check-in?"
+
+Doc A: "Changes allowed up to 24h before departure."
+Doc B: "Check-in opens 24h before departure."
+Doc C: "Post-check-in changes require cancellation and rebooking."
+
+Naive RAG finds A and B, misses C.
+Answer: "Yes, changes are allowed up to 24h before." — WRONG.
+```
+
+<FlowDiagram title="Three Failure Modes, Three Fixes">
+  <div class="flow-row">
+    <div class="flow-node danger">
+      <span class="node-icon">🔤</span>
+      <span class="node-label">Query Mismatch</span>
+      <span class="node-desc">Casual vs. technical language</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">🔄</span>
+      <span class="node-label">Query Transformation</span>
+      <span class="node-desc">HyDE, Multi-Query</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node danger">
+      <span class="node-icon">📉</span>
+      <span class="node-label">Low Ranking</span>
+      <span class="node-desc">Right doc buried at rank 8</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">🏆</span>
+      <span class="node-label">Re-Ranking</span>
+      <span class="node-desc">Cross-encoder precision</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node danger">
+      <span class="node-icon">🧩</span>
+      <span class="node-label">Missing Context</span>
+      <span class="node-desc">Answer needs multiple docs</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">🤖</span>
+      <span class="node-label">Agentic RAG</span>
+      <span class="node-desc">Agent retrieves iteratively</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<KeyInsight>
+Advanced RAG daha fazla karmaşıklık değil — spesifik, öngörülebilir başarısızlık modlarını düzeltmek. Önce başarısızlığı teşhis edin. Hedefli çözümü uygulayın.
+</KeyInsight>
+
+## Fix 1: Query Transformation
+
+Ham kullanıcı sorgusuyla aramayın. Daha iyi retrieve eden bir şeye dönüştürün.
+
+### HyDE (Hypothetical Document Embeddings)
+
+İşin özü şu: **varsayımsal bir cevap, gerçek cevaba sorunun kendisinden daha benzer.**
+
+<FlowDiagram title="HyDE: Question → Hypothetical Answer → Search">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">User Question</span>
+      <span class="node-desc">"Why is my booking gone?"</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">LLM: Generate Hypo Doc</span>
+      <span class="node-desc">Write a doc-style answer</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Search with Hypo Doc</span>
+      <span class="node-desc">Same vocabulary as real docs</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+```python
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
+# Step 1: Generate a hypothetical answer
+hyde_prompt = ChatPromptTemplate.from_messages([
+    ("system", """Write a short passage that would answer this question.
+Write it as if it comes from official technical documentation.
+It doesn't need to be factually correct — just plausible."""),
+    ("human", "{question}")
+])
+
+hyde_chain = hyde_prompt | llm | StrOutputParser()
+
+question = "Why is my booking not showing up?"
+hypothetical_doc = hyde_chain.invoke({"question": question})
+# "Bookings may not appear in retrieval results when the PNR has expired,
+#  when the office ID context differs, or when the booking is pending
+#  ticketing confirmation."
+```
+
+```python
+# Step 2: Search with the hypothetical doc, not the question
+embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+hyde_embedding = embeddings.embed_query(hypothetical_doc)
+results = vector_store.similarity_search_by_vector(hyde_embedding, k=5)
+```
+
+Neden çalışır: varsayımsal doküman gerçek dokümanlarla **aynı kelime dağarcığını** kullanır. "PNR expired" ifadesi "PNR retrieval returns 404" ile "booking not showing up"a göre çok daha iyi eşleşir.
+
+<PresenterNote>
+**Ekranda:** Colab — [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb)
+**Yapın:** 'HyDE Comparison' hücrelerini çalıştırın. Similarity score'ları yan yana gösterin: direkt soru = 0.65, HyDE = 0.89. Rakamlar argümanı yapar. Ekstra LLM call'ın maliyeti: yaklaşık 1 cent ve 1-2 saniye.
+**Sorun:** "Bu ekstra LLM call'ın maliyeti ne? Değer mi?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — Multi-Query ve Step-Back bölümlerine geçin.
+</PresenterNote>
+
+### Multi-Query
+
+Aynı sorunun birden fazla perspektifini üretip daha geniş bir retrieval ağı atın:
+
+```python
+multi_query_prompt = ChatPromptTemplate.from_messages([
+    ("system", """Generate 3 alternative versions of this question
+that capture different aspects or phrasings. One per line."""),
+    ("human", "{question}")
+])
+
+question = "Why is my booking not showing up?"
+alternatives = (multi_query_prompt | llm | StrOutputParser()).invoke(
+    {"question": question}
+)
+# 1. What causes a PNR to not appear in booking retrieval?
+# 2. Troubleshooting missing reservations in the booking system
+# 3. How to resolve 404 errors when fetching booking records?
+
+# Retrieve for each variant, deduplicate results
+all_results = []
+for q in [question] + alternatives.strip().split("\n"):
+    all_results.extend(retriever.invoke(q))
+
+unique_results = list({doc.page_content: doc for doc in all_results}.values())
+```
+
+### Step-Back Prompting
+
+Önce daha geniş bir soru sorun, o bağlamı spesifik soruyu cevaplamak için kullanın:
+
+```python
+step_back_prompt = ChatPromptTemplate.from_messages([
+    ("system", """Generate a broader question that provides context
+for answering the original. Example:
+Specific: "Why does error 4812 occur?"
+Broader: "What are common errors in Flight Offers Search and their causes?"
+Return only the broader question."""),
+    ("human", "{question}")
+])
+
+broad_question = (step_back_prompt | llm | StrOutputParser()).invoke(
+    {"question": "Why does my PNR expire after 24 hours?"}
+)
+# "What is the PNR lifecycle and what determines expiration policies?"
+
+# Retrieve for both broad and specific, combine
+broad_context = retriever.invoke(broad_question)
+specific_context = retriever.invoke(question)
+combined = broad_context + specific_context
+```
+
+### When to Use Which
+
+| Technique | Best For | Cost | Latency |
+|-----------|----------|------|---------|
+| **HyDE** | Technical docs, vocabulary mismatch | 1 LLM call | +1-2s |
+| **Multi-Query** | Ambiguous or broad questions | 1 LLM call | +1-2s |
+| **Step-Back** | Specific questions needing broader context | 1 LLM call + 2x retrieval | +2-3s |
+
+<Aside type="tip">
+You can combine these. Use Multi-Query to generate variants, then apply HyDE to each. Expensive but powerful for critical applications.
+</Aside>
+
+## Fix 2: Re-Ranking
+
+Retrieval size adayları getirir. Re-ranking **hassasiyet için yeniden sıralar.**
+
+Pattern: hızlı bi-encoder ile geniş retrieve, sonra yavaş cross-encoder ile hassas re-rank.
+
+<FlowDiagram title="Two-Stage Retrieval + Re-Ranking">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">⚡</span>
+      <span class="node-label">Stage 1: Bi-Encoder</span>
+      <span class="node-desc">Fast. Top 20 candidates. ~1ms</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🎯</span>
+      <span class="node-label">Stage 2: Cross-Encoder</span>
+      <span class="node-desc">Precise. Top 5 from 20. ~1s</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Final Top 5</span>
+      <span class="node-desc">Best docs, correctly ranked</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+Fark: bi-encoder'lar sorgu ve dokümanı **ayrı ayrı** embed eder (hızlı ama yaklaşık). Cross-encoder'lar sorgu ve dokümanı **birlikte** işler (yavaş ama hassas — iki taraftaki her kelimenin etkileşimini görür).
+
+### With Cohere Reranker
+
+```python
+from langchain_cohere import CohereRerank
+from langchain.retrievers import ContextualCompressionRetriever
+
+# Retrieve 20 candidates broadly
+base_retriever = vector_store.as_retriever(search_kwargs={"k": 20})
+
+# Re-rank to top 5 precisely
+reranker = CohereRerank(model="rerank-english-v3.0", top_n=5)
+
+reranking_retriever = ContextualCompressionRetriever(
+    base_compressor=reranker,
+    base_retriever=base_retriever
+)
+
+results = reranking_retriever.invoke("How to handle expired PNRs?")
+```
+
+### Open-Source Alternative
+
+```python
+from sentence_transformers import CrossEncoder
+
+cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+
+# Score each candidate against the query
+candidates = vector_store.similarity_search("expired PNR handling", k=20)
+pairs = [("How to handle expired PNRs?", doc.page_content) for doc in candidates]
+scores = cross_encoder.predict(pairs)
+
+# Sort by cross-encoder score
+ranked = sorted(zip(scores, candidates), key=lambda x: x[0], reverse=True)
+top_5 = [doc for _, doc in ranked[:5]]
+```
+
+<Aside type="note">
+Re-ranking typically improves answer quality by **10-25%** on standard benchmarks. It's one of the highest-ROI improvements you can add — and it takes about 10 lines of code.
+</Aside>
+
+## Fix 3: Agentic RAG (Conceptually)
+
+RAG ile Part 1'deki Agent eğitiminin buluşma noktası. Naive RAG'da retrieval **her zaman ve tam olarak bir kez** olur. Agentic RAG bir agent'ın karar vermesini sağlar:
+
+- Retrieve **edilmeli mi**? (belki cevap zaten biliniyor — selamlama, matematik, genel bilgi)
+- **Ne** aranmalı? (şu ana kadar bulunanlara göre sorguyu yeniden formüle et)
+- **Tekrar aranmalı mı**? (ilk retrieval yeterli değilse, max 3 iterasyon)
+
+<FlowDiagram title="Naive RAG vs Agentic RAG">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📋</span>
+      <span class="node-label">Naive RAG</span>
+      <span class="node-desc">Always retrieve once → generate</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 1rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Question</span>
+      <span class="node-desc">User asks</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">Agent Decides</span>
+      <span class="node-desc">Need to search?</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Retrieve</span>
+      <span class="node-desc">Search knowledge base</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">🔄</span>
+      <span class="node-label">Evaluate</span>
+      <span class="node-desc">Enough info? Loop if not</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow animated" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">↩ reformulate + retrieve again (max 3 loops)</div>
+  </div>
+</FlowDiagram>
+
+### The pattern in 10 lines of pseudocode
+
+```text
+def agentic_rag(question):
+    # 1. Should we even search?
+    if not agent.needs_retrieval(question):
+        return llm.answer(question)              # direct answer
+
+    # 2. Iterative search until we have enough context
+    context = []
+    for attempt in range(MAX_ITERATIONS=3):
+        results = retriever.search(question)
+        context.extend(results)
+        if agent.is_context_sufficient(question, context):
+            break
+        question = agent.reformulate(question, context)
+
+    # 3. Generate the grounded answer
+    return llm.answer(question, context)
+```
+
+That's the entire idea. Three decisions, all made by an LLM acting as a router: "search?", "enough?", "rephrase?". The full LangGraph implementation (≈60 lines of Python) lives in the DeepDive at the bottom of this module — too dense for a live workshop, ideal for self-study afterwards.
+
+<KeyInsight>
+**Don't memorize the Agentic RAG code today.** Memorize the **decision points**: should I search, is it enough, should I reformulate. When you need to build it for real, the LangGraph patterns from the Agent Development course will feel familiar — it's the same state + conditional routing you saw there.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Colab — [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb)
+**Yapın:** 'Re-ranking' hücrelerini çalıştırarak before/after karşılaştırmasını gösterin. Sonra 3 farklı sorgu deneyin: "Merhaba" (retrieve etmemeli), "Flight API auth nasıl?" (bir kez retrieve), "Tüm API'lerin auth yöntemlerini karşılaştır" (birden fazla retrieve).
+**Sorun:** "Agent her sorguda retrieve yapmalı mı? Neden olmasın?"
+**Sonra:** Notebook'ta DURUN. Site'a dönün — Hands-On Exercises bölümüne geçin.
+</PresenterNote>
+
+## Exercises
+
+<ColabLink title="Exercise 4.1: HyDE, Re-Ranking & Advanced Techniques" notebook="/notebooks/rag/4.1-advanced-techniques.ipynb" level="Basic" />
+
+<PresenterNote>
+**Ekranda:** Colab — [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb) ve [4.1-advanced-techniques.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/rag/4.1-advanced-techniques.ipynb)
+**Yapın:** Notebook'ları gösterin ve egzersiz bölümlerini işaret edin. İlk HyDE'ı bitirenlerin re-ranking'e geçmesini söyleyin. Challenge notebook'unu erken bitirenler için gösterin.
+**Sorun:** "Hangi teknik kendi use case'iniz için en faydalı olur?"
+**Sonra:** Katılımcılara: Şimdi siz deneyin — notebook'un sonundaki YOUR TURN bölümlerini yapın. 10-15 dakika süre.
+</PresenterNote>
+
+<DeepDive title="Advanced: Agentic RAG — Full LangGraph Implementation">
+
+The conceptual pseudocode above expands into this LangGraph implementation. Read it after the workshop — it's the same conditional-routing pattern you saw in the Agent Development course's LangGraph module, just applied to retrieval decisions.
+
+```python
+from langgraph.graph import StateGraph, END
+from typing import TypedDict
+from langchain_groq import ChatGroq
+from langchain_core.messages import HumanMessage, SystemMessage
+
+class AgentState(TypedDict):
+    question: str
+    context: list[str]
+    answer: str
+    needs_retrieval: bool
+    retrieval_count: int
+
+llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+
+def should_retrieve(state: AgentState) -> AgentState:
+    """Agent decides if retrieval is needed."""
+    response = llm.invoke([
+        SystemMessage(content="""Decide if you need to search a knowledge base.
+Reply YES or NO only.
+NO for: greetings, general knowledge, math.
+YES for: specific product questions, policy lookups, technical details."""),
+        HumanMessage(content=state["question"])
+    ])
+    state["needs_retrieval"] = "YES" in response.content.upper()
+    return state
+
+def retrieve(state: AgentState) -> AgentState:
+    """Retrieve relevant documents."""
+    results = retriever.invoke(state["question"])
+    state["context"] = [doc.page_content for doc in results]
+    state["retrieval_count"] = state.get("retrieval_count", 0) + 1
+    return state
+
+def evaluate_context(state: AgentState) -> str:
+    """Is the context sufficient?"""
+    if state["retrieval_count"] >= 3:
+        return "generate"  # prevent infinite loops
+
+    response = llm.invoke([
+        SystemMessage(content="Does this context answer the question? YES or NO."),
+        HumanMessage(content=f"Q: {state['question']}\nContext: {state['context']}")
+    ])
+    return "generate" if "YES" in response.content.upper() else "retrieve_more"
+
+def retrieve_more(state: AgentState) -> AgentState:
+    """Reformulate and retrieve again."""
+    response = llm.invoke([
+        SystemMessage(content="Reformulate the question to find missing details."),
+        HumanMessage(content=f"Original: {state['question']}\nFound: {state['context']}")
+    ])
+    state["question"] = response.content
+    return retrieve(state)
+
+def generate(state: AgentState) -> AgentState:
+    """Generate final answer."""
+    context = "\n\n".join(state["context"]) if state["context"] else "No context."
+    response = llm.invoke([
+        SystemMessage(content=f"Answer from context. Cite sources.\n\n{context}"),
+        HumanMessage(content=state["question"])
+    ])
+    state["answer"] = response.content
+    return state
+
+# Build the graph
+def route_retrieval(state: AgentState) -> str:
+    return "retrieve" if state["needs_retrieval"] else "direct_answer"
+
+graph = StateGraph(AgentState)
+graph.add_node("should_retrieve", should_retrieve)
+graph.add_node("retrieve", retrieve)
+graph.add_node("evaluate", lambda s: s)
+graph.add_node("retrieve_more", retrieve_more)
+graph.add_node("generate", generate)
+graph.add_node("direct_answer", lambda s: {**s, "answer": llm.invoke(
+    [HumanMessage(content=s["question"])]).content})
+
+graph.set_entry_point("should_retrieve")
+graph.add_conditional_edges("should_retrieve", route_retrieval)
+graph.add_edge("retrieve", "evaluate")
+graph.add_conditional_edges("evaluate", evaluate_context, {
+    "generate": "generate",
+    "retrieve_more": "retrieve_more"
+})
+graph.add_edge("retrieve_more", "evaluate")
+graph.add_edge("generate", END)
+graph.add_edge("direct_answer", END)
+
+agent = graph.compile()
+
+# Use it
+result = agent.invoke({
+    "question": "What authentication method does the Flight API use?",
+    "context": [],
+    "answer": "",
+    "needs_retrieval": False,
+    "retrieval_count": 0
+})
+
+print(f"Retrieved: {result['retrieval_count']} time(s)")
+print(f"Answer: {result['answer']}")
+```
+
+The interesting design choices are:
+
+1. **`should_retrieve` is a standalone node** — not every query needs the database. Greetings, math, and general knowledge are handled by the LLM directly.
+2. **`evaluate_context` is a routing function**, not a regular node — it returns a string ("generate" or "retrieve_more") that drives the conditional edge.
+3. **`retrieval_count` is a hard safety bound** — without it, the agent could loop forever on a query whose answer simply isn't in the knowledge base.
+
+</DeepDive>
+
+<DeepDive title="RAPTOR, GraphRAG, and Multi-Modal RAG">
+
+### RAPTOR (Recursive Abstractive Processing for Tree-Organized Retrieval)
+
+Builds a tree of summaries over document chunks. Level 0 is your chunks. Level 1 is summaries of chunk clusters. Level 2 is summaries of summaries. At query time, the retriever matches against both summaries (broad questions) and leaf chunks (specific questions).
+
+### GraphRAG (Microsoft Research)
+
+Instead of flat retrieval, builds a **knowledge graph** from documents — entities, relationships, community structure. Excels at global questions: "What are the main themes across all incident reports?" where individual chunk retrieval misses the big picture.
+
+### Multi-Modal RAG
+
+RAG beyond text — embed and retrieve images, tables, diagrams. Using models like CLIP, you can search for architecture diagrams with natural language queries.
+
+These represent the cutting edge. Most production systems don't need them yet — but knowing they exist helps you recognize when you do.
+
+</DeepDive>
+
+## Özet
+
+Üç şey:
+
+1. **Düzeltmeden önce teşhis edin.** Naive RAG üç öngörülebilir şekilde başarısız olur: sorgu uyumsuzluğu, düşük sıralama, eksik bağlam. Her birinin spesifik, hedefli çözümü var.
+
+2. **HyDE ve re-ranking en yüksek ROI.** Bir ekstra LLM call (HyDE) veya 10 satır kod (re-ranking) retrieval'ı %10-25 iyileştirebilir. Süslü şeylerden önce bunları yapın.
+
+3. **Agentic RAG Part 1 ile 2'yi birleştirir.** Ne zaman, ne ve kaç kez retrieve edeceğine karar veren bir agent. Agent eğitimi ile RAG eğitiminin kesişim noktası.
+
+## Next Up
+
+RAG'ınız çalışıyor. İleri teknikler edge case'leri hallediyor. Şimdi: iyi çalışıp çalışmadığını nasıl bileceksiniz? Nasıl ölçecek, izleyecek, ölçeklendirecek ve production'da işleteceksiniz? **Module 11: Production RAG.**

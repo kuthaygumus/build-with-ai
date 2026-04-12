@@ -1,18 +1,18 @@
 ---
 title: AI Eğitim Serisi
-description: Agent Geliştirme ve RAG üzerine iki bölümlük uygulamalı eğitim. Gerçek sistemler geliştirin, sunum dosyaları değil.
+description: Dört günlük uygulamalı eğitim. "LLM nedir?" sorusundan otonom, bilgiyle güçlendirilmiş agent'lar geliştirmeye.
 template: splash
 hero:
   title: |
     Gerçekten Çalışan
     AI Sistemleri Geliştirin
-  tagline: Mühendisler için uygulamalı eğitim serisi. Slayt yok. Teori yığını yok. İlk dakikadan itibaren kod yazıyorsunuz.
+  tagline: Mühendisler için uygulamalı eğitim serisi. İlk dakikadan itibaren kod yazıyorsunuz. Elinizde çalışan sistemlerle ayrılıyorsunuz.
   actions:
-    - text: Agent'larla Başlayın
-      link: /tr/agent-development/01-why-agents/
+    - text: Oturum 1'e Başla
+      link: /tr/session-1/01-what-is-llm/
       icon: right-arrow
-    - text: RAG'a Geçin
-      link: /tr/rag/01-knowledge-problem/
+    - text: Oturum 2'ye Geç
+      link: /tr/session-2/07-knowledge-problem/
       variant: minimal
 ---
 
@@ -20,128 +20,128 @@ import { Card, CardGrid, Steps, Aside } from '@astrojs/starlight/components';
 
 ## Bu Eğitim Ne?
 
-Bu, sıfırdan gerçek AI sistemleri geliştireceğiniz **iki bölümlük bir eğitim serisi**. Ders değil. İzleyeceğiniz bir demo değil. Kod yazacak, bir şeyleri bozacak, düzeltecek ve sonunda nasıl çalıştığını anladığınız çalışan sistemlerle ayrılacaksınız.
+Sıfırdan gerçek AI sistemleri geliştireceğiniz **dört günlük bir eğitim serisi**. Ders değil. İzleyeceğiniz bir demo değil. Kod yazacak, bir şeyleri bozacak, düzeltecek ve sonunda nasıl çalıştığını anladığınız çalışan sistemlerle ayrılacaksınız.
 
 <CardGrid>
-  <Card title="Bölüm 1: Agent Geliştirme" icon="rocket">
-    **Süre: 2 Gün**
+  <Card title="Oturum 1: LLM'den Agent'a" icon="rocket">
+    **Gün 1-2**
 
-    Akıl yürüten, karar veren, araçları çağıran ve insan müdahalesi olmadan görevleri tamamlayan otonom bir agent geliştireceksiniz.
+    "LLM nedir?" sorusuyla başlayıp, karar veren, araçları çağıran ve hataları yöneten production-ready bir agent'a ulaşacaksınız.
 
-    Sonunda: MCP araç entegrasyonu, koşullu mantık ve insan onay mekanizması içeren çalışan bir çok adımlı agent.
+    Sonunda: MCP araç entegrasyonu, koşullu mantık ve güvenlik bariyerleri içeren çalışan bir LangGraph agent.
   </Card>
-  <Card title="Bölüm 2: RAG" icon="open-book">
-    **Süre: 2 Gün**
+  <Card title="Oturum 2: Bilgiyle Güçlendirilmiş Agent'lar" icon="open-book">
+    **Gün 3-4**
 
-    Kendi dokümanlarınızdan soruları doğru şekilde, kaynak göstererek ve prodüksiyon kalitesinde yanıtlayan bir sistem geliştireceksiniz.
+    Agent'ınıza bilgi verin. RAG pipeline kurun, gelişmiş retrieval tekniklerinde ustalaşın ve her şeyi **Agentic RAG** ile birleştirin.
 
-    Sonunda: Gelişmiş retrieval, re-ranking, değerlendirme metrikleri ve önbellekleme katmanı içeren bir RAG pipeline.
+    Sonunda: Ne zaman arayacağına kendisi karar veren, yeterliliği değerlendiren ve dokümanlarınızdan kaynaklı cevaplar üreten otonom bir agent.
   </Card>
 </CardGrid>
 
 ## Kimler İçin?
 
-Siz bir yazılımcısınız. Belki ChatGPT kullanmışsınızdır. Belki AI'a hiç dokunmamışsınızdır. Fark etmez. Her şey sıfırdan anlatılıyor, ama hızlı ilerliyoruz ve derinlere dalıyoruz.
+Geliştiriciyseniz yeterli. ChatGPT kullanmış olabilirsiniz, hiç AI'a dokunmamış olabilirsiniz. Fark etmez. Her kavram sıfırdan açıklanıyor ama hızlı ilerliyoruz ve derine iniyoruz.
 
-- **AI'da yeni misiniz?** Ana yolu takip edin. Her kavram gerçek kodla sıfırdan anlatılır.
-- **Zaten aşina mısınız?** **Derinlemesine** bölümlerine ve **Challenge** alıştırmalarına göz atın.
-- **Senior/Architect mısınız?** Prodüksiyon kalıpları, güvenlik değerlendirmeleri ve mimari kararlar en çok fayda sağlayacağınız yerler.
+- **AI'da yeniyseniz?** Ana yolu takip edin. Her kavram "Bu ne?" ve "Buna neden ihtiyacım var?" ile başlıyor.
+- **Zaten biliyorsanız?** **Deep Dive** bölümlerine ve **Challenge** alıştırmalarına bakın.
+- **Senior/Mimarsanız?** Production pattern'ları, güvenlik düşünceleri ve mimari kararlar en çok değer bulacağınız yerler.
 
-## Nasıl İşliyor?
+## Nasıl Çalışıyor?
 
-Her bölüm 2 gün sürer. İşte ritim:
+Her modül aynı ritmi izliyor:
 
 <Steps>
-1. **Çalıştığını görün** — Her modül, bitmiş ürünün çalışan haliyle başlar. Tek satır yazmadan önce sonucu görürsünüz.
+1. **Problemi hisset** — Neyin çalışmadığını gör. Sınırlılığı bizzat yaşa.
 
-2. **Nedenini anlayın** — Kısa, odaklı açıklama. Dolgu yok. Kendiniz yapabilmeniz için tam olarak ihtiyacınız olanı anlatıyoruz.
+2. **Nedenini anla** — Kısa, odaklı açıklama. Bu teknoloji neden var. Hangi problemi çözüyor.
 
-3. **Kendiniz geliştirin** — Colab notebook'unu açın, kodu çalıştırın, değiştirin, bozun, anlayın. Öğrenme aslında burada gerçekleşir.
+3. **Çözümü kur** — Colab notebook'unu aç, kodu yaz, çalıştığını gör.
 
-4. **Daha ileri gidin** — Daha derine inmek isteyenler için Challenge alıştırmaları. Yönlendirme yok — sadece bir hedef ve birkaç ipucu.
+4. **Daha ileri git** — Derine inmek isteyenler için challenge alıştırmaları.
 </Steps>
 
 ### Araçlar
 
 | Araç | Ne Yapar | Neden |
-|------|---------|------|
-| **Bu site** | Teori, diyagramlar, mimari, referans | Eğitim sırasında gezinin, sonra tekrar bakın |
-| **Google Colab** | Tarayıcınızda Python kodu çalıştırın | Sıfır kurulum. Bir bağlantıya tıklayın, kodlamaya başlayın |
+|------|----------|-------|
+| **Bu site** | Teori, diyagramlar, mimari, referans | Eğitim sırasında navigasyon, sonra tekrar |
+| **Google Colab** | Tarayıcıda Python kodu çalıştır | Sıfır kurulum. Link'e tıkla, kodlamaya başla |
 
 <Aside type="tip">
-Bilgisayarınıza hiçbir şey kurmanıza gerek yok. Her alıştırma Google Colab'da çalışır — sadece bir tarayıcı ve bir Google hesabı yeterli.
+Makinenize hiçbir şey kurmanız gerekmiyor. Tüm alıştırmalar Google Colab'da çalışıyor — sadece tarayıcı ve Google hesabı yeterli.
 </Aside>
 
-## Ne Geliştireceksiniz?
+## Ne İnşa Edeceksiniz?
 
-### Bölüm 1: Agent'lar
+### Oturum 1: LLM'den Agent'a (Gün 1-2)
 
-| Gün | Başlangıç Noktanız | Bitiş Noktanız |
-|-----|-------------------|----------------|
-| **1. Gün** | "Agent nedir?" | Bellek ve yapılandırılmış çıktı içeren çalışan bir LangChain pipeline |
-| **2. Gün** | Doğrusal çalışan bir chain | Koşullu yönlendirme, araç kullanımı ve insan onayı içeren bir LangGraph agent |
+| Gün | Başlangıç | Sonuç |
+|-----|-----------|-------|
+| **Gün 1** | "LLM nedir?" | Memory ve MCP araç entegrasyonlu chain'ler |
+| **Gün 2** | Doğrusal çalışan chain | Koşullu yönlendirme ve production bariyerli LangGraph agent |
 
-### Bölüm 2: RAG
+### Oturum 2: Bilgiyle Güçlendirilmiş Agent'lar (Gün 3-4)
 
-| Gün | Başlangıç Noktanız | Bitiş Noktanız |
-|-----|-------------------|----------------|
-| **1. Gün** | "Embedding nedir?" | Tam bir RAG pipeline: PDF girer, doğru yanıtlar çıkar, kaynaklarıyla birlikte |
-| **2. Gün** | Bazen hata yapan basit bir pipeline | HyDE, re-ranking ve değerlendirme metrikleriyle prodüksiyon kalitesinde RAG |
+| Gün | Başlangıç | Sonuç |
+|-----|-----------|-------|
+| **Gün 3** | "Agent'ım şirket verisinde hallucinate ediyor" | Tam RAG pipeline: doküman girer, kaynaklı cevap çıkar |
+| **Gün 4** | Bazen başarısız olan naive pipeline | **Agentic RAG** — gelişmiş retrieval ve değerlendirmeli otonom agent |
 
-## Hikayenin Bütünü
+## Hikaye Yayı
 
-Bunlar iki ayrı atölye değil. Tek bir hikaye:
+Bu iki ayrı workshop değil. Tek bir anlatı ipliği olan tek bir hikaye:
 
 <CardGrid>
-  <Card title="Bölüm 1: AI ne yapabilir?" icon="rocket">
-    Otonom olarak **düşünen ve harekete geçen** agent'lar geliştirin. Sonunda: "Bu çok güçlü, ama sadece eğitildiği şeyleri biliyor."
+  <Card title="Oturum 1: AI ne yapabilir?" icon="rocket">
+    Otonom olarak **düşünen ve hareket eden** agent'lar geliştirin. Sonunda: "Bu güçlü, ama sadece eğitim verisini biliyor."
   </Card>
-  <Card title="Bölüm 2: AI ne bilebilir?" icon="open-book">
-    Agent'lara **sizin verilerinize** erişim verin. Sonunda: İkisini birleştirip **Agentic RAG** oluşturun — ne zaman arama yapacağına, neyi arayacağına karar veren ve kaynaklı yanıtlar üreten bir agent.
+  <Card title="Oturum 2: AI ne bilebilir?" icon="open-book">
+    Agent'lara **sizin verinize** erişim verin. Sonunda: **Agentic RAG** — ne zaman arayacağına karar veren, dokümanlarınızı bulan ve kaynaklı cevaplar üreten agent.
   </Card>
 </CardGrid>
 
 ## Başlamadan Önce
 
 İhtiyacınız olan:
-- Bir Google hesabı (Colab notebook'ları için)
-- **Ücretsiz** Groq API anahtarı (aşağıdaki kuruluma bakın)
-- Temel Python bilgisi (değişkenler, fonksiyonlar, döngüler — bu kadar)
+- Google hesabı (Colab notebook'ları için)
+- **Ücretsiz** Groq API anahtarı (aşağıya bakın)
+- Temel Python bilgisi (değişkenler, fonksiyonlar, döngüler — o kadar)
 
 İhtiyacınız olmayan:
 - AI/ML deneyimi
-- GPU erişimi veya ücretli API abonelikleri
-- Yerel Python kurulumu
-- LangChain, embedding veya vektör veritabanları hakkında ön bilgi
+- GPU erişimi veya ücretli API aboneliği
+- Lokal Python kurulumu
+- LangChain, embedding veya vektör veritabanı ön bilgisi
 
 ### API Anahtarı Kurulumu (2 dakika, ücretsiz)
 
-Tüm alıştırmalar LLM çağrıları için **Groq** kullanır — tamamen ücretsiz, kredi kartı gerekmez. Embedding'ler Colab'da lokal çalışır, API anahtarı bile gerekmez.
+Tüm alıştırmalar LLM çağrıları için **Groq** kullanıyor — tamamen ücretsiz, kredi kartı gerektirmez. Embedding'ler Colab'da lokal olarak çalışır, API anahtarı gerekmez.
 
 <Steps>
 1. [console.groq.com/keys](https://console.groq.com/keys) adresine gidin
-2. Bir hesap oluşturun (Google veya email ile)
-3. **"Create API Key"** butonuna tıklayın
+2. Hesap oluşturun (Google veya email)
+3. **"Create API Key"** tıklayın
 4. Anahtarı kopyalayın — her notebook'un ilk hücresine yapıştıracaksınız
 </Steps>
 
 <Aside type="tip">
-Groq'un ücretsiz planı, Llama 3.3 70B modeli ile dakikada 30 istek sağlar. Eğitimdeki tüm alıştırmalar için fazlasıyla yeterli.
+Groq'un ücretsiz katmanı dakikada 30 istek ve Llama 3.3 70B modeli sunuyor — güçlü bir açık kaynak model. Tüm alıştırmalar için fazlasıyla yeterli.
 </Aside>
 
-## Hızlı Bağlantılar
+## Hızlı Linkler
 
 <CardGrid>
-  <Card title="Agent Geliştirme — 1. Gün" icon="right-arrow">
-    [Neden Agent?](/tr/agent-development/01-why-agents/) | [MCP](/tr/agent-development/02-mcp/) | [LangChain](/tr/agent-development/03-langchain/)
+  <Card title="Oturum 1 — Gün 1" icon="right-arrow">
+    [LLM Nedir?](/tr/session-1/01-what-is-llm/) | [Limitler](/tr/session-1/02-limits-of-llm/) | [MCP](/tr/session-1/03-mcp/) | [LangChain](/tr/session-1/04-langchain/)
   </Card>
-  <Card title="Agent Geliştirme — 2. Gün" icon="right-arrow">
-    [LangGraph](/tr/agent-development/04-langgraph/) | [Entegrasyon](/tr/agent-development/05-integration/)
+  <Card title="Oturum 1 — Gün 2" icon="right-arrow">
+    [LangGraph](/tr/session-1/05-langgraph/) | [Production Agent](/tr/session-1/06-production-agent/)
   </Card>
-  <Card title="RAG — 1. Gün" icon="right-arrow">
-    [Bilgi Problemi](/tr/rag/01-knowledge-problem/) | [Embedding'ler](/tr/rag/02-embeddings/) | [Pipeline](/tr/rag/03-rag-pipeline/)
+  <Card title="Oturum 2 — Gün 3" icon="right-arrow">
+    [Bilgi Problemi](/tr/session-2/07-knowledge-problem/) | [Embedding'ler](/tr/session-2/08-embeddings/) | [RAG Pipeline](/tr/session-2/09-rag-pipeline/)
   </Card>
-  <Card title="RAG — 2. Gün" icon="right-arrow">
-    [Gelişmiş RAG](/tr/rag/04-advanced-rag/) | [Prodüksiyon](/tr/rag/05-production-rag/)
+  <Card title="Oturum 2 — Gün 4" icon="right-arrow">
+    [İleri RAG](/tr/session-2/10-advanced-rag/) | [Production RAG](/tr/session-2/11-production-rag/) | [Agentic RAG](/tr/session-2/12-agentic-rag/)
   </Card>
 </CardGrid>

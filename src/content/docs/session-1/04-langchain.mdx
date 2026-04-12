@@ -1,0 +1,413 @@
+---
+title: "Module 4: LangChain — Why a Framework?"
+description: "Feel the pain of raw API calls, then discover why LangChain exists — composable chains, memory management, and the LCEL pipe operator."
+---
+
+import DeepDive from '../../../components/DeepDive.astro';
+import ColabLink from '../../../components/ColabLink.astro';
+import ModuleHeader from '../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../components/PresenterNote.astro';
+import KeyInsight from '../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="70 min" day={1} goal="Understand when you need a framework (and when you don't), then build composable chains with memory using LangChain and LCEL." />
+
+## Do You Even Need a Framework?
+
+Before we teach LangChain, let's ask the honest question: **do you need it?**
+
+<Tabs>
+  <TabItem label="Skip LangChain When">
+    - You're making **simple API calls** to one model
+    - You want **full control** over every HTTP request
+    - You're building a **throwaway prototype**
+    - The abstraction adds more complexity than it removes
+
+    ```python
+    # Sometimes this is all you need:
+    import requests
+    
+    response = requests.post(url, json={
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "user", "content": "What is IATA code for CDG?"}],
+        "temperature": 0
+    })
+    print(response.json()["choices"][0]["message"]["content"])
+    ```
+  </TabItem>
+  <TabItem label="Use LangChain When">
+    - You need **multi-step workflows** with reusable components
+    - You want to **swap models** without changing application logic
+    - You need **memory** and conversation management
+    - You want **streaming, retries, and tracing** for free
+    - Multiple people work on LLM features
+    - Your app will grow in complexity
+
+    LangChain's value scales with complexity. Simple today, complex tomorrow? Start with the framework.
+  </TabItem>
+</Tabs>
+
+Now let's make this concrete. We'll build the same thing both ways — raw API and LangChain — so you can **feel** the difference.
+
+<PresenterNote>
+**Ekranda:** Site (iki tab)
+
+**Yapın:** "Dürüst olalım — her LLM uygulaması framework gerektirmez. Bazen `requests.post` yeter. Ama ne zaman yetmez? Bunu hissetmek için aynı şeyi iki şekilde yapacağız."
+
+**Sorun:** "Kaçınız Django veya Express kullandınız? Framework neden var?" Cevap: boilerplate'i framework halleder, siz mantığa odaklanırsınız.
+</PresenterNote>
+
+## The Pain: Building Without a Framework
+
+A 3-step workflow with raw API calls: (1) analyze a flight disruption, (2) classify severity, (3) generate a passenger SMS.
+
+```python
+import requests, json
+
+API_URL = "https://api.groq.com/openai/v1/chat/completions"
+HEADERS = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+
+# Step 1: Analyze the disruption
+analysis_response = requests.post(API_URL, headers=HEADERS, json={
+    "model": "llama-3.3-70b-versatile",
+    "temperature": 0,
+    "messages": [
+        {"role": "system", "content": "You are an airline operations analyst. Be concise."},
+        {"role": "user", "content": f"""Analyze this flight disruption:
+Flight: AF1234, Route: CDG → NRT, Delay: 180 min, Passengers: 287
+Provide: severity (minor/moderate/severe), impact summary, top 3 actions."""}
+    ]
+})
+analysis = analysis_response.json()["choices"][0]["message"]["content"]
+
+# Step 2: Classify severity from analysis
+classify_response = requests.post(API_URL, headers=HEADERS, json={
+    "model": "llama-3.3-70b-versatile",
+    "temperature": 0,
+    "messages": [
+        {"role": "system", "content": "Extract the severity. Reply with ONLY: minor, moderate, or severe."},
+        {"role": "user", "content": analysis}
+    ]
+})
+severity = classify_response.json()["choices"][0]["message"]["content"].strip().lower()
+
+# Step 3: Generate passenger SMS based on severity
+sms_response = requests.post(API_URL, headers=HEADERS, json={
+    "model": "llama-3.3-70b-versatile",
+    "temperature": 0.3,
+    "messages": [
+        {"role": "system", "content": "Write empathetic, professional airline SMS messages. Under 160 chars."},
+        {"role": "user", "content": f"Severity: {severity}. Analysis: {analysis}. Write SMS for passengers."}
+    ]
+})
+sms = sms_response.json()["choices"][0]["message"]["content"]
+```
+
+It works. But look at the cost:
+- **3 copies** of the same HTTP setup (URL, headers, JSON structure)
+- **No streaming** — each call blocks until complete
+- **No retry** — if the API fails, you crash
+- **No tracing** — if the output is wrong, where did it go wrong?
+- **Manual message management** — you're building message arrays by hand
+- Want to swap models? **Change every call.**
+
+Now let's see the same thing with LangChain.
+
+<PresenterNote>
+**Ekranda:** Site (kod bloğu)
+
+**Yapın:** Kodu gösterin. "3 adım, 3 ayrı requests.post, her birinde aynı boilerplate. Çalışıyor. Ama model değiştirmek istesem? 3 yerde değiştirmem lazım. Retry? Yok. Streaming? Yok. Tracing? Yok."
+
+**Sonra:** "Şimdi aynı şeyi LangChain ile yapalım."
+</PresenterNote>
+
+## The Solution: Same Workflow, with LangChain
+
+```python
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+model = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+parser = StrOutputParser()
+
+# Step 1: Analyze
+analysis_chain = ChatPromptTemplate.from_messages([
+    ("system", "You are an airline operations analyst. Be concise."),
+    ("human", "Analyze: Flight {flight}, Route: {route}, Delay: {delay} min, PAX: {pax}")
+]) | model | parser
+
+# Step 2: Classify
+classify_chain = ChatPromptTemplate.from_messages([
+    ("system", "Extract severity. Reply ONLY: minor, moderate, or severe."),
+    ("human", "{analysis}")
+]) | model | parser
+
+# Step 3: SMS
+sms_chain = ChatPromptTemplate.from_messages([
+    ("system", "Write empathetic airline SMS. Under 160 chars."),
+    ("human", "Severity: {severity}. Analysis: {analysis}. Write SMS.")
+]) | ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3) | parser
+
+# Run it
+analysis = analysis_chain.invoke({"flight": "AF1234", "route": "CDG→NRT", "delay": 180, "pax": 287})
+severity = classify_chain.invoke({"analysis": analysis})
+sms = sms_chain.invoke({"severity": severity, "analysis": analysis})
+```
+
+Same three steps. But now:
+- **One model instance**, change once to swap providers
+- **Pipe operator** (`|`) composes prompt → model → parser
+- Free **streaming** with `chain.stream()`, **async** with `chain.ainvoke()`, **retry** with `chain.with_retry()`
+- Automatic **tracing** in LangSmith
+
+<KeyInsight>
+LangChain's value isn't in any single feature. It's in the compound effect: swap models with one line, get streaming/retry/tracing for free, and compose reusable building blocks with the pipe operator. The framework earns its keep as complexity grows.
+</KeyInsight>
+
+## Core Building Blocks
+
+### Chat Models — Unified Interface
+
+Same API across providers. Swap Claude for GPT for local model — zero code changes.
+
+```python
+from langchain_groq import ChatGroq
+from langchain_anthropic import ChatAnthropic
+
+# Same interface, different brain
+groq = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+claude = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
+
+# This works identically with either
+response = groq.invoke("What is IATA code for Tokyo Narita?")
+print(response.content)  # "NRT"
+```
+
+### Prompt Templates — Parameterized Prompts
+
+Like parameterized SQL — never hardcode, always template.
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are an airline operations analyst."),
+    ("human", "Analyze disruption: Flight {flight}, Delay: {delay} min")
+])
+
+# Variables filled at runtime
+formatted = prompt.invoke({"flight": "AF1234", "delay": 180})
+```
+
+### Output Parsers — Structured Data from Text
+
+LLMs return text. Your application needs structured data.
+
+```python
+from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
+
+# Simple: extract text
+parser = StrOutputParser()
+
+# Structured: parse into Pydantic model
+from pydantic import BaseModel, Field
+
+class FlightAnalysis(BaseModel):
+    severity: str = Field(description="minor, moderate, severe, or critical")
+    actions: list[str] = Field(description="Recommended actions")
+    cost_eur: float = Field(description="Estimated cost impact")
+```
+
+<Aside type="tip">
+Modern LangChain supports `model.with_structured_output(FlightAnalysis)` — uses native tool calling under the hood. More reliable than asking the LLM to output JSON.
+</Aside>
+
+<PresenterNote>
+**Ekranda:** Colab — [3.1-first-chain.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.1-first-chain.ipynb)
+
+**Yapın:** Setup çalıştırın. İlk chain'i (`prompt | model | parser`) çalıştırın. Prompt'taki system message'ı canlı değiştirerek output farkını gösterin.
+
+**Sorun:** "System mesajını değiştirmek agent'ı nasıl değiştirdi? Tek cümle."
+</PresenterNote>
+
+## LCEL: The Pipe Operator
+
+**LangChain Expression Language** composes building blocks into chains. Same concept as Unix pipes:
+
+```bash
+# Unix: data flows left to right
+cat log.txt | grep ERROR | wc -l
+```
+
+```python
+# LCEL: same concept
+chain = prompt | model | parser
+```
+
+<FlowDiagram title="LCEL: Data Flows Left to Right">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📝</span>
+      <span class="node-label">Prompt</span>
+      <span class="node-desc">Template + variables → messages</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">Model</span>
+      <span class="node-desc">Messages → AIMessage</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📊</span>
+      <span class="node-label">Parser</span>
+      <span class="node-desc">AIMessage → structured data</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+Every LCEL chain automatically gets:
+
+| Feature | What You Get |
+|---|---|
+| **Streaming** | `chain.stream(input)` — tokens flow through |
+| **Async** | `await chain.ainvoke(input)` — non-blocking |
+| **Batching** | `chain.batch([input1, input2])` — parallel |
+| **Retries** | `chain.with_retry(stop_after_attempt=3)` |
+| **Fallbacks** | `chain.with_fallback(backup_chain)` |
+| **Tracing** | Every step traced in LangSmith |
+
+You write `prompt | model | parser`. You get all of the above. That's the framework earning its keep.
+
+## Memory: Solving Limit 2
+
+Remember Module 2, Limit 2: the LLM has no memory. Chains are stateless — every call is independent. Memory changes that.
+
+```python
+from langchain_core.chat_history import InMemoryChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
+
+# Chain with a history placeholder
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful flight booking assistant."),
+    ("placeholder", "{history}"),
+    ("human", "{input}"),
+])
+
+chain = prompt | model | StrOutputParser()
+
+# Memory store — keyed by session ID
+message_store = {}
+
+def get_session_history(session_id: str):
+    if session_id not in message_store:
+        message_store[session_id] = InMemoryChatMessageHistory()
+    return message_store[session_id]
+
+chain_with_memory = RunnableWithMessageHistory(
+    chain,
+    get_session_history,
+    input_messages_key="input",
+    history_messages_key="history",
+)
+
+# The chain now remembers
+config = {"configurable": {"session_id": "user_123"}}
+
+r1 = chain_with_memory.invoke(
+    {"input": "I need a flight from Istanbul to Tokyo on Sep 15"},
+    config=config
+)
+
+# It knows "there" means Tokyo
+r2 = chain_with_memory.invoke(
+    {"input": "What airlines fly there direct?"},
+    config=config
+)
+```
+
+### Memory Strategies
+
+Not all conversations are the same:
+
+| Strategy | How It Works | Best For |
+|---|---|---|
+| **Buffer** | Stores all messages | Short conversations (< 20 turns) |
+| **Window** | Keeps last N messages | Longer conversations |
+| **Summary** | LLM summarizes old messages | Very long, cost-sensitive |
+| **Token Buffer** | Keeps within token limit | Production with predictable costs |
+
+<PresenterNote>
+**Ekranda:** Colab — [3.2-memory.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/3.2-memory.ipynb)
+
+**Yapın:** Memory notebook'unu açın. Multi-turn conversation hücrelerini çalıştırın — "there" kelimesinin hatırlandığını gösterin.
+
+**Sorun:** "LangChain olmadan memory nasıl yapardınız?" Cevap: her mesajı listeye ekleyip, tüm listeyi her seferinde gönderirdiniz. Framework bunu otomatik yapıyor.
+
+**Kapanış:** "Ama LangChain'in limiti var — chain'ler düz çizgi. Karar veremezler. Yarın LangGraph ile bunu çözeceğiz."
+
+**Katılımcılara:** YOUR TURN bölümlerini yapmaları için 10 dakika süre.
+</PresenterNote>
+
+<KeyInsight>
+Memory is opt-in, not default. Chains are stateless. Add `RunnableWithMessageHistory` when you need conversation continuity. Choose your strategy based on conversation length and cost.
+</KeyInsight>
+
+<DeepDive title="Advanced: Custom Runnables and Parallel Execution">
+
+### Custom Runnables
+
+Any function becomes a pipe-compatible component:
+
+```python
+from langchain_core.runnables import RunnableLambda
+
+def enrich_with_flight_data(input_dict: dict) -> dict:
+    flight_data = flight_api.get_details(input_dict["flight_number"])
+    return {**input_dict, "flight_data": flight_data}
+
+chain = RunnableLambda(enrich_with_flight_data) | prompt | model | parser
+```
+
+### RunnableParallel — Concurrent Execution
+
+```python
+from langchain_core.runnables import RunnableParallel
+
+parallel = RunnableParallel(
+    analysis=analysis_chain,
+    sentiment=sentiment_chain,
+    cost=cost_chain,
+)
+# All three run concurrently
+results = parallel.invoke({"flight": "AF1234"})
+```
+
+</DeepDive>
+
+## Key Takeaways
+
+<CardGrid>
+  <Card title="Know when to skip it" icon="warning">
+    Simple API calls don't need a framework. LangChain earns its keep as complexity grows.
+  </Card>
+  <Card title="LCEL pipes compose" icon="right-arrow">
+    `prompt | model | parser` — composable building blocks with free streaming, async, retries.
+  </Card>
+  <Card title="Memory is opt-in" icon="document">
+    Chains are stateless. Add memory when you need it. Choose strategy by conversation length.
+  </Card>
+</CardGrid>
+
+## Exercises
+
+<ColabLink title="Exercise 4.1: Build Your First Chain" notebook="/notebooks/agent-dev/3.1-first-chain.ipynb" level="Basic" />
+<ColabLink title="Exercise 4.2: Conversational Memory" notebook="/notebooks/agent-dev/3.2-memory.ipynb" level="Basic" />
+
+## Next Up
+
+You've built linear chains — data flows in one direction. But what happens when you need branching? Looping? Human approval? Chains hit their limit.
+
+**Module 5: LangGraph** picks up exactly where chains leave off. That's tomorrow morning — Day 2.

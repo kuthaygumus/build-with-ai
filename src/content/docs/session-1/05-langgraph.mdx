@@ -1,0 +1,887 @@
+---
+title: "Module 5: LangGraph — Stateful Agents"
+description: "Chains can't decide. LangGraph models workflows as graphs — with state, conditional routing, human approval, and loops — turning your LLM into a decision-making agent."
+---
+
+import DeepDive from '../../../components/DeepDive.astro';
+import ColabLink from '../../../components/ColabLink.astro';
+import ModuleHeader from '../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../components/PresenterNote.astro';
+import KeyInsight from '../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="80 min" day={2} goal="Feel why LCEL chains break under real decision logic, then build a stateful agent graph with conditional routing using LangGraph." />
+
+## The Pain: Chains Can't Decide
+
+Yesterday you built a disruption analysis chain in Module 4. It analyzed a flight, classified severity, and generated a passenger SMS. Linear. Clean. Three steps, one direction.
+
+Now the business asks: **"If the disruption is severe, escalate to ops. If it's minor, auto-resolve."**
+
+Let's try it with LCEL:
+
+```python
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+model = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+parser = StrOutputParser()
+
+# Step 1: Analyze
+analyze_chain = ChatPromptTemplate.from_messages([
+    ("system", "You are an airline operations analyst."),
+    ("human", "Analyze: Flight {flight}, Delay: {delay} min. Classify: minor/severe.")
+]) | model | parser
+
+# Step 2a: Auto-resolve (minor)
+auto_chain = ChatPromptTemplate.from_messages([
+    ("system", "Generate a standard rebooking SMS for a minor delay."),
+    ("human", "Flight {flight}, Delay: {delay} min.")
+]) | model | parser
+
+# Step 2b: Escalate (severe)
+escalate_chain = ChatPromptTemplate.from_messages([
+    ("system", "Create an emergency rebooking plan with hotel and meal vouchers."),
+    ("human", "Flight {flight}, Delay: {delay} min.")
+]) | model | parser
+
+# Now... how do we route?
+analysis = analyze_chain.invoke({"flight": "AF1234", "delay": 180})
+
+if "severe" in analysis.lower():
+    result = escalate_chain.invoke({"flight": "AF1234", "delay": 180})
+else:
+    result = auto_chain.invoke({"flight": "AF1234", "delay": 180})
+```
+
+It works. But look at what you had to do: **leave the pipe and write Python `if/else` around it.** The routing lives outside the chain. The state lives in local variables. Nothing is composable, traceable, or reusable.
+
+Now add these requirements from a real airline ops team:
+- If severe **and** more than 200 passengers, notify premium passengers first
+- If auto-resolve fails, retry once, then escalate
+- Before any rebooking, get human approval
+- Log every decision for compliance audit
+
+Your neat `if/else` wrapper becomes a tangled mess of nested conditionals, try/except blocks, and manual state tracking. The chain abstraction has broken down.
+
+<PresenterNote>
+**Ekranda:** Site (bu sayfa, kod blogu)
+
+**Yapın:** Kodu gosterin. "Dun chain yapmistik. Simdi business diyor ki 'ciddi ise eskale et, kuçukse otomatik çoz.' Ne yapiyoruz? Pipe'dan çikip Python if/else yaziyoruz. State? Local variable. Tracing? Yok. Retry? Kendiniz yazin. Human approval? Nasil?"
+
+**Sorun:** "Bu kodu 5 kişilik bir takimda maintain edebilir misiniz?" 2-3 saniye bekleyin. Cevap: hayir.
+
+**Sonra:** "İşte LangGraph tam bunu çözüyor."
+</PresenterNote>
+
+<KeyInsight>
+LCEL pipes are one-directional. The moment your workflow needs a fork — "if X do A, else do B" — you leave the pipe and manage state by hand. LangGraph makes branching, looping, and human checkpoints **first-class citizens** of the framework.
+</KeyInsight>
+
+## What LangGraph Gives You
+
+LangGraph models your workflow as a **directed graph**. Four building blocks. That's the entire API surface that matters.
+
+<FlowDiagram title="The Four Building Blocks">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📦</span>
+      <span class="node-label">State</span>
+      <span class="node-desc">TypedDict — shared memory</span>
+    </div>
+    <div class="flow-node secondary">
+      <span class="node-icon">⚙️</span>
+      <span class="node-label">Nodes</span>
+      <span class="node-desc">Functions that do work</span>
+    </div>
+    <div class="flow-node secondary">
+      <span class="node-icon">➡️</span>
+      <span class="node-label">Edges</span>
+      <span class="node-desc">Wiring between nodes</span>
+    </div>
+    <div class="flow-node warning">
+      <span class="node-icon">🔀</span>
+      <span class="node-label">Conditional Edges</span>
+      <span class="node-desc">Runtime routing decisions</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+| Building Block | What It Does | Analogy |
+|---|---|---|
+| **State** | Shared typed data that flows through the graph | A passenger manifest passed desk to desk |
+| **Nodes** | Functions that read state, do work, return updates | Individual desks: analysis, rebooking, notifications |
+| **Edges** | Fixed wiring — "after A, always go to B" | A conveyor belt between desks |
+| **Conditional Edges** | Runtime routing — "after A, go to B or C based on state" | A switch operator who reads the manifest and routes |
+
+Everything in LangGraph — human-in-the-loop, multi-agent, subgraphs — is built from these four primitives. Learn four things, understand the whole framework.
+
+<PresenterNote>
+**Ekranda:** Site (tablo + diyagram)
+
+**Yapın:** "4 yapi tasi. State, Node, Edge, Conditional Edge. Geri kalan her sey — human-in-the-loop, multi-agent, subgraph — bu 4 kavramın uzerine kurulu. 4 şey ogrenin, tum framework'u anlayin."
+
+**Sorun:** "Hangi yapi tasi chain'de YOKTU?" Cevap: Conditional Edge. Chain'de dallanma yok.
+</PresenterNote>
+
+## Building Block 1: State — The Shared Memory
+
+State is a `TypedDict` that every node can read and write. It flows through the entire graph.
+
+```python
+from typing import Annotated
+from typing_extensions import TypedDict
+from langgraph.graph.message import add_messages
+
+class FlightDisruptionState(TypedDict):
+    messages: Annotated[list, add_messages]  # Conversation history (appends, never overwrites)
+    flight_number: str                       # e.g. "AF1234"
+    delay_minutes: int                       # e.g. 180
+    passenger_count: int                     # e.g. 287
+    severity: str                            # Set by analyze node: "minor" | "moderate" | "severe"
+    resolution: str                          # Set by handler nodes
+    notification_sent: bool                  # Set by notify node
+```
+
+<Aside type="note">
+**The `Annotated[list, add_messages]` pattern is critical.** `add_messages` is a **reducer** — instead of replacing the list each time a node returns messages, it appends them. Without it, each node would overwrite the previous conversation. Reducers control how state updates merge.
+</Aside>
+
+Think of state as a clipboard passed between departments. The analysis desk writes "severity: severe." The routing desk reads that field and sends the clipboard to the escalation desk. The escalation desk writes the rebooking plan. Every desk sees the full clipboard.
+
+## Building Block 2: Nodes — The Workers
+
+Each node is a plain Python function. It receives the current state, does work, and returns a dictionary of state updates. Only the fields you return get updated — everything else is preserved.
+
+```python
+from langchain_groq import ChatGroq
+
+model = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+
+
+def analyze(state: FlightDisruptionState) -> dict:
+    """Analyze the disruption and classify severity."""
+    prompt = f"""Analyze this flight disruption:
+    Flight: {state['flight_number']}
+    Delay: {state['delay_minutes']} minutes
+    Passengers: {state['passenger_count']}
+    
+    Classify severity as exactly one word:
+    - minor: under 60 min delay
+    - moderate: 60-180 min delay
+    - severe: over 180 min delay
+    
+    Respond with ONLY the severity word."""
+
+    response = model.invoke([{"role": "user", "content": prompt}])
+    severity = response.content.strip().lower()
+
+    return {
+        "severity": severity,
+        "messages": [{"role": "assistant",
+                      "content": f"Analysis complete. Severity: {severity}"}]
+    }
+
+
+def auto_resolve(state: FlightDisruptionState) -> dict:
+    """Handle minor disruptions automatically."""
+    return {
+        "resolution": f"Auto-resolved: {state['flight_number']} — "
+                      f"minor delay ({state['delay_minutes']}min). "
+                      f"Standard rebooking applied. SMS queued for "
+                      f"{state['passenger_count']} passengers.",
+        "messages": [{"role": "assistant",
+                      "content": "Minor disruption auto-resolved."}]
+    }
+
+
+def escalate(state: FlightDisruptionState) -> dict:
+    """Create a full rebooking plan for severe disruptions."""
+    prompt = f"""Create an emergency rebooking plan:
+    Flight: {state['flight_number']}
+    Severity: {state['severity']}
+    Delay: {state['delay_minutes']} minutes
+    Passengers: {state['passenger_count']}
+    
+    Include: alternative flights, hotel vouchers, meal compensation,
+    premium passenger priority handling."""
+
+    response = model.invoke([{"role": "user", "content": prompt}])
+    return {
+        "resolution": response.content,
+        "messages": [{"role": "assistant",
+                      "content": "Escalated: Rebooking plan created for ops review."}]
+    }
+
+
+def notify(state: FlightDisruptionState) -> dict:
+    """Send notifications to affected passengers."""
+    channel = "SMS + App push" if state["severity"] == "minor" else "SMS + App + Email + Lounge display"
+    return {
+        "notification_sent": True,
+        "messages": [{"role": "assistant",
+                      "content": f"Notified {state['passenger_count']} passengers via {channel}."}]
+    }
+```
+
+<Aside type="tip">
+Nodes are plain `def` functions — no decorators, no base classes, no inheritance. This means they're easy to unit test: call the function with a mock state dict and assert the returned updates. LangGraph doesn't impose a testing framework.
+</Aside>
+
+<PresenterNote>
+**Ekranda:** Site (node fonksiyonlari)
+
+**Yapın:** "Bakin — duz Python fonksiyonlari. State sozluk olarak geliyor, sozluk olarak donuyor. Sadece degistirmek istediginiz alanlari dondurursunuz, gerisi korunur. Unit test? Fonksiyonu mock state ile çagirin, assert yapin. Bu kadar."
+
+**Sorun:** "auto_resolve fonksiyonu LLM çagirmiyor. escalate çagiriyor. Neden?" Cevap: Minor delay icin LLM'e gerek yok — kural tabanli yeter. Ciddi durumlar icin LLM'in yaraticiligi lazim.
+</PresenterNote>
+
+## Building Block 3: Edges — The Wiring
+
+Normal edges always go from A to B. Conditional edges inspect the state and choose the next node at runtime.
+
+```python
+def route_by_severity(state: FlightDisruptionState) -> str:
+    """Routing function — returns the NAME of the next node."""
+    if state["severity"] in ("minor",):
+        return "auto_resolve"
+    elif state["severity"] in ("moderate", "severe"):
+        return "escalate"
+    else:
+        return "escalate"  # Unknown severity? Be safe, escalate.
+```
+
+This function is pure Python. No LLM call. It reads one field from the state and returns a string. That string must match a node name. That's the entire conditional edge API.
+
+## Putting It All Together: The Complete Graph
+
+```python
+from langgraph.graph import StateGraph, START, END
+
+# 1. Create the graph with our state schema
+workflow = StateGraph(FlightDisruptionState)
+
+# 2. Add nodes — register functions by name
+workflow.add_node("analyze", analyze)
+workflow.add_node("auto_resolve", auto_resolve)
+workflow.add_node("escalate", escalate)
+workflow.add_node("notify", notify)
+
+# 3. Wire edges
+workflow.add_edge(START, "analyze")              # Entry: always analyze first
+
+workflow.add_conditional_edges(                   # Fork: route by severity
+    "analyze",
+    route_by_severity,
+    {
+        "auto_resolve": "auto_resolve",
+        "escalate": "escalate",
+    }
+)
+
+workflow.add_edge("auto_resolve", "notify")      # Both paths converge at notify
+workflow.add_edge("escalate", "notify")
+workflow.add_edge("notify", END)                  # Exit
+
+# 4. Compile into an executable graph
+graph = workflow.compile()
+```
+
+<FlowDiagram title="Flight Disruption Agent — Complete Graph">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🚀</span>
+      <span class="node-label">START</span>
+      <span class="node-desc">Disruption event</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Analyze</span>
+      <span class="node-desc">Classify severity</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">🔀</span>
+      <span class="node-label">Route</span>
+      <span class="node-desc">minor? severe?</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Auto-Resolve</span>
+      <span class="node-desc">Standard rebooking</span>
+    </div>
+    <div class="flow-arrow" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">minor</div>
+    <div class="flow-node danger">
+      <span class="node-icon">🚨</span>
+      <span class="node-label">Escalate</span>
+      <span class="node-desc">Full rebooking plan</span>
+    </div>
+    <div class="flow-arrow" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">moderate / severe</div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem; justify-content: center;">
+    <div class="flow-arrow animated">↓ both paths</div>
+  </div>
+  <div class="flow-row" style="justify-content: center;">
+    <div class="flow-node secondary">
+      <span class="node-icon">📢</span>
+      <span class="node-label">Notify</span>
+      <span class="node-desc">SMS + App + Email</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🏁</span>
+      <span class="node-label">END</span>
+      <span class="node-desc">Resolution complete</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<PresenterNote>
+**Ekranda:** Site (graph kodu + diyagram)
+
+**Yapın:** Kodu satirlar arasinda gezin:
+1. `StateGraph(FlightDisruptionState)` — "State semasiyla basliyoruz"
+2. `add_node` — "Fonksiyonlari isimleriyle kaydediyoruz"
+3. `add_edge(START, "analyze")` — "Her zaman analyze ile basla"
+4. `add_conditional_edges` — "Burasi sihin olan yer — runtime'da state'e bakarak yonlendiriyor"
+5. `compile()` — "Graph donuyor, artik calistirabilirsiniz"
+
+**Sorun:** "Bu graph'a yeni bir node eklemek istesem — mesela 'check_premium_status' — nereye koyardiniz?" 2-3 cevap toplayin.
+</PresenterNote>
+
+## Running and Debugging the Graph
+
+### Invocation
+
+```python
+# Run the graph with initial state
+result = graph.invoke({
+    "flight_number": "AF1234",
+    "delay_minutes": 180,
+    "passenger_count": 287,
+    "messages": [],
+    "severity": "",
+    "resolution": "",
+    "notification_sent": False,
+})
+
+print(f"Severity:     {result['severity']}")
+print(f"Resolution:   {result['resolution'][:100]}...")
+print(f"Notified:     {result['notification_sent']}")
+```
+
+### Streaming Debug Output
+
+When something goes wrong, you need to see which node did what. Streaming gives you a play-by-play:
+
+```python
+# Stream node-by-node output — invaluable for debugging
+for event in graph.stream({
+    "flight_number": "AF1234",
+    "delay_minutes": 45,
+    "passenger_count": 150,
+    "messages": [],
+    "severity": "",
+    "resolution": "",
+    "notification_sent": False,
+}):
+    for node_name, node_output in event.items():
+        print(f"\n{'='*50}")
+        print(f"Node: {node_name}")
+        print(f"Output: {node_output}")
+```
+
+```
+==================================================
+Node: analyze
+Output: {'severity': 'minor', 'messages': [...]}
+
+==================================================
+Node: auto_resolve
+Output: {'resolution': 'Auto-resolved: AF1234 — minor delay...', 'messages': [...]}
+
+==================================================
+Node: notify
+Output: {'notification_sent': True, 'messages': [...]}
+```
+
+Notice: with a 45-minute delay, the graph went `analyze → auto_resolve → notify`. Change the delay to 240 minutes and it goes `analyze → escalate → notify`. Same graph, different path — decided at runtime.
+
+### Visualization
+
+LangGraph can render your graph as a diagram — directly from code. No separate diagramming tool.
+
+```python
+# Print as Mermaid (paste into any Mermaid renderer)
+print(graph.get_graph().draw_mermaid())
+
+# Display as PNG in Jupyter / Colab
+from IPython.display import Image, display
+display(Image(graph.get_graph().draw_mermaid_png()))
+```
+
+This is not documentation you maintain separately. It IS the graph. Add a node, the diagram updates. Remove an edge, it disappears. Code and visualization are always in sync.
+
+<PresenterNote>
+**Ekranda:** Colab — [4.1-basic-graph.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/4.1-basic-graph.ipynb)
+
+**Yapın:** Notebook'u acin. Setup hücrelerini calistirin. Graph'i build edip `draw_mermaid_png()` ile gorselini gosterin. Sonra `graph.stream()` ile adim adim çalismayi gosterin — hangi node'un ne donduğunu canli gorun.
+
+**Sonra:** Delay'i 45'e ve 240'a degistirip iki farkli path'i canli gosterin. "Ayni graph, farkli yol. Runtime'da karar veriliyor."
+
+**Sorun:** "Stream output'ta hangi node'un calismadığini fark ettiniz mi?" (45 dakikada escalate calismadi, 240 dakikada auto_resolve calismadi.)
+</PresenterNote>
+
+<KeyInsight>
+`graph.stream()` is your best debugging tool. It shows you exactly which nodes ran, in what order, and what each one returned. When an agent does something unexpected, stream first, read the state at each step, find where it diverged.
+</KeyInsight>
+
+## Conditional Routing: The Decision Engine
+
+The routing function is where LangGraph earns its keep over plain chains. Let's build a more realistic version for airline customer service:
+
+```python
+from langgraph.graph import StateGraph, START, END
+
+class CustomerRequestState(TypedDict):
+    messages: Annotated[list, add_messages]
+    request_text: str
+    category: str           # "rebooking" | "complaint" | "inquiry" | "urgent"
+    priority: str           # "standard" | "premium"
+    response: str
+    escalated: bool
+
+def classify(state: CustomerRequestState) -> dict:
+    """LLM classifies the request into a category."""
+    response = model.invoke([
+        {"role": "system",
+         "content": "Classify this airline customer request into exactly one "
+                    "category: rebooking, complaint, inquiry, or urgent. "
+                    "Respond with ONLY the category word."},
+        {"role": "user", "content": state["request_text"]}
+    ])
+    return {"category": response.content.strip().lower()}
+
+def handle_rebooking(state: CustomerRequestState) -> dict:
+    response = model.invoke([
+        {"role": "system",
+         "content": "You are a rebooking specialist. Find alternative flights. "
+                    "Be efficient and solution-oriented."},
+        {"role": "user", "content": state["request_text"]}
+    ])
+    return {"response": response.content, "escalated": False}
+
+def handle_complaint(state: CustomerRequestState) -> dict:
+    response = model.invoke([
+        {"role": "system",
+         "content": "Handle this complaint with empathy. "
+                    "Acknowledge the issue, apologize sincerely, propose resolution."},
+        {"role": "user", "content": state["request_text"]}
+    ])
+    return {"response": response.content, "escalated": False}
+
+def handle_inquiry(state: CustomerRequestState) -> dict:
+    response = model.invoke([
+        {"role": "system",
+         "content": "Answer this travel inquiry helpfully and accurately."},
+        {"role": "user", "content": state["request_text"]}
+    ])
+    return {"response": response.content, "escalated": False}
+
+def handle_urgent(state: CustomerRequestState) -> dict:
+    return {
+        "response": "URGENT: Routed to duty manager. Reference created.",
+        "escalated": True,
+    }
+
+# The routing function — pure Python, no LLM
+def route_request(state: CustomerRequestState) -> str:
+    routing_map = {
+        "rebooking": "handle_rebooking",
+        "complaint": "handle_complaint",
+        "inquiry": "handle_inquiry",
+        "urgent": "handle_urgent",
+    }
+    return routing_map.get(state["category"], "handle_inquiry")
+
+# Build
+workflow = StateGraph(CustomerRequestState)
+workflow.add_node("classify", classify)
+workflow.add_node("handle_rebooking", handle_rebooking)
+workflow.add_node("handle_complaint", handle_complaint)
+workflow.add_node("handle_inquiry", handle_inquiry)
+workflow.add_node("handle_urgent", handle_urgent)
+
+workflow.add_edge(START, "classify")
+workflow.add_conditional_edges(
+    "classify",
+    route_request,
+    {
+        "handle_rebooking": "handle_rebooking",
+        "handle_complaint": "handle_complaint",
+        "handle_inquiry": "handle_inquiry",
+        "handle_urgent": "handle_urgent",
+    }
+)
+workflow.add_edge("handle_rebooking", END)
+workflow.add_edge("handle_complaint", END)
+workflow.add_edge("handle_inquiry", END)
+workflow.add_edge("handle_urgent", END)
+
+graph = workflow.compile()
+
+# Test it
+result = graph.invoke({
+    "request_text": "My flight TK1234 was cancelled and I need to get to London by tomorrow morning",
+    "messages": [],
+    "category": "",
+    "priority": "standard",
+    "response": "",
+    "escalated": False,
+})
+
+print(f"Category: {result['category']}")
+print(f"Response: {result['response'][:200]}")
+```
+
+<FlowDiagram title="Customer Request Router — 4-Way Branch">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📥</span>
+      <span class="node-label">Request</span>
+      <span class="node-desc">Customer message arrives</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">🏷️</span>
+      <span class="node-label">Classify</span>
+      <span class="node-desc">LLM determines category</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔄</span>
+      <span class="node-label">Rebooking</span>
+      <span class="node-desc">Find alternatives</span>
+    </div>
+    <div class="flow-node secondary">
+      <span class="node-icon">😤</span>
+      <span class="node-label">Complaint</span>
+      <span class="node-desc">Empathy + resolution</span>
+    </div>
+    <div class="flow-node secondary">
+      <span class="node-icon">❔</span>
+      <span class="node-label">Inquiry</span>
+      <span class="node-desc">Informative answer</span>
+    </div>
+    <div class="flow-node danger">
+      <span class="node-icon">🚨</span>
+      <span class="node-label">Urgent</span>
+      <span class="node-desc">Duty manager</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">All handlers → END</div>
+  </div>
+</FlowDiagram>
+
+<PresenterNote>
+**Ekranda:** Colab — [4.2-conditional-routing.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/4.2-conditional-routing.ipynb)
+
+**Yapın:** Notebook'u acin. Conditional routing bolumunu calistirin. Farkli request metinleri deneyin:
+- "I need to change my flight to an earlier one" → rebooking
+- "Your service was terrible, I waited 3 hours" → complaint
+- "What's the baggage allowance for business class?" → inquiry
+- "Medical emergency on board, need immediate assistance" → urgent
+
+**Sorun:** "Routing fonksiyonu LLM çagiriyor mu?" Cevap: Hayir. Classify LLM çagiriyor, ama routing fonksiyonunun kendisi sadece bir dict lookup. LLM siniflandiriyor, Python yonlendiriyor.
+
+**Sonra:** Katilimcilara 15 dakika YOUR TURN bolumlerini yapma suresi verin.
+</PresenterNote>
+
+## Human-in-the-Loop: When the Agent Must Wait
+
+Some decisions are too important for full autonomy. Rebooking 287 passengers on alternative flights? Issuing 50,000 EUR in hotel vouchers? You want a human to approve before the agent executes.
+
+LangGraph supports this as a first-class feature: the graph **pauses** at a designated node, persists its state to a checkpointer, and waits. A human reviews, approves (or modifies), and the graph resumes exactly where it left off.
+
+```python
+from langgraph.checkpoint.memory import MemorySaver
+
+# Compile with a checkpointer and an interrupt point
+graph = workflow.compile(
+    checkpointer=MemorySaver(),
+    interrupt_before=["escalate"]  # Pause BEFORE this node runs
+)
+
+# Run — graph will pause before "escalate"
+config = {"configurable": {"thread_id": "disruption_AF1234"}}
+result = graph.invoke({
+    "flight_number": "AF1234",
+    "delay_minutes": 240,
+    "passenger_count": 287,
+    "messages": [],
+    "severity": "",
+    "resolution": "",
+    "notification_sent": False,
+}, config)
+
+# Graph is paused. Human reviews:
+print(f"Severity classified as: {result['severity']}")
+print("Awaiting human approval to escalate...")
+
+# Human approves → resume from exactly where it paused
+final = graph.invoke(None, config)
+print(f"Resolution: {final['resolution'][:100]}...")
+```
+
+<FlowDiagram title="Human-in-the-Loop: Pause, Review, Resume">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Analyze</span>
+      <span class="node-desc">Classify severity</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">⏸️</span>
+      <span class="node-label">PAUSE</span>
+      <span class="node-desc">interrupt_before=["escalate"]</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">👤</span>
+      <span class="node-label">Human Review</span>
+      <span class="node-desc">Approve / modify / reject</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🚨</span>
+      <span class="node-label">Escalate</span>
+      <span class="node-desc">Resumes execution</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+Two things make this work:
+
+1. **`interrupt_before`** — tells the graph to freeze before a specific node. There's also `interrupt_after` for pausing after a node completes.
+2. **Checkpointer** — persists the graph's full state so it can be resumed, even in a different process. `MemorySaver()` is in-memory (dev). Production uses `PostgresSaver` or `RedisSaver`.
+
+<Aside type="caution">
+Without a checkpointer, `interrupt_before` silently does nothing. Always pair them. In production, always use a persistent checkpointer — if the process restarts, in-memory state is gone.
+</Aside>
+
+<KeyInsight>
+Human-in-the-loop in LangGraph is not an afterthought — it's two parameters on `compile()`. The graph freezes, persists state, and resumes on command. This is how you build agents that take consequential actions (rebookings, payments, notifications) with human oversight.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (kod + diyagram)
+
+**Yapın:** Kavramsal tutun — ~5 dakika. "Gercek dunyada booking degistiren, ödeme yapan, müşteriye bildirim gönderen agent'lar var. Bunları insan onayı olmadan deploy etmek isteyemezsiniz. LangGraph bunu iki parametre ile çözüyor: `interrupt_before` ve `checkpointer`."
+
+**Sorun:** "Takim olarak, hangi agent aksiyonlari insan onayı olmadan gitmemeli?" 3-4 ornek toplayin (rebooking, refund, upgrade, complaint escalation).
+
+**Vurgulayın:** "Bugün bunu canli kodlamayacağız — notebook'lardaki DeepDive bolumunde tam implementasyon var. Ama konsepti bilin: graph durur, state saklanir, insan onaylar, graph devam eder."
+</PresenterNote>
+
+## The Step-by-Step Pattern
+
+Every LangGraph project follows the same 6-step lifecycle:
+
+<Steps>
+1. **Define State** — Create a `TypedDict` with all fields your workflow needs. Use `Annotated` with reducers for fields that accumulate (like message history).
+
+2. **Write Nodes** — Each node is a function: takes state, does work, returns a dict of updates. Mix LLM calls with pure Python logic.
+
+3. **Write Routing Functions** — Pure Python functions that read state and return the name of the next node. No LLM needed here.
+
+4. **Build the Graph** — `StateGraph(YourState)`, `add_node()`, `add_edge()`, `add_conditional_edges()`.
+
+5. **Compile** — `workflow.compile()` returns an executable graph. Add `checkpointer` and `interrupt_before` for human-in-the-loop.
+
+6. **Run and Debug** — `graph.invoke()` for single runs. `graph.stream()` for step-by-step visibility. `draw_mermaid_png()` for visualization.
+</Steps>
+
+## When to Use What
+
+You now have three levels of abstraction. Here's when to use each:
+
+| Situation | Use | Why |
+|---|---|---|
+| Single LLM call, maybe with parsing | **Raw API / LangChain** | No orchestration needed |
+| Linear pipeline: A → B → C | **LCEL pipe** | Clean, composable, one direction |
+| Branching: "if X do A, else B" | **LangGraph** | Conditional edges |
+| Loops: "retry until quality ≥ threshold" | **LangGraph** | Edges that go backward |
+| Human approval before action | **LangGraph** | `interrupt_before` + checkpointer |
+| Multiple specialized agents | **LangGraph** | Subgraphs with shared state |
+
+<Aside type="tip">
+Don't reach for LangGraph when a chain will do. If your workflow is A → B → C with no branching, LCEL is simpler and lighter. LangGraph earns its complexity when you need forks, loops, or checkpoints.
+</Aside>
+
+<PresenterNote>
+**Ekranda:** Site (tablo)
+
+**Yapın:** Tabloyu gosterin. "LangGraph her zaman gerekli değil. Duz bir pipeline icin LCEL yeter. Ama branching, loop, veya human approval gerektiginde LangGraph'in yerini baska bir sey alamaz."
+
+**Sorun:** "Dunkü chain egzersiziniz — onu graph'a çevirmek gerekir miydi?" Cevap: Hayir, düzdü. "Peki müsteri sikayet yonetim akisi?" Cevap: Evet, çunku dallanma var.
+</PresenterNote>
+
+<DeepDive title="Advanced: Subgraphs, Multi-Agent, and Persistence">
+
+### Subgraphs — Modular Agent Design
+
+Complex agents compose from smaller graphs. A subgraph is a compiled graph used as a node in a parent graph:
+
+```python
+# Subgraph: handles passenger rebooking logic
+passenger_workflow = StateGraph(PassengerState)
+passenger_workflow.add_node("check_tier", check_passenger_tier)
+passenger_workflow.add_node("find_alternatives", find_alternative_flights)
+passenger_workflow.add_node("execute_rebook", execute_rebooking)
+# ... wire edges ...
+passenger_subgraph = passenger_workflow.compile()
+
+# Parent graph uses the subgraph as a node
+main_workflow = StateGraph(DisruptionState)
+main_workflow.add_node("analyze", analyze_disruption)
+main_workflow.add_node("handle_passengers", passenger_subgraph)  # <-- subgraph as node
+main_workflow.add_node("report", generate_report)
+```
+
+Each subgraph is independently testable. Build complexity from simple, validated pieces.
+
+### Multi-Agent: Researcher + Reviewer Loop
+
+Two agents that critique each other's work until quality is sufficient:
+
+```python
+class ReviewState(TypedDict):
+    messages: Annotated[list, add_messages]
+    task: str
+    draft: str
+    feedback: str
+    iteration: int
+
+def researcher(state: ReviewState) -> dict:
+    context = ""
+    if state.get("feedback"):
+        context = f"\n\nAddress this feedback:\n{state['feedback']}"
+    response = model.invoke([
+        {"role": "system", "content": "You are a thorough researcher."},
+        {"role": "user", "content": f"Task: {state['task']}{context}"}
+    ])
+    return {"draft": response.content, "iteration": state.get("iteration", 0) + 1}
+
+def reviewer(state: ReviewState) -> dict:
+    response = model.invoke([
+        {"role": "system",
+         "content": "Critically review this report. If it's good enough, "
+                    "say APPROVED. Otherwise, provide specific feedback."},
+        {"role": "user", "content": f"Review:\n\n{state['draft']}"}
+    ])
+    return {"feedback": response.content}
+
+def should_continue(state: ReviewState) -> str:
+    if "APPROVED" in state["feedback"].upper():
+        return "finalize"
+    if state["iteration"] >= 3:
+        return "finalize"  # Safety bound: max 3 iterations
+    return "revise"
+
+workflow = StateGraph(ReviewState)
+workflow.add_node("researcher", researcher)
+workflow.add_node("reviewer", reviewer)
+workflow.add_node("finalize", lambda s: {"draft": s["draft"]})
+
+workflow.add_edge(START, "researcher")
+workflow.add_edge("researcher", "reviewer")
+workflow.add_conditional_edges(
+    "reviewer", should_continue,
+    {"revise": "researcher", "finalize": "finalize"}
+)
+workflow.add_edge("finalize", END)
+graph = workflow.compile()
+```
+
+The key insight: multi-agent is just **conditional routing with a backward edge**. No new API, no new concept.
+
+### Production Persistence
+
+`MemorySaver` is in-memory — process dies, state dies. Production uses durable storage:
+
+```python
+from langgraph.checkpoint.postgres import PostgresSaver
+
+with PostgresSaver.from_conn_string(
+    "postgresql://user:pass@localhost:5432/agents"
+) as checkpointer:
+    graph = workflow.compile(checkpointer=checkpointer)
+    
+    # State survives process restarts
+    config = {"configurable": {"thread_id": "disruption_AF1234"}}
+    result = graph.invoke(initial_state, config)
+```
+
+### LangSmith Tracing
+
+Every node, every LLM call, every state update — traced automatically:
+
+```python
+import os
+os.environ["LANGSMITH_TRACING"] = "true"
+os.environ["LANGSMITH_API_KEY"] = "your-key"
+
+# Every graph invocation is now traced at smith.langchain.com
+# Shows: node order, input/output per call, token usage, latency, errors
+```
+
+</DeepDive>
+
+## Key Takeaways
+
+<CardGrid>
+  <Card title="Chains are lines, graphs are maps" icon="random">
+    LCEL pipes flow in one direction. LangGraph adds branching, loops, and checkpoints — the control structures real workflows need.
+  </Card>
+  <Card title="Four building blocks, that's it" icon="list-format">
+    State (TypedDict), Nodes (functions), Edges (wiring), Conditional Edges (routing). Everything else — human-in-the-loop, multi-agent, subgraphs — is built from these four.
+  </Card>
+  <Card title="Routing is pure Python" icon="seti:python">
+    The routing function reads state and returns a node name. No LLM call needed. The LLM classifies, Python routes. Keep them separate.
+  </Card>
+  <Card title="Human-in-the-loop is two parameters" icon="approve-check-circle">
+    `interrupt_before` + `checkpointer` on `compile()`. The graph freezes, persists state, waits for approval, and resumes exactly where it paused.
+  </Card>
+</CardGrid>
+
+## Exercises
+
+<ColabLink title="Exercise 5.1: Build a Basic State Graph" notebook="/notebooks/agent-dev/4.1-basic-graph.ipynb" level="Basic" />
+
+<ColabLink title="Exercise 5.2: Conditional Routing Graph" notebook="/notebooks/agent-dev/4.2-conditional-routing.ipynb" level="Challenge" />
+
+<PresenterNote>
+**Ekranda:** Colab notebook'lari
+
+**Yapın:** Her iki notebook'u gosterin. "5.1 temel graph — state, node, edge. Bunu bitirin, sonra 5.2'ye geçin — conditional routing ile customer request router."
+
+**Sorun:** "Kendi is akisinizi düsünün — hangi node'lar olurdu, nerede dallanma olurdu?"
+
+**Katilimcilara:** 15-20 dakika egzersiz süresi. Erken bitirenler notebook'un DeepDive bolumlerini incelesin.
+</PresenterNote>
+
+## Next Up
+
+You can now build agents that decide: analyze a situation, route to specialized handlers, loop until quality is met, and pause for human approval. The building blocks are all in place — MCP for tools, LangChain for composable chains, LangGraph for stateful orchestration.
+
+But building blocks alone don't survive production. What happens when the LLM hallucinates a severity classification? When your API key costs spike because a loop won't terminate? When a passenger's PII leaks into logs?
+
+**Module 6: The Production Agent** puts guardrails, cost control, error handling, and security around everything you've built — turning a demo into a deployable system.

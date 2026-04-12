@@ -1,0 +1,493 @@
+---
+title: "Module 3: Giving the LLM Hands — Tools & MCP"
+description: "The Model Context Protocol is the open standard for connecting AI applications to external systems. Build once, connect everywhere."
+---
+
+import DeepDive from '../../../components/DeepDive.astro';
+import ColabLink from '../../../components/ColabLink.astro';
+import ModuleHeader from '../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../components/PresenterNote.astro';
+import KeyInsight from '../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="60 min" day={1} goal="Understand why tool integration needs a standard, learn the MCP architecture, and build your first MCP server." />
+
+## The Problem We're Solving
+
+Module 2 showed us: an LLM **can't act**. It generates text, but it can't check the weather, query a database, or file a Jira ticket. The solution is giving it tools — functions it can call.
+
+But tools create a new problem.
+
+<PresenterNote>
+**Ekranda:** Site (bu sayfa)
+
+**Yapın:** "Hatırlayın — Modül 2'de LLM'in aksiyon alamadığını gördük. Tool'lar çözüm. Ama tool'ları bağlamak yeni bir problem yaratıyor. Bakalım."
+
+**Sonra:** N x M diyagramına geçin.
+</PresenterNote>
+
+## The Integration Explosion
+
+You have 5 AI applications — Claude, ChatGPT, Cursor, your custom app, a CI bot. They need to reach 8 tools — Jira, GitHub, Slack, PostgreSQL, Confluence, S3, email, a flight API.
+
+Without a standard: **5 x 8 = 40 custom integrations.** Each with its own auth, data format, error handling, docs, and maintenance. Add one new tool? Five more integrations. Add one new AI client? Eight more.
+
+<FlowDiagram title="Before: The N x M Nightmare">
+  <div class="flow-row">
+    <div class="flow-node danger">
+      <span class="node-icon">🤖</span>
+      <span class="node-label">5 AI Clients</span>
+      <span class="node-desc">Claude, GPT, Cursor, custom, CI</span>
+    </div>
+    <div class="flow-arrow animated">x</div>
+    <div class="flow-node danger">
+      <span class="node-icon">🔧</span>
+      <span class="node-label">8 Tools</span>
+      <span class="node-desc">Jira, GitHub, Slack, DB...</span>
+    </div>
+    <div class="flow-arrow animated">=</div>
+    <div class="flow-node danger">
+      <span class="node-icon">💥</span>
+      <span class="node-label">40 Integrations</span>
+      <span class="node-desc">Each custom-built</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<FlowDiagram title="After: N + M with a Standard">
+  <div class="flow-row">
+    <div class="flow-node success">
+      <span class="node-icon">🤖</span>
+      <span class="node-label">5 AI Clients</span>
+      <span class="node-desc">Each implements MCP once</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔌</span>
+      <span class="node-label">MCP</span>
+      <span class="node-desc">One open standard</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">🔧</span>
+      <span class="node-label">8 Tools</span>
+      <span class="node-desc">Each implements MCP once</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">5 + 8 = 13 implementations, not 40</div>
+  </div>
+</FlowDiagram>
+
+<PresenterNote>
+**Ekranda:** Site — iki diyagram
+
+**Yapın:** Matematiği gösterin: "3 AI client x 5 tool = 15 entegrasyon. 6. tool'u eklediğinizde 3 tane daha. MCP ile? Sadece 1 tane daha."
+
+**Sorun:** "Takımınızda kaç farklı entegrasyon noktası var?"
+</PresenterNote>
+
+## What Is MCP?
+
+<Aside type="note" title="Official Definition">
+**MCP (Model Context Protocol)** is an open standard for connecting AI applications to external data sources and tools. Think of MCP like a USB-C port for AI applications — just as USB-C provides a standardized way to connect devices, MCP provides a standardized way to connect AI to external systems.
+
+— [modelcontextprotocol.io](https://modelcontextprotocol.io/docs/getting-started/intro)
+</Aside>
+
+MCP was created by Anthropic and open-sourced in late 2024. It's already adopted across the industry:
+
+| Client | Status |
+|---|---|
+| **Claude Desktop / Claude Code** | Built-in MCP support |
+| **ChatGPT** | MCP support (2025) |
+| **VS Code (GitHub Copilot)** | MCP support |
+| **Cursor** | MCP support |
+| **Zed, Windsurf** | MCP support |
+
+Build your tool once as an MCP server → it works with all of them. Build your client once with MCP support → it works with every tool.
+
+<KeyInsight>
+MCP turns 40 custom integrations into 13. Build once, connect everywhere. This is not a bet on a future standard — it's already the industry standard.
+</KeyInsight>
+
+## Architecture: Three Layers
+
+MCP has a layered architecture — separation of concerns for security.
+
+<FlowDiagram title="MCP Architecture">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🏠</span>
+      <span class="node-label">Host</span>
+      <span class="node-desc">Claude Desktop, Cursor, your app</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📡</span>
+      <span class="node-label">Client</span>
+      <span class="node-desc">1:1 connection to a server</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">⚡</span>
+      <span class="node-label">Server</span>
+      <span class="node-desc">Wraps an external tool</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<Steps>
+1. **Host** — The application the user interacts with. Manages security, user consent, and spawns clients. Examples: Claude Desktop, Cursor, your custom agent.
+
+2. **Client** — Lives inside the host. Each client has a 1:1 connection to a single server. If one server crashes, the others keep running. **Isolation by design.**
+
+3. **Server** — Exposes capabilities (tools, resources, prompts) over the protocol. Wraps an external system and makes it accessible to AI in a standardized way.
+</Steps>
+
+Why three layers instead of two? **Security.** The host controls what the AI can access. The client provides isolation — a broken server can't poison the others. The server runs sandboxed, exposing only what it was designed to.
+
+<PresenterNote>
+**Ekranda:** Site — Architecture diyagramı
+
+**Yapın:** "3 katman. Host kontrol eder, Client izolasyon sağlar, Server tool'u açar. Neden 3 katman? Güvenlik. Bozuk bir MCP server diğerlerini etkileyemez."
+
+**Sorun:** "LLM'i doğrudan tool'lara bağlasak ne olur? Neden arada katman var?"
+</PresenterNote>
+
+## Transport: How Messages Move
+
+MCP uses JSON-RPC 2.0 for message format — the transport is pluggable:
+
+<Tabs>
+  <TabItem label="stdio (Local)">
+    The server runs as a **child process**. Communication over stdin/stdout.
+
+    ```json
+    {
+      "mcpServers": {
+        "flight-data": {
+          "command": "python",
+          "args": ["flight_mcp_server.py"]
+        }
+      }
+    }
+    ```
+
+    **Best for**: Local development, CLI tools, personal automation.
+  </TabItem>
+
+  <TabItem label="Streamable HTTP (Remote)">
+    The server runs as a **web service**. HTTP for requests, optional SSE for streaming.
+
+    ```json
+    {
+      "mcpServers": {
+        "flight-data": {
+          "url": "https://mcp.internal.example.com/flights",
+          "headers": {
+            "Authorization": "Bearer ${FLIGHT_API_TOKEN}"
+          }
+        }
+      }
+    }
+    ```
+
+    **Best for**: Production deployments, shared infrastructure, team-wide tools.
+  </TabItem>
+</Tabs>
+
+<PresenterNote>
+**Yapın:** "stdio = lokal geliştirme, HTTP = production. Transport detayı önemli değil — kavramı anlayın. JSON-RPC 2.0 sadece mesaj formatı standardı."
+</PresenterNote>
+
+## The Three Primitives
+
+Every MCP server exposes capabilities through exactly three types. The key question for each: **who decides?**
+
+<FlowDiagram title="MCP Primitives — Who Controls What?">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔧</span>
+      <span class="node-label">Tools</span>
+      <span class="node-desc">Model decides to call</span>
+    </div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📄</span>
+      <span class="node-label">Resources</span>
+      <span class="node-desc">Host decides to include</span>
+    </div>
+    <div class="flow-node secondary">
+      <span class="node-icon">💬</span>
+      <span class="node-label">Prompts</span>
+      <span class="node-desc">User selects from menu</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+### Tools — Model-Controlled
+
+Functions the AI decides to call. This is what you'll use 90% of the time.
+
+```python
+from mcp.server import Server
+
+server = Server("travel-flights")
+
+@server.tool()
+async def search_flights(
+    origin: str,
+    destination: str,
+    date: str,
+    passengers: int = 1
+) -> str:
+    """Search available flights between two airports on a given date.
+    
+    Args:
+        origin: IATA airport code (e.g., 'CDG')
+        destination: IATA airport code (e.g., 'NRT')
+        date: Travel date in YYYY-MM-DD format
+        passengers: Number of passengers (default: 1)
+    """
+    results = await flight_api.search(origin, destination, date, passengers)
+    return format_flight_results(results)
+```
+
+The AI model sees the tool name, description, and parameter schema — and **decides when and how to call it**. The docstring is critical: it's the tool's user manual for the AI.
+
+### Resources — Application-Controlled
+
+Read-only data the AI can access. Like GET endpoints — the host decides what to include in context.
+
+```python
+@server.resource("flights://status/{flight_number}")
+async def get_flight_status(flight_number: str) -> str:
+    """Get real-time status of a specific flight."""
+    status = await flight_api.get_status(flight_number)
+    return json.dumps(status, indent=2)
+```
+
+### Prompts — User-Controlled
+
+Reusable templates the user selects. Standardizes how the AI approaches domain-specific tasks.
+
+```python
+@server.prompt()
+async def disruption_analysis(flight_number: str) -> str:
+    """Analyze a flight disruption and suggest rebooking options."""
+    return f"""Analyze the disruption for flight {flight_number}.
+Steps:
+1. Check current flight status
+2. Identify affected passengers
+3. Search for alternative flights
+4. Rank alternatives by tier, feasibility, cost
+5. Generate rebooking recommendation"""
+```
+
+<KeyInsight>
+**Tools** = model-controlled (AI decides to call). **Resources** = application-controlled (host decides to include). **Prompts** = user-controlled (user selects). Three primitives, three control planes — this separation is the foundation of MCP's security model.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site — 3 primitive bölümü
+
+**Yapın:** Her primitive'in "kim karar veriyor" sorusunu vurgulayın:
+- Tools: AI karar veriyor — "Bu sorgu için search_flights çağırmam lazım"
+- Resources: Host karar veriyor — "Bu context'e flight status ekleyeyim"
+- Prompts: Kullanıcı karar veriyor — "Disruption analysis template'ini seç"
+
+**Sorun:** "Tool'u resource yaparsanız en büyük fark ne?" (AI artık çağıramaz — sadece host sunduğunda görür.)
+</PresenterNote>
+
+## MCP in the Wild
+
+You're probably already using MCP without knowing it.
+
+**Claude Code** uses MCP servers for file system operations, bash execution, and web fetching. Every time Claude Code reads a file — that's MCP under the hood.
+
+**A typical Cursor/VS Code setup:**
+
+```json
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": { "DATABASE_URL": "postgresql://localhost:5432/mydb" }
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" }
+    }
+  }
+}
+```
+
+Your editor's AI can now query your database and interact with GitHub — through a standard protocol. Want to swap the GitHub server for GitLab? The client code doesn't change.
+
+## Hands-On: Building a Flight MCP Server
+
+Let's build a flight information server from scratch:
+
+```python
+# flight_mcp_server.py
+import json
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+
+server = Server("travel-flight-tools")
+
+FLIGHTS_DB = {
+    "AF1234": {
+        "carrier": "Air France", "origin": "CDG", "destination": "NRT",
+        "departure": "2025-03-15T10:30:00", "status": "on_time",
+        "aircraft": "A350-900", "passengers": 287
+    },
+    "AF5678": {
+        "carrier": "Air France", "origin": "CDG", "destination": "JFK",
+        "departure": "2025-03-15T14:00:00", "status": "delayed",
+        "delay_minutes": 45, "aircraft": "B777-300ER", "passengers": 342
+    }
+}
+
+@server.tool()
+async def get_flight_status(flight_number: str) -> str:
+    """Get the current status of a flight by its flight number.
+
+    Args:
+        flight_number: The flight number (e.g., 'AF1234')
+    """
+    flight = FLIGHTS_DB.get(flight_number.upper())
+    if not flight:
+        return f"Flight {flight_number} not found."
+    return json.dumps({
+        "flight": flight_number.upper(),
+        "carrier": flight["carrier"],
+        "route": f"{flight['origin']} → {flight['destination']}",
+        "status": flight["status"],
+        "departure": flight["departure"],
+    }, indent=2)
+
+@server.tool()
+async def list_flights(origin: str = "", destination: str = "") -> str:
+    """List available flights, optionally filtered by origin/destination."""
+    results = []
+    for fn, data in FLIGHTS_DB.items():
+        if origin and data["origin"] != origin.upper():
+            continue
+        if destination and data["destination"] != destination.upper():
+            continue
+        results.append({"flight_number": fn, "route": f"{data['origin']} → {data['destination']}", "status": data["status"]})
+    return json.dumps(results, indent=2) if results else "No flights found."
+
+async def main():
+    async with stdio_server() as (read_stream, write_stream):
+        await server.run(read_stream, write_stream)
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
+```
+
+<PresenterNote>
+**Ekranda:** Colab — [2.1-mcp-concepts.ipynb](https://colab.research.google.com/github/kuthaygumus/build-with-ai/blob/main/public/notebooks/agent-dev/2.1-mcp-concepts.ipynb)
+
+**Yapın:** Notebook'u açın. Setup + ilk 4 hücreyi çalıştırın. Tool tanımını, JSON-RPC response'unu gösterin.
+
+**Sonra:** Katılımcılara 10-15 dakika YOUR TURN bölümlerini yapma süresi verin.
+</PresenterNote>
+
+## Where MCP Sits in the Stack
+
+MCP is the **connectivity layer**. It sits between the agent brain (LLM + framework) and the external world.
+
+<FlowDiagram title="MCP in the Agent Stack">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">👤</span>
+      <span class="node-label">Your App</span>
+      <span class="node-desc">Frontend, API, bot</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">Agent</span>
+      <span class="node-desc">LangGraph + LLM</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔌</span>
+      <span class="node-label">MCP Layer</span>
+      <span class="node-desc">Standard connectivity</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🌐</span>
+      <span class="node-label">External World</span>
+      <span class="node-desc">APIs, DBs, services</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+In Module 4 you'll use LangChain to compose LLM calls into chains. In Module 5 you'll use LangGraph to orchestrate complex flows. MCP is the standard that connects all of them to the outside world.
+
+<DeepDive title="Advanced: Security and OAuth 2.1">
+
+### Security Considerations
+
+MCP introduces a new attack surface. Three defense layers:
+
+**1. Tool Confirmation** — The host shows the user what tool is being called before executing:
+```
+AI wants to call: delete_booking(booking_id="ABC123")
+[Allow] [Deny] [Allow All for this session]
+```
+
+**2. Scoped Permissions** — Servers implement least-privilege access.
+
+**3. Input Validation** — Never trust tool inputs blindly. They come from the LLM, which can be manipulated via prompt injection:
+```python
+@server.tool()
+async def query_database(sql_query: str) -> str:
+    """Execute a read-only SQL query."""
+    if not sql_query.strip().upper().startswith("SELECT"):
+        return "Error: Only SELECT queries are allowed."
+    async with read_only_pool.acquire() as conn:
+        result = await conn.fetch(sql_query)
+    return json.dumps(result)
+```
+
+### OAuth 2.1 for Remote Servers
+
+Production Streamable HTTP servers integrate with existing identity providers (Active Directory, Okta) via OAuth 2.1. The client obtains an access token, then includes it as a Bearer token in MCP requests.
+
+For full details: [modelcontextprotocol.io/docs/learn/architecture](https://modelcontextprotocol.io/docs/learn/architecture)
+
+</DeepDive>
+
+## Key Takeaways
+
+<CardGrid>
+  <Card title="N+M, not N x M" icon="seti:config">
+    MCP eliminates the integration explosion. One protocol. Build once, connect everywhere.
+  </Card>
+  <Card title="Host → Client → Server" icon="list-format">
+    Three-layer architecture with clear security boundaries. Isolation by design.
+  </Card>
+  <Card title="Three primitives" icon="puzzle">
+    Tools (model calls), Resources (host includes), Prompts (user selects). Three control planes.
+  </Card>
+  <Card title="Already the standard" icon="approve-check-circle">
+    Claude, ChatGPT, VS Code, Cursor and dozens more already speak MCP.
+  </Card>
+</CardGrid>
+
+## Exercises
+
+<ColabLink title="Exercise 3.1: MCP Concepts & Tool Definition" notebook="/notebooks/agent-dev/2.1-mcp-concepts.ipynb" level="Basic" />
+
+## Next Up
+
+Your LLM can now act through tools. But writing the raw API calls for every LLM interaction — managing messages, formatting prompts, parsing output — is tedious. Is there a better way? **Module 4: LangChain** — and we'll start with the question of whether you even need a framework.

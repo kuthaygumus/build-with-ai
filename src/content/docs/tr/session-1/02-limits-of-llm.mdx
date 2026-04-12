@@ -1,0 +1,364 @@
+---
+title: "Modül 2: Çıplak Bir LLM'in Sınırları"
+description: "Bir LLM'in yapamadığı dört şey — ve her sınırın araçlar, bellek, RAG ve orkestrasyon ihtiyacını neden doğurduğu."
+---
+
+import DeepDive from '../../../../components/DeepDive.astro';
+import ModuleHeader from '../../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../../components/PresenterNote.astro';
+import KeyInsight from '../../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="35 min" day={1} goal="Çıplak bir LLM'in dört temel sınırını deneyimleyin — her biri bu hafta öğreneceğiniz bir teknolojiye doğrudan karşılık gelir." />
+
+## Bu Modül Neden Var
+
+Modül 1 size bir LLM'in neler yapabildiğini gösterdi. Şimdi neler **yapamadığını** göreceksiniz. Bu akademik değil — her sınır, belirli bir teknolojinin var olma nedenidir:
+
+<FlowDiagram title="Dört Sınır → Dört Çözüm">
+  <div class="flow-row">
+    <div class="flow-node danger">
+      <span class="node-icon">🚫</span>
+      <span class="node-label">Eylem Yapamaz</span>
+      <span class="node-desc">Sadece metin, araç yok</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">🔌</span>
+      <span class="node-label">MCP & Araçlar</span>
+      <span class="node-desc">Modül 3, bugün</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.25rem;">
+    <div class="flow-node danger">
+      <span class="node-icon">🚫</span>
+      <span class="node-label">Belleği Yok</span>
+      <span class="node-desc">Her çağrı durumsuz</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">🔗</span>
+      <span class="node-label">LangChain Memory</span>
+      <span class="node-desc">Modül 4, bugün</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.25rem;">
+    <div class="flow-node danger">
+      <span class="node-icon">🚫</span>
+      <span class="node-label">Özel Veri Yok</span>
+      <span class="node-desc">Sadece eğitim verisi</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">📚</span>
+      <span class="node-label">RAG</span>
+      <span class="node-desc">Gün 3-4</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.25rem;">
+    <div class="flow-node danger">
+      <span class="node-icon">🚫</span>
+      <span class="node-label">Karar Veremez</span>
+      <span class="node-desc">Dallanma veya döngü yok</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">📊</span>
+      <span class="node-label">LangGraph</span>
+      <span class="node-desc">Modül 5, Gün 2</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+Bu modülün sonunda **eğitimin tamamının yol haritasını** bileceksiniz — çünkü her modül bu dört problemden birini çözmek için var.
+
+<PresenterNote>
+**Ekranda:** Site (diyagram)
+
+**Yapın:** "Bu diyagram eğitimin haritası. 4 limit, 4 çözüm. Bugün ve yarın ilk, ikinci ve dördüncü limitleri çözeceğiz. Üçüncü limit — private data — ise gelecek oturumun tamamını kaplayacak."
+
+**Not:** Bu modülde ilk defa katılımcılarla etkileşimli demo yapılacak. Her limit için kısa canlı gösterim var.
+</PresenterNote>
+
+## Sınır 1: Eylem Yapamaz
+
+Bir LLM metin üretir. Yaptığı **tek şey** budur. Bir API çağıramaz, veritabanı sorgulayamaz, e-posta gönderemez veya hava durumunu kontrol edemez. İzleyin:
+
+```python
+messages = [
+    {"role": "user", "content": "What's the weather in Istanbul right now?"}
+]
+response = call_llm(messages)
+# → "As of my last update, Istanbul typically has mild weather in April,
+#    with temperatures around 12-18°C..."
+```
+
+Bu gerçek hava durumu değil. Modelin kontrol etme yolu yok. Eğitim sırasında öğrendiği kalıplara dayanarak **makul görünen bir metin üretti**. Bu, yardımcı bir cevap gibi görünen bir halüsinasyondur.
+
+Şimdi araçları olan bir agent ile karşılaştırın:
+
+```python
+# Hava durumu aracına sahip Agent
+agent.run("What's the weather in Istanbul right now?")
+# Agent düşünür: "Gerçek zamanlı veriye ihtiyacım var. Hava durumu API'sini çağırayım."
+# → calls weather_api("Istanbul")
+# → "Currently 16°C in Istanbul, partly cloudy, 65% humidity."
+```
+
+Fark: ikinci sistem **gerçek dünyada eylem yapabiliyor**. İlki sadece dünya hakkında metin üretebiliyor.
+
+<KeyInsight>
+Araçsız bir LLM, telefonu, bilgisayarı ve kapısı olmayan bir odaya kilitlenmiş parlak bir danışman gibidir. Düşünmede harika. Herhangi bir şey **yapmaktan** tamamen aciz.
+</KeyInsight>
+
+**Çözüm**: LLM'e araç çağırma yeteneği vermek. **MCP** (Modül 3) bunu standartlaştırır — AI'ı dış sistemlere bağlamak için bir protokol.
+
+<PresenterNote>
+**Ekranda:** Site (kod blokları)
+
+**Yapın:** İki kodu yan yana gösterin. "Birincisi uydurma — modelin hava durumunu kontrol etme yolu yok. İkincisi gerçek — çünkü bir tool var."
+
+**Sorun:** "Kendi işinizde hangi sistem bir LLM'in erişmesi gereken bir dış kaynak? Jira? Veritabanı? Email?"
+</PresenterNote>
+
+## Sınır 2: Belleği Yok
+
+Modül 1'i hatırlayın: her API çağrısı **durumsuz (stateless)**'dur. LLM'in çağrılar arasında sıfır belleği vardır.
+
+```python
+# Çağrı 1
+response = call_llm([
+    {"role": "user", "content": "I'm planning a trip to Tokyo next month."}
+])
+# → "Great! Tokyo is wonderful in spring..."
+
+# Çağrı 2 — YENİ, bağımsız bir istek
+response = call_llm([
+    {"role": "user", "content": "What airlines fly there from Istanbul?"}
+])
+# → "Could you clarify which destination you're asking about?"
+```
+
+Model "there" kelimesinin Tokyo demek olduğunu bilmiyor. Her çağrı sıfırdan başlar. Konuşma mevcut değildir.
+
+ChatGPT hatırlıyormuş gibi görünür çünkü **uygulama** her çağrıda tüm konuşma geçmişini tekrar gönderir:
+
+```python
+# ChatGPT'nin perde arkasında gerçekte yaptığı
+response = call_llm([
+    {"role": "user", "content": "I'm planning a trip to Tokyo next month."},
+    {"role": "assistant", "content": "Great! Tokyo is wonderful in spring..."},
+    {"role": "user", "content": "What airlines fly there from Istanbul?"}
+])
+# → "Turkish Airlines (TK), ANA (NH), and JAL (JL) fly IST→NRT nonstop."
+```
+
+Şimdi çalışıyor — çünkü tüm geçmiş context window'da. Ama bu yaklaşımın bir sorunu var: konuşmalar uzar, context window'ların sınırları vardır ve her şeyi göndermek paraya mal olur.
+
+<KeyInsight>
+LLM hatırlamaz. Uygulama, geçmişi tekrar göndererek hatırlıyormuş gibi **davranır**. Bunu verimli yönetmek — neyi tutacağınız, neyi özetleyeceğiniz, neyi atacağınız — temel bir mühendislik problemidir. LangChain bunu **bellek kalıpları** (memory patterns) ile çözer (Modül 4).
+</KeyInsight>
+
+**Çözüm**: Konuşma geçmişini akıllıca yöneten framework'ler. **LangChain** (Modül 4) bellek stratejileri sunar: her şeyi sakla, son N mesajı tut, eskileri özetle veya bir token bütçesine uy.
+
+<PresenterNote>
+**Ekranda:** Site (3 kod bloğu)
+
+**Yapın:** Birinci çağrıyı gösterin, ikinci çağrıyı gösterin — "there" kelimesini anlayamadığını gösterin. Üçüncü çağrıyı gösterin — "bakın, tüm geçmişi gönderdik, şimdi anlıyor." Sorun: "Konuşma 100 mesaja ulaşırsa ne olur?"
+
+**Cevap rehberi:** Context window dolar. Ya para ödersiniz, ya summarize edersiniz, ya da eski mesajları atarsınız. Module 4'te tam bunu çözeceğiz.
+</PresenterNote>
+
+## Sınır 3: Verilerinizi Bilmez
+
+Bir LLM, aylar veya yıllar önce halka açık internet verileriyle eğitilmiştir. Şunlar hakkında hiçbir şey bilmez:
+
+- Şirketinizin iç politikaları
+- Dünkü olay raporu
+- API dokümantasyonunuz
+- Müşteri sözleşmeleri
+- CEO'nuzun bu sabah gönderdiği e-posta
+
+```python
+response = call_llm([
+    {"role": "user", "content": "What is Amadeus's refund policy for GDS bookings?"}
+])
+# → "Amadeus typically offers refunds within 24 hours of booking for most
+#    GDS reservations, subject to airline and fare rules..."
+```
+
+Bu cevap **doğru gibi görünüyor**. Kısmen doğru bile olabilir. Ama model gerçek politikanızı alıntılamıyor, makul görünen metin üretiyor. Politika geçen hafta değiştiyse, modelin bunu bilme yolu yok.
+
+Bu en tehlikeli sınırdır: **kendi verileriniz hakkında güvenle söylenen halüsinasyon.**
+
+<Aside type="caution">
+Gerçek iş riski burada yaşar. Yanlış iade politikasını, yanlış SLA şartlarını veya yanlış uyumluluk gereksinimlerini güvenle alıntılayan bir agent, "Bilmiyorum" diyen birinden daha fazla zarar verebilir.
+</Aside>
+
+**Çözüm**: **RAG — Retrieval-Augmented Generation** (Gün 3-4). Modelin eğitim sırasında ezberlediğine güvenmek yerine:
+1. Belgelerinizi aranabilir bir veritabanında saklarsınız
+2. Bir soru geldiğinde ilgili belgeleri bulursunuz
+3. Bu belgeleri prompt'a dahil edersiniz
+4. Model **gerçek verilerinize dayanarak** cevap verir
+
+```python
+# RAG ile (önizleme — bunu Oturum 2'de inşa edeceksiniz)
+docs = search_your_documents("Amadeus refund policy GDS")
+# → bulur: refund-policy-v3.2.pdf, sayfa 14
+
+response = call_llm([
+    {"role": "system", "content": f"Answer based ONLY on this context:\n{docs}"},
+    {"role": "user", "content": "What is Amadeus's refund policy for GDS bookings?"}
+])
+# → "According to refund-policy-v3.2.pdf: GDS bookings are eligible for
+#    full refund within 48 hours. After that, a €75 processing fee applies..."
+```
+
+Aynı soru, ama şimdi cevap gerçek belgenizden geliyor — kaynak göstererek.
+
+<PresenterNote>
+**Ekranda:** Site (iki kod bloğu)
+
+**Yapın:** "Bu iki cevap arasındaki farkı görüyor musunuz? Biri 'sanırım böyledir' diyor, diğeri 'v3.2.pdf sayfa 14'e göre böyledir' diyor. İşte RAG'ın gücü bu."
+
+**Vurgulayın:** "Bu konuyu bugün detaylı işlemeyeceğiz — Gün 3-4'ün tamamı buna ayrılmış. Ama tohumu şimdi ekiyoruz: agent'ınız akıllı olacak ama bilgisiz. Bilgiyi eklemek Session 2'nin işi."
+</PresenterNote>
+
+## Sınır 4: Karar Veremez
+
+Tek bir LLM çağrısı düz bir çizgidir: soru girer, cevap çıkar. Dallanamaz, döngü yapamaz veya yollar arasında seçim yapamaz.
+
+Gerçek iş akışları karar gerektirir:
+
+```
+Uçuş aksaması ciddiyse:
+    → operasyon ekibine yükselt
+    → önce premium yolcuları bilgilendir
+    → alternatif uçuşları ara
+
+Küçük bir aksamaysa:
+    → standart yeniden rezervasyonla otomatik çöz
+    → tüm yolculara bildirim gönder
+
+Kritikse:
+    → acil durum protokolünü tetikle
+    → havalimanı yönetimine bildir
+    → tüm aktarmalı uçuşları beklet
+```
+
+Bunu tek bir API çağrısıyla ifade edemezsiniz. Hatta bir çağrı zinciri ile bile ifade edemezsiniz — çünkü zincir tek yönde ilerler ve burada **dallanma** ve potansiyel olarak **geriye döngü** gerekir.
+
+```python
+# Bu basit bir chain ile ÇALIŞMAZ
+chain = analyze | classify | handle_severe | notify
+# Ya classify "küçük" derse? Chain yine handle_severe'i çalıştırır.
+# Chain'ler doğrusaldır. Gerçek iş akışları graftır.
+```
+
+**Çözüm**: **LangGraph** (Modül 5, Gün 2). İş akışınızı bir graf olarak modeller — düğümler iş yapar, kenarlar akışı kontrol eder, koşullu kenarlar karar verir. Dallanma, döngü, insan onayı bekleme ve başarısız adımları yeniden deneme yapabilirsiniz.
+
+<KeyInsight>
+Chain'ler tek yönde ilerler. Gerçek iş akışlarının çatalları, döngüleri ve kontrol noktaları vardır. LangGraph size graf tabanlı orkestrasyon sunar — geleneksel programlamada kullandığınız koşullu mantığın aynısı, ama LLM iş akışları için.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (pseudocode bloğu)
+
+**Yapın:** if/else yapısını gösterin. "Bu mantığı tek bir LLM çağrısıyla yapamazsınız. Bir chain ile de yapamazsınız — chain düz çizgidir. Graph lazım. İşte LangGraph Gün 2'de tam bunu yapacak."
+
+**Sorun:** "Takımınızda hangi iş akışı birden fazla karar noktası içeriyor? Düşünün — 'eğer X ise A yap, değilse B yap' gibi."
+</PresenterNote>
+
+## Bütün Resim: Agent Nedir?
+
+Bir **agent**, dört sınırın tamamını aşan bir sistemdir:
+
+<FlowDiagram title="Agent = LLM + Dört Sınırın Çözümü">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">LLM</span>
+      <span class="node-desc">Akıl yürütme motoru</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔌</span>
+      <span class="node-label">Araçlar</span>
+      <span class="node-desc">Eylem yapabilir (MCP)</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">💾</span>
+      <span class="node-label">Bellek</span>
+      <span class="node-desc">Hatırlayabilir (LangChain)</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📊</span>
+      <span class="node-label">Orkestrasyon</span>
+      <span class="node-desc">Karar verebilir (LangGraph)</span>
+    </div>
+    <div class="flow-arrow animated">=</div>
+    <div class="flow-node primary">
+      <span class="node-icon">🤖</span>
+      <span class="node-label">Agent</span>
+      <span class="node-desc">Otonom sistem</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+Bir agent bir döngü çalıştırır:
+
+1. **Algıla**: Girdi gelir — mesaj, olay, tetikleyici
+2. **Akıl Yürüt**: LLM durumu değerlendirir ve ne yapacağına karar verir
+3. **Eylem Yap**: Bir araç çağırır, veritabanı sorgular, bildirim gönderir
+4. **Hatırla**: Sonucu saklar, durumu günceller
+5. **Döngü**: Hedefe ulaşılana kadar adım 1'e geri dön
+
+| | Chatbot | Agent |
+|---|---|---|
+| **Etkileşim** | Siz sorarsınız, o cevaplar | Bir hedef belirlersiniz, o hedefe doğru çalışır |
+| **Eylemler** | Sadece metin | API çağırır, dosya okur, veri yazar |
+| **Bellek** | Çağrılar arası yok | Adımlar boyunca bağlamı hatırlar |
+| **Kontrol** | İnsan her adımı yönlendirir | Agent sonraki adımlara otonom karar verir |
+| **Örnek** | "Hava durumu ne?" | "İptal edilen uçuştaki tüm yolcuları yeniden rezerve et" |
+
+<PresenterNote>
+**Ekranda:** Site (diyagram + tablo)
+
+**Yapın:** "4 limit, 4 çözüm, 1 agent. Bu eğitimin tüm hikayesi bu diyagramda. Bugün tools ve memory öğreniyoruz. Yarın orchestration. Gelecek ay knowledge."
+
+**Sorun:** "Bu tablodaki en büyük fark hangisi sizce?" 2-3 cevap toplayın.
+
+**Sonra:** "İlk limiti çözelim — LLM'e eller verelim. Bu bizi MCP'ye götürüyor."
+</PresenterNote>
+
+## Yol Haritanız
+
+Artık nereye gittiğimizi biliyorsunuz:
+
+| Modül | Çözdüğü Sorun | Ne İnşa Edeceksiniz |
+|---|---|---|
+| **3. MCP** (bugün, 60 dk) | Eylem Yapamaz | LLM'e eller veren bir araç sunucusu |
+| **4. LangChain** (bugün, 70 dk) | Belleği Yok | Konuşma belleğine sahip zincirler |
+| **5. LangGraph** (yarın, 80 dk) | Karar Veremez | Dallanma ve döngülere sahip bir graf |
+| **6. Production** (yarın, 50 dk) | Hepsi bir arada | Üretime hazır bir agent |
+| **7-12. RAG** (Oturum 2) | Özel Veri Yok | Kaynak gösterimli, bilgi destekli agent |
+
+<DeepDive title="Tarihsel Bağlam: Buraya Nasıl Geldik">
+
+Otomasyonun dört çağı. Her biri öncekinin bir sınırını çözdü:
+
+1. **Kurallar (1970'ler–2000'ler)**: Elle yazılmış `if/else`. Düşündüğünüz 50 durum için mükemmel. 51. durum çöker.
+2. **ML (2010'lar)**: Veriden öğrenir. Ama dar kapsamlı — görev başına bir model, akıl yürütme yok.
+3. **LLM'ler (2023)**: Genel amaçlı akıl yürütme. Belirsizlikle başa çıkar, kendini açıklar. Ama: metin girer, metin çıkar. Eylem yapamaz.
+4. **Agent'lar (2024+)**: LLM + araçlar + bellek + orkestrasyon. Hem akıl yürütür HEM eylem yapar. Şu anda buradayız.
+
+Her çağ bir sınırı çözdü: kurallar ölçeklenemedi, ML akıl yürütemedi, LLM'ler eylem yapamadı. Agent'lar akıl yürütme + eylemi birleştirir.
+
+</DeepDive>
+
+## Sıradaki
+
+Sınır 1'i çözme zamanı. LLM eylem yapamıyor mu? **Ona eller verelim.** Modül 3, MCP'yi tanıtıyor — herhangi bir AI istemcisini herhangi bir araca bağlayan açık standart. İlk araç sunucunuzu 60 dakikada inşa edeceksiniz.

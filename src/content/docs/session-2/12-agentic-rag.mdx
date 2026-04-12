@@ -1,0 +1,507 @@
+---
+title: "Module 12: Agentic RAG — Grand Finale"
+description: "Combine everything from four days: an agent that autonomously decides when to retrieve, evaluates sufficiency, and generates cited answers."
+---
+
+import DeepDive from '../../../components/DeepDive.astro';
+import ColabLink from '../../../components/ColabLink.astro';
+import ModuleHeader from '../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../components/PresenterNote.astro';
+import KeyInsight from '../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="50 min" day={4} goal="Combine agents and RAG into one system: a LangGraph agent that autonomously retrieves knowledge, evaluates sufficiency, and generates cited answers." />
+
+## The Full Arc
+
+Four days. Twelve modules. One story.
+
+<FlowDiagram title="The Journey">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">Day 1</span>
+      <span class="node-desc">LLM + Tools + Chains</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📊</span>
+      <span class="node-label">Day 2</span>
+      <span class="node-desc">Graphs + Production Agent</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📚</span>
+      <span class="node-label">Day 3</span>
+      <span class="node-desc">Embeddings + RAG Pipeline</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node primary">
+      <span class="node-icon">🚀</span>
+      <span class="node-label">Day 4 — Now</span>
+      <span class="node-desc">Agent + RAG = Agentic RAG</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+On Day 2, your agent was powerful but **uninformed** — it hallucinated on private data. On Day 3, you built a RAG pipeline that gives **grounded answers** — but it's a passive system that only responds to queries.
+
+Now we combine them: **an agent that decides when to search, what to search for, and generates cited answers autonomously.**
+
+<PresenterNote>
+**Ekranda:** Site (diyagram)
+
+**Yapın:** "4 gün, 12 modül. Gün 2'de agent'ınız akıllı ama bilgisizdi. Gün 3'te RAG pipeline'ınız bilgili ama pasifti. Şimdi ikisini birleştiriyoruz."
+
+**Sorun:** "RAG pipeline'ı neden kendi başına yetmiyor? Neden agent lazım?" Cevap: RAG reaktif — soru gelir, cevap döner. Agent proaktif — ne zaman arama yapacağına, yeterli bilgi olup olmadığına, tekrar denemesi gerekip gerekmediğine kendisi karar verir.
+</PresenterNote>
+
+## Why Agents Need RAG (and Vice Versa)
+
+| | Agent Alone | RAG Alone | Agentic RAG |
+|---|---|---|---|
+| **Can act** | Yes | No | Yes |
+| **Has knowledge** | No (hallucinate) | Yes (from docs) | Yes |
+| **Decides what to search** | — | No (user queries) | Yes (autonomous) |
+| **Evaluates sufficiency** | — | No | Yes |
+| **Retries with different queries** | — | No | Yes |
+| **Combines multiple sources** | — | Manual | Autonomous |
+
+<KeyInsight>
+RAG is reactive — a question comes in, an answer goes out. Agentic RAG is proactive — the agent decides when to retrieve, judges if the context is sufficient, and reformulates queries when it isn't. The agent brings **autonomy**. RAG brings **knowledge**. Together: autonomous knowledge.
+</KeyInsight>
+
+## Three Decisions an Agentic RAG System Makes
+
+The difference between naive RAG and Agentic RAG comes down to three autonomous decisions:
+
+<FlowDiagram title="The Three Decisions">
+  <div class="flow-row">
+    <div class="flow-node warning">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Decision 1</span>
+      <span class="node-desc">Should I retrieve?</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Decision 2</span>
+      <span class="node-desc">Is context sufficient?</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Decision 3</span>
+      <span class="node-desc">Should I reformulate?</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+### Decision 1: Should I Retrieve?
+
+Not every question needs retrieval. "What's 2+2?" doesn't need a document search. "What's our cancellation policy?" does.
+
+```python
+def route_question(state: AgenticRAGState) -> str:
+    """Decide if retrieval is needed."""
+    response = model.invoke([
+        SystemMessage(content="""Classify the question:
+- "retrieve" if it asks about specific policies, procedures, or company data
+- "direct" if it's general knowledge or simple reasoning"""),
+        HumanMessage(content=state["question"])
+    ])
+    return "retrieve" if "retrieve" in response.content.lower() else "direct"
+```
+
+### Decision 2: Is Context Sufficient?
+
+After retrieval, the agent evaluates: do I have enough information to answer confidently?
+
+```python
+def evaluate_context(state: AgenticRAGState) -> str:
+    """Judge if retrieved context is sufficient."""
+    response = model.invoke([
+        SystemMessage(content="""Given the question and context, can you answer confidently?
+Reply ONLY "sufficient" or "insufficient".
+Insufficient means: key information is missing, context is off-topic, or contradictory."""),
+        HumanMessage(content=f"Question: {state['question']}\n\nContext: {state['context']}")
+    ])
+    return "generate" if "sufficient" in response.content.lower() else "reformulate"
+```
+
+### Decision 3: Should I Reformulate?
+
+If context is insufficient, the agent tries a different search strategy — different keywords, broader scope, or a different angle.
+
+```python
+def reformulate_query(state: AgenticRAGState) -> dict:
+    """Generate a better search query based on what was missing."""
+    response = model.invoke([
+        SystemMessage(content="The previous search didn't find enough information. Reformulate the query to find the missing pieces. Return ONLY the new search query."),
+        HumanMessage(content=f"Original: {state['question']}\nPrevious context (insufficient): {state['context'][:500]}")
+    ])
+    return {
+        "search_query": response.content,
+        "retrieval_attempts": state.get("retrieval_attempts", 0) + 1
+    }
+```
+
+<PresenterNote>
+**Ekranda:** Site (3 karar bölümü)
+
+**Yapın:** "Naive RAG'da bu kararların hiçbiri yok — soru gelir, arama yapılır, cevap dönülür. Agentic RAG'da agent 3 karar veriyor: aramalı mıyım, bulduğum yeterli mi, tekrar denemeli miyim."
+
+**Sorun:** "Bu 3 karar size ne hatırlatıyor?" İpucu: Module 5'teki conditional routing. Cevap: LangGraph! Conditional edges ile aynı pattern.
+</PresenterNote>
+
+## Building It: LangGraph + RAG
+
+This is the **same conditional routing pattern** from Module 5, applied to retrieval:
+
+```python
+from typing import Annotated
+from typing_extensions import TypedDict
+from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
+from langchain_groq import ChatGroq
+from langchain_core.messages import SystemMessage, HumanMessage
+
+class AgenticRAGState(TypedDict):
+    question: str
+    search_query: str
+    context: str
+    answer: str
+    sources: list[str]
+    retrieval_attempts: int
+
+model = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+
+def retrieve(state: AgenticRAGState) -> dict:
+    """Search the vector store for relevant documents."""
+    query = state.get("search_query", state["question"])
+    docs = vectorstore.similarity_search(query, k=4)
+    context = "\n\n".join([
+        f"[Source: {doc.metadata.get('source', 'unknown')}]\n{doc.page_content}"
+        for doc in docs
+    ])
+    sources = [doc.metadata.get("source", "unknown") for doc in docs]
+    return {"context": context, "sources": sources}
+
+def generate(state: AgenticRAGState) -> dict:
+    """Generate a grounded, cited answer."""
+    response = model.invoke([
+        SystemMessage(content="""Answer the question based ONLY on the provided context.
+Include citations: reference the source document for each claim.
+If the context doesn't contain the answer, say so explicitly."""),
+        HumanMessage(content=f"Question: {state['question']}\n\nContext:\n{state['context']}")
+    ])
+    return {"answer": response.content}
+
+def direct_answer(state: AgenticRAGState) -> dict:
+    """Answer without retrieval for general questions."""
+    response = model.invoke([
+        SystemMessage(content="Answer this general knowledge question concisely."),
+        HumanMessage(content=state["question"])
+    ])
+    return {"answer": response.content, "sources": []}
+
+def should_stop_reformulating(state: AgenticRAGState) -> str:
+    """Stop after 3 retrieval attempts."""
+    if state.get("retrieval_attempts", 0) >= 3:
+        return "generate"  # Best effort with what we have
+    return "reformulate"
+```
+
+### Wiring the Graph
+
+```python
+builder = StateGraph(AgenticRAGState)
+
+# Add nodes
+builder.add_node("retrieve", retrieve)
+builder.add_node("evaluate", evaluate_context_node)
+builder.add_node("reformulate", reformulate_query)
+builder.add_node("generate", generate)
+builder.add_node("direct_answer", direct_answer)
+
+# Entry: decide if retrieval needed
+builder.add_conditional_edges(
+    START,
+    route_question,
+    {"retrieve": "retrieve", "direct": "direct_answer"}
+)
+
+# After retrieval: evaluate sufficiency
+builder.add_edge("retrieve", "evaluate")
+
+# After evaluation: generate or try again
+builder.add_conditional_edges(
+    "evaluate",
+    evaluate_context,
+    {"generate": "generate", "reformulate": "reformulate"}
+)
+
+# After reformulation: check attempt count
+builder.add_conditional_edges(
+    "reformulate",
+    should_stop_reformulating,
+    {"reformulate": "retrieve", "generate": "generate"}  # Loop back or give up
+)
+
+# Terminal nodes
+builder.add_edge("generate", END)
+builder.add_edge("direct_answer", END)
+
+graph = builder.compile()
+```
+
+<FlowDiagram title="Agentic RAG Graph">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Question</span>
+      <span class="node-desc">User asks something</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">🔀</span>
+      <span class="node-label">Route</span>
+      <span class="node-desc">Retrieve or direct?</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Retrieve</span>
+      <span class="node-desc">Search vector store</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Evaluate</span>
+      <span class="node-desc">Sufficient context?</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">💬</span>
+      <span class="node-label">Generate</span>
+      <span class="node-desc">Cited answer</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">Insufficient? → Reformulate → Retrieve again (max 3 attempts)</div>
+  </div>
+</FlowDiagram>
+
+### Running It
+
+```python
+# Question that needs retrieval
+result = graph.invoke({
+    "question": "What is the cancellation fee for economy tickets after 24 hours?",
+    "retrieval_attempts": 0
+})
+
+print(result["answer"])
+# → "According to cancellation-policy-v3.2.pdf: Economy tickets incur a €75
+#    cancellation fee after the 24-hour free cancellation window. Refunds are
+#    processed within 7-10 business days [Source: cancellation-policy-v3.2.pdf]."
+
+print(f"Sources: {result['sources']}")
+print(f"Retrieval attempts: {result['retrieval_attempts']}")
+```
+
+```python
+# Question that doesn't need retrieval
+result = graph.invoke({
+    "question": "What is the IATA code for Tokyo Narita?",
+    "retrieval_attempts": 0
+})
+# → Routes to direct_answer, skips retrieval entirely
+# → "The IATA code for Tokyo Narita is NRT."
+```
+
+<PresenterNote>
+**Ekranda:** Site (graph diyagramı + kod)
+
+**Yapın:** Graph yapısını gösterin. "Bu Module 5'teki LangGraph pattern'ın aynısı — conditional edges. Tek fark: şimdi RAG retrieve/evaluate döngüsü var."
+
+**Vurgulayın:** Reformulate → Retrieve döngüsünü gösterin. "Bu döngü Agentic RAG'ın gücü. Naive RAG tek deneme yapar ve vazgeçer. Bu agent 3 kere dener, her seferinde farklı bir açıdan."
+
+**Sorun:** "Bu graph'a başka hangi node eklerdiniz?" Olası cevaplar: web search fallback, human escalation, caching.
+</PresenterNote>
+
+<KeyInsight>
+Agentic RAG is not a new concept — it's the **same LangGraph conditional routing pattern** from Module 5, applied to retrieval. You already know how to build this. The only new piece is wrapping RAG (Module 9) inside graph nodes.
+</KeyInsight>
+
+## The Complete Architecture
+
+Here's everything from 4 days, in one diagram:
+
+<FlowDiagram title="Full Agent Architecture">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">👤</span>
+      <span class="node-label">User Goal</span>
+      <span class="node-desc">Complex question or task</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">LangGraph Agent</span>
+      <span class="node-desc">Routes, decides, loops</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📚</span>
+      <span class="node-label">RAG Pipeline</span>
+      <span class="node-desc">Retrieve from your docs</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔌</span>
+      <span class="node-label">MCP Tools</span>
+      <span class="node-desc">Flight API, booking, email</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🛡️</span>
+      <span class="node-label">Guardrails</span>
+      <span class="node-desc">Input/output guards, cost limits</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Result</span>
+      <span class="node-desc">Grounded, cited, validated</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+Every piece maps to a module you completed:
+
+| Component | Module | What It Does |
+|---|---|---|
+| **LLM** | Module 1 | Next-token prediction engine |
+| **MCP Tools** | Module 3 | Standardized tool connectivity |
+| **LangChain** | Module 4 | Composable chains with memory |
+| **LangGraph** | Module 5 | Graph-based orchestration |
+| **Guardrails** | Module 6 | Error handling, cost, security |
+| **Embeddings** | Module 8 | Text → vectors for search |
+| **RAG Pipeline** | Module 9 | Retrieve → augment → generate |
+| **Advanced RAG** | Module 10 | HyDE, re-ranking, evaluation |
+| **Production RAG** | Module 11 | Metrics, monitoring, scaling |
+| **Agentic RAG** | Module 12 | Autonomous retrieval decisions |
+
+<DeepDive title="Advanced: CRAG and Adaptive RAG">
+
+### Corrective RAG (CRAG)
+
+When vector store retrieval fails, fall back to web search:
+
+```python
+def route_after_evaluation(state):
+    if state["context_quality"] == "sufficient":
+        return "generate"
+    elif state["retrieval_attempts"] < 2:
+        return "reformulate"
+    else:
+        return "web_search"  # Fallback to web search
+
+def web_search(state):
+    """Fall back to web search when vector store fails."""
+    results = web_search_tool.search(state["question"])
+    return {"context": results, "sources": ["web"]}
+```
+
+### Cost-Aware Model Routing
+
+Use cheap models for routing, powerful models for generation:
+
+```python
+haiku = ChatGroq(model="llama-3.1-8b-instant", temperature=0)  # Fast, cheap
+sonnet = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)  # Powerful
+
+def route_question(state):
+    # Cheap model decides if retrieval needed
+    return haiku.invoke(routing_prompt)
+
+def generate(state):
+    # Powerful model generates the answer
+    return sonnet.invoke(generation_prompt)
+```
+
+### Multi-Source RAG
+
+Route to different knowledge bases based on question type:
+
+```python
+def route_to_knowledge_base(state):
+    category = classify_question(state["question"])
+    if category == "policy":
+        return "policy_vectorstore"
+    elif category == "technical":
+        return "api_docs_vectorstore"
+    else:
+        return "general_vectorstore"
+```
+
+</DeepDive>
+
+## Training Recap
+
+<Steps>
+1. **Module 1-2**: What an LLM is — and its four fundamental limits.
+
+2. **Module 3**: MCP gave it hands — standardized tool connectivity.
+
+3. **Module 4**: LangChain gave it composability — chains, memory, pipes.
+
+4. **Module 5**: LangGraph gave it decision-making — state, branching, loops.
+
+5. **Module 6**: Production patterns — error handling, cost control, security.
+
+6. **Module 7-9**: RAG gave it knowledge — embeddings, retrieval, grounded answers.
+
+7. **Module 10-11**: Advanced + Production RAG — HyDE, re-ranking, evaluation metrics.
+
+8. **Module 12**: Agentic RAG combined everything — an agent that autonomously retrieves, evaluates, and generates cited answers.
+</Steps>
+
+## What to Take Away
+
+<CardGrid>
+  <Card title="Agents = Reasoning + Action" icon="rocket">
+    LLMs reason. Tools act. Frameworks orchestrate. RAG informs. That's the complete stack.
+  </Card>
+  <Card title="MCP standardizes connectivity" icon="puzzle">
+    Build your tool once, connect to any AI client. The N+M solution.
+  </Card>
+  <Card title="LangGraph for real workflows" icon="random">
+    Branching, looping, human approval — production needs graphs, not chains.
+  </Card>
+  <Card title="RAG grounds answers in reality" icon="open-book">
+    Retrieve real documents, cite real sources, eliminate hallucination.
+  </Card>
+</CardGrid>
+
+<KeyInsight>
+The best way to solidify this knowledge is to build an agent for a real workflow in your team. Start small — single tool, two-node graph, one document collection — and iterate. The capstone is your starting point, not your ceiling.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (recap + takeaways)
+
+**Yapın:** "4 gün, 12 modül, tek hikaye: LLM'den Agentic RAG'a. Şimdi elinizde tüm araçlar var. Asıl öğrenme bundan sonra başlıyor — kendi takımınızda gerçek bir problemi çözecek bir agent kurun."
+
+**Sorun (kapanış):** "Bu 4 günden sonra ilk yapacağınız proje ne olurdu? Hangi sistemi agent'a bağlardınız?" 3-4 cevap toplayın.
+
+**Kapanış:** Alkış, teşekkür, ve "Sorularınız varsa buradayız."
+</PresenterNote>
+
+<Aside type="tip">
+Take the capstone notebook, connect the retriever to your team's actual documents, and wire it into a LangGraph agent with MCP tools. A real agent solving a real problem for your team is worth more than a thousand tutorials.
+</Aside>

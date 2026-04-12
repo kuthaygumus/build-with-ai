@@ -1,0 +1,507 @@
+---
+title: "Modül 6: Agentic RAG — Büyük Final"
+description: "Dört günün her şeyini birleştirin: ne zaman arama yapacağına otonom karar veren, yeterliliği değerlendiren ve kaynaklı yanıtlar üreten bir agent."
+---
+
+import DeepDive from '../../../../components/DeepDive.astro';
+import ColabLink from '../../../../components/ColabLink.astro';
+import ModuleHeader from '../../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../../components/PresenterNote.astro';
+import KeyInsight from '../../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="50 dk" day={4} goal="Agent ve RAG'ı tek bir sistemde birleştirin: otonom olarak bilgi alan, yeterliliği değerlendiren ve kaynaklı yanıtlar üreten bir LangGraph agent'ı." />
+
+## Tüm Yolculuk
+
+Dört gün. On iki modül. Tek bir hikaye.
+
+<FlowDiagram title="Yolculuk">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">Gün 1</span>
+      <span class="node-desc">LLM + Araçlar + Chain'ler</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📊</span>
+      <span class="node-label">Gün 2</span>
+      <span class="node-desc">Graph'lar + Prodüksiyon Agent</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📚</span>
+      <span class="node-label">Gün 3</span>
+      <span class="node-desc">Embedding'ler + RAG Pipeline</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node primary">
+      <span class="node-icon">🚀</span>
+      <span class="node-label">Gün 4 — Şimdi</span>
+      <span class="node-desc">Agent + RAG = Agentic RAG</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+Gün 2'de agent'ınız güçlü ama **bilgisizdi** — özel veriler üzerinde halüsinasyon yapıyordu. Gün 3'te **temellendirilmiş yanıtlar** veren bir RAG pipeline kurdunuz — ama sadece sorgulara tepki veren pasif bir sistem.
+
+Şimdi ikisini birleştiriyoruz: **ne zaman arama yapacağına, ne arayacağına karar veren ve otonom olarak kaynaklı yanıtlar üreten bir agent.**
+
+<PresenterNote>
+**Ekranda:** Site (diyagram)
+
+**Yapın:** "4 gün, 12 modül. Gün 2'de agent'ınız akıllı ama bilgisizdi. Gün 3'te RAG pipeline'ınız bilgili ama pasifti. Şimdi ikisini birleştiriyoruz."
+
+**Sorun:** "RAG pipeline'ı neden kendi başına yetmiyor? Neden agent lazım?" Cevap: RAG reaktif — soru gelir, cevap döner. Agent proaktif — ne zaman arama yapacağına, yeterli bilgi olup olmadığına, tekrar denemesi gerekip gerekmediğine kendisi karar verir.
+</PresenterNote>
+
+## Agent'ların RAG'a İhtiyacı (ve Tam Tersi)
+
+| | Yalnız Agent | Yalnız RAG | Agentic RAG |
+|---|---|---|---|
+| **Aksiyon alabilir** | Evet | Hayır | Evet |
+| **Bilgi sahibi** | Hayır (halüsinasyon) | Evet (dokümanlardan) | Evet |
+| **Neyi arayacağına karar verir** | — | Hayır (kullanıcı sorguları) | Evet (otonom) |
+| **Yeterliliği değerlendirir** | — | Hayır | Evet |
+| **Farklı sorgularla tekrar dener** | — | Hayır | Evet |
+| **Birden fazla kaynağı birleştirir** | — | Manuel | Otonom |
+
+<KeyInsight>
+RAG reaktiftir — soru gelir, yanıt döner. Agentic RAG proaktiftir — agent ne zaman arama yapacağına karar verir, bağlamın yeterli olup olmadığını değerlendirir ve yeterli olmadığında sorguları yeniden formüle eder. Agent **otonomi** getirir. RAG **bilgi** getirir. Birlikte: otonom bilgi.
+</KeyInsight>
+
+## Bir Agentic RAG Sisteminin Verdiği Üç Karar
+
+Naive RAG ile Agentic RAG arasındaki fark, üç otonom karara dayanır:
+
+<FlowDiagram title="Üç Karar">
+  <div class="flow-row">
+    <div class="flow-node warning">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Karar 1</span>
+      <span class="node-desc">Arama yapmalı mıyım?</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Karar 2</span>
+      <span class="node-desc">Bağlam yeterli mi?</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Karar 3</span>
+      <span class="node-desc">Yeniden formüle etmeli miyim?</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+### Karar 1: Arama Yapmalı mıyım?
+
+Her sorunun arama gerektirmesi gerekmez. "2+2 kaç eder?" için doküman araması gerekmez. "İptal politikamız nedir?" için gerekir.
+
+```python
+def route_question(state: AgenticRAGState) -> str:
+    """Decide if retrieval is needed."""
+    response = model.invoke([
+        SystemMessage(content="""Classify the question:
+- "retrieve" if it asks about specific policies, procedures, or company data
+- "direct" if it's general knowledge or simple reasoning"""),
+        HumanMessage(content=state["question"])
+    ])
+    return "retrieve" if "retrieve" in response.content.lower() else "direct"
+```
+
+### Karar 2: Bağlam Yeterli mi?
+
+Arama sonrasında agent değerlendirir: güvenle yanıt vermek için yeterli bilgiye sahip miyim?
+
+```python
+def evaluate_context(state: AgenticRAGState) -> str:
+    """Judge if retrieved context is sufficient."""
+    response = model.invoke([
+        SystemMessage(content="""Given the question and context, can you answer confidently?
+Reply ONLY "sufficient" or "insufficient".
+Insufficient means: key information is missing, context is off-topic, or contradictory."""),
+        HumanMessage(content=f"Question: {state['question']}\n\nContext: {state['context']}")
+    ])
+    return "generate" if "sufficient" in response.content.lower() else "reformulate"
+```
+
+### Karar 3: Yeniden Formüle Etmeli miyim?
+
+Bağlam yetersizse, agent farklı bir arama stratejisi dener — farklı anahtar kelimeler, daha geniş kapsam veya farklı bir açı.
+
+```python
+def reformulate_query(state: AgenticRAGState) -> dict:
+    """Generate a better search query based on what was missing."""
+    response = model.invoke([
+        SystemMessage(content="The previous search didn't find enough information. Reformulate the query to find the missing pieces. Return ONLY the new search query."),
+        HumanMessage(content=f"Original: {state['question']}\nPrevious context (insufficient): {state['context'][:500]}")
+    ])
+    return {
+        "search_query": response.content,
+        "retrieval_attempts": state.get("retrieval_attempts", 0) + 1
+    }
+```
+
+<PresenterNote>
+**Ekranda:** Site (3 karar bölümü)
+
+**Yapın:** "Naive RAG'da bu kararların hiçbiri yok — soru gelir, arama yapılır, cevap dönülür. Agentic RAG'da agent 3 karar veriyor: aramalı mıyım, bulduğum yeterli mi, tekrar denemeli miyim."
+
+**Sorun:** "Bu 3 karar size ne hatırlatıyor?" İpucu: Module 5'teki conditional routing. Cevap: LangGraph! Conditional edges ile aynı pattern.
+</PresenterNote>
+
+## İnşa Edelim: LangGraph + RAG
+
+Bu, Modül 5'teki **aynı conditional routing pattern'ı**, arama işlemine uygulanmış hali:
+
+```python
+from typing import Annotated
+from typing_extensions import TypedDict
+from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
+from langchain_groq import ChatGroq
+from langchain_core.messages import SystemMessage, HumanMessage
+
+class AgenticRAGState(TypedDict):
+    question: str
+    search_query: str
+    context: str
+    answer: str
+    sources: list[str]
+    retrieval_attempts: int
+
+model = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+
+def retrieve(state: AgenticRAGState) -> dict:
+    """Search the vector store for relevant documents."""
+    query = state.get("search_query", state["question"])
+    docs = vectorstore.similarity_search(query, k=4)
+    context = "\n\n".join([
+        f"[Source: {doc.metadata.get('source', 'unknown')}]\n{doc.page_content}"
+        for doc in docs
+    ])
+    sources = [doc.metadata.get("source", "unknown") for doc in docs]
+    return {"context": context, "sources": sources}
+
+def generate(state: AgenticRAGState) -> dict:
+    """Generate a grounded, cited answer."""
+    response = model.invoke([
+        SystemMessage(content="""Answer the question based ONLY on the provided context.
+Include citations: reference the source document for each claim.
+If the context doesn't contain the answer, say so explicitly."""),
+        HumanMessage(content=f"Question: {state['question']}\n\nContext:\n{state['context']}")
+    ])
+    return {"answer": response.content}
+
+def direct_answer(state: AgenticRAGState) -> dict:
+    """Answer without retrieval for general questions."""
+    response = model.invoke([
+        SystemMessage(content="Answer this general knowledge question concisely."),
+        HumanMessage(content=state["question"])
+    ])
+    return {"answer": response.content, "sources": []}
+
+def should_stop_reformulating(state: AgenticRAGState) -> str:
+    """Stop after 3 retrieval attempts."""
+    if state.get("retrieval_attempts", 0) >= 3:
+        return "generate"  # Best effort with what we have
+    return "reformulate"
+```
+
+### Graph'ı Bağlama
+
+```python
+builder = StateGraph(AgenticRAGState)
+
+# Node'ları ekle
+builder.add_node("retrieve", retrieve)
+builder.add_node("evaluate", evaluate_context_node)
+builder.add_node("reformulate", reformulate_query)
+builder.add_node("generate", generate)
+builder.add_node("direct_answer", direct_answer)
+
+# Giriş: arama gerekli mi karar ver
+builder.add_conditional_edges(
+    START,
+    route_question,
+    {"retrieve": "retrieve", "direct": "direct_answer"}
+)
+
+# Arama sonrası: yeterliliği değerlendir
+builder.add_edge("retrieve", "evaluate")
+
+# Değerlendirme sonrası: üret veya tekrar dene
+builder.add_conditional_edges(
+    "evaluate",
+    evaluate_context,
+    {"generate": "generate", "reformulate": "reformulate"}
+)
+
+# Yeniden formülasyon sonrası: deneme sayısını kontrol et
+builder.add_conditional_edges(
+    "reformulate",
+    should_stop_reformulating,
+    {"reformulate": "retrieve", "generate": "generate"}  # Döngüye dön veya vazgeç
+)
+
+# Terminal node'lar
+builder.add_edge("generate", END)
+builder.add_edge("direct_answer", END)
+
+graph = builder.compile()
+```
+
+<FlowDiagram title="Agentic RAG Graph">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Soru</span>
+      <span class="node-desc">Kullanıcı bir şey sorar</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">🔀</span>
+      <span class="node-label">Yönlendir</span>
+      <span class="node-desc">Arama mı, doğrudan mı?</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Ara</span>
+      <span class="node-desc">Vector store'da ara</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Değerlendir</span>
+      <span class="node-desc">Bağlam yeterli mi?</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">💬</span>
+      <span class="node-label">Üret</span>
+      <span class="node-desc">Kaynaklı yanıt</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">Yetersiz mi? → Yeniden formüle et → Tekrar ara (maks 3 deneme)</div>
+  </div>
+</FlowDiagram>
+
+### Çalıştırma
+
+```python
+# Arama gerektiren soru
+result = graph.invoke({
+    "question": "What is the cancellation fee for economy tickets after 24 hours?",
+    "retrieval_attempts": 0
+})
+
+print(result["answer"])
+# → "According to cancellation-policy-v3.2.pdf: Economy tickets incur a €75
+#    cancellation fee after the 24-hour free cancellation window. Refunds are
+#    processed within 7-10 business days [Source: cancellation-policy-v3.2.pdf]."
+
+print(f"Sources: {result['sources']}")
+print(f"Retrieval attempts: {result['retrieval_attempts']}")
+```
+
+```python
+# Arama gerektirmeyen soru
+result = graph.invoke({
+    "question": "What is the IATA code for Tokyo Narita?",
+    "retrieval_attempts": 0
+})
+# → direct_answer'a yönlendirir, aramayı tamamen atlar
+# → "The IATA code for Tokyo Narita is NRT."
+```
+
+<PresenterNote>
+**Ekranda:** Site (graph diyagramı + kod)
+
+**Yapın:** Graph yapısını gösterin. "Bu Module 5'teki LangGraph pattern'ın aynısı — conditional edges. Tek fark: şimdi RAG retrieve/evaluate döngüsü var."
+
+**Vurgulayın:** Reformulate → Retrieve döngüsünü gösterin. "Bu döngü Agentic RAG'ın gücü. Naive RAG tek deneme yapar ve vazgeçer. Bu agent 3 kere dener, her seferinde farklı bir açıdan."
+
+**Sorun:** "Bu graph'a başka hangi node eklerdiniz?" Olası cevaplar: web search fallback, human escalation, caching.
+</PresenterNote>
+
+<KeyInsight>
+Agentic RAG yeni bir kavram değil — Modül 5'teki **aynı LangGraph conditional routing pattern'ıdır**, arama işlemine uygulanmış hali. Bunu nasıl yapacağınızı zaten biliyorsunuz. Tek yeni parça, RAG'ı (Modül 9) graph node'larının içine sarmaktır.
+</KeyInsight>
+
+## Tam Mimari
+
+İşte 4 günden her şey, tek bir diyagramda:
+
+<FlowDiagram title="Tam Agent Mimarisi">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">👤</span>
+      <span class="node-label">Kullanıcı Hedefi</span>
+      <span class="node-desc">Karmaşık soru veya görev</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">LangGraph Agent</span>
+      <span class="node-desc">Yönlendirir, karar verir, döngü kurar</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📚</span>
+      <span class="node-label">RAG Pipeline</span>
+      <span class="node-desc">Dokümanlarınızdan arama yapar</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">🔌</span>
+      <span class="node-label">MCP Araçları</span>
+      <span class="node-desc">Uçuş API, rezervasyon, e-posta</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🛡️</span>
+      <span class="node-label">Guardrail'ler</span>
+      <span class="node-desc">Giriş/çıkış korumaları, maliyet limitleri</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Sonuç</span>
+      <span class="node-desc">Temellendirilmiş, kaynaklı, doğrulanmış</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+Her parça tamamladığınız bir modüle karşılık gelir:
+
+| Bileşen | Modül | Ne Yapar |
+|---|---|---|
+| **LLM** | Modül 1 | Sonraki-token tahmin motoru |
+| **MCP Araçları** | Modül 3 | Standartlaştırılmış araç bağlantısı |
+| **LangChain** | Modül 4 | Bellek ile birleştirilebilir chain'ler |
+| **LangGraph** | Modül 5 | Graph tabanlı orkestrasyon |
+| **Guardrail'ler** | Modül 6 | Hata yönetimi, maliyet kontrolü, güvenlik |
+| **Embedding'ler** | Modül 8 | Metin → arama için vektörler |
+| **RAG Pipeline** | Modül 9 | Arama → zenginleştir → üret |
+| **Gelişmiş RAG** | Modül 10 | HyDE, yeniden sıralama, değerlendirme |
+| **Prodüksiyon RAG** | Modül 11 | Metrikler, izleme, ölçeklendirme |
+| **Agentic RAG** | Modül 12 | Otonom arama kararları |
+
+<DeepDive title="İleri Seviye: CRAG ve Adaptive RAG">
+
+### Corrective RAG (CRAG)
+
+Vector store araması başarısız olduğunda, web aramasına düş:
+
+```python
+def route_after_evaluation(state):
+    if state["context_quality"] == "sufficient":
+        return "generate"
+    elif state["retrieval_attempts"] < 2:
+        return "reformulate"
+    else:
+        return "web_search"  # Web aramasına düş
+
+def web_search(state):
+    """Fall back to web search when vector store fails."""
+    results = web_search_tool.search(state["question"])
+    return {"context": results, "sources": ["web"]}
+```
+
+### Maliyet Bilinçli Model Yönlendirme
+
+Yönlendirme için ucuz modeller, üretim için güçlü modeller kullanın:
+
+```python
+haiku = ChatGroq(model="llama-3.1-8b-instant", temperature=0)  # Hızlı, ucuz
+sonnet = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)  # Güçlü
+
+def route_question(state):
+    # Ucuz model arama gerekip gerekmediğine karar verir
+    return haiku.invoke(routing_prompt)
+
+def generate(state):
+    # Güçlü model yanıtı üretir
+    return sonnet.invoke(generation_prompt)
+```
+
+### Çoklu Kaynak RAG
+
+Soru türüne göre farklı bilgi tabanlarına yönlendirin:
+
+```python
+def route_to_knowledge_base(state):
+    category = classify_question(state["question"])
+    if category == "policy":
+        return "policy_vectorstore"
+    elif category == "technical":
+        return "api_docs_vectorstore"
+    else:
+        return "general_vectorstore"
+```
+
+</DeepDive>
+
+## Eğitim Özeti
+
+<Steps>
+1. **Modül 1-2**: Bir LLM'in ne olduğu — ve dört temel sınırlaması.
+
+2. **Modül 3**: MCP ona eller verdi — standartlaştırılmış araç bağlantısı.
+
+3. **Modül 4**: LangChain birleştirilebilirlik kazandırdı — chain'ler, bellek, pipe'lar.
+
+4. **Modül 5**: LangGraph karar verme yeteneği kazandırdı — durum, dallanma, döngüler.
+
+5. **Modül 6**: Prodüksiyon kalıpları — hata yönetimi, maliyet kontrolü, güvenlik.
+
+6. **Modül 7-9**: RAG bilgi kazandırdı — embedding'ler, arama, temellendirilmiş yanıtlar.
+
+7. **Modül 10-11**: Gelişmiş + Prodüksiyon RAG — HyDE, yeniden sıralama, değerlendirme metrikleri.
+
+8. **Modül 12**: Agentic RAG her şeyi birleştirdi — otonom olarak alan, değerlendiren ve kaynaklı yanıtlar üreten bir agent.
+</Steps>
+
+## Yanınızda Götürecekleriniz
+
+<CardGrid>
+  <Card title="Agent'lar = Akıl Yürütme + Aksiyon" icon="rocket">
+    LLM'ler akıl yürütür. Araçlar aksiyon alır. Framework'ler orkestrasyon yapar. RAG bilgilendirir. İşte tam yığın bu.
+  </Card>
+  <Card title="MCP bağlantıyı standartlaştırır" icon="puzzle">
+    Aracınızı bir kez oluşturun, herhangi bir AI istemcisine bağlayın. N+M çözümü.
+  </Card>
+  <Card title="Gerçek iş akışları için LangGraph" icon="random">
+    Dallanma, döngü, insan onayı — prodüksiyon chain değil, graph gerektirir.
+  </Card>
+  <Card title="RAG yanıtları gerçekliğe dayandırır" icon="open-book">
+    Gerçek dokümanları alın, gerçek kaynakları referans gösterin, halüsinasyonu ortadan kaldırın.
+  </Card>
+</CardGrid>
+
+<KeyInsight>
+Bu bilgiyi pekiştirmenin en iyi yolu, ekibinizdeki gerçek bir iş akışı için agent oluşturmaktır. Küçük başlayın — tek araç, iki node'lu graph, bir doküman koleksiyonu — ve iterasyon yapın. Capstone projeniz başlangıç noktanızdır, tavanınız değil.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (recap + takeaways)
+
+**Yapın:** "4 gün, 12 modül, tek hikaye: LLM'den Agentic RAG'a. Şimdi elinizde tüm araçlar var. Asıl öğrenme bundan sonra başlıyor — kendi takımınızda gerçek bir problemi çözecek bir agent kurun."
+
+**Sorun (kapanış):** "Bu 4 günden sonra ilk yapacağınız proje ne olurdu? Hangi sistemi agent'a bağlardınız?" 3-4 cevap toplayın.
+
+**Kapanış:** Alkış, teşekkür, ve "Sorularınız varsa buradayız."
+</PresenterNote>
+
+<Aside type="tip">
+Capstone notebook'u alın, retriever'ı ekibinizin gerçek dokümanlarına bağlayın ve MCP araçlarıyla bir LangGraph agent'ına entegre edin. Ekibiniz için gerçek bir problemi çözen gerçek bir agent, bin tutorialdan daha değerlidir.
+</Aside>

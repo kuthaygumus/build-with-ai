@@ -1,0 +1,300 @@
+---
+title: "Module 1: What Is an LLM?"
+description: "What a Large Language Model actually is, how it works under the hood, and the four concepts that explain 90% of LLM behavior."
+---
+
+import DeepDive from '../../../components/DeepDive.astro';
+import ModuleHeader from '../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../components/PresenterNote.astro';
+import KeyInsight from '../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="30 min" day={1} goal="Understand what an LLM actually is, see it work through a raw API call, and learn the four concepts that govern all LLM behavior." />
+
+## The Question Nobody Asks
+
+Everyone uses the words "AI" and "LLM." Most people can't explain what they actually mean. Before we build anything, we need to answer one question: **what is this thing?**
+
+<PresenterNote>
+**Ekranda:** Site (bu sayfa)
+
+**Yapın:** "Yapay zeka nedir diye sorduğumuzda çoğumuz ChatGPT'yi düşünürüz. Ama ChatGPT bir ürün — altında çalışan şey bir LLM. Bugün o LLM'in ne olduğunu, nasıl çalıştığını, ve neden böyle davrandığını anlayacağız."
+
+**Sorun (kısa el kaldırma):** "Daha önce ChatGPT veya Claude API'sini koddan çağırdınız mı?" 5-10 saniye.
+
+**Not:** Bu modülde notebook açılmıyor. İlk notebook Modül 2'de açılacak.
+</PresenterNote>
+
+## What an LLM Actually Is
+
+A **Large Language Model** is a program that predicts the next token in a sequence.
+
+That's it. Everything else — the conversations, the code generation, the reasoning — emerges from this single mechanism: **given everything so far, what word comes next?**
+
+```
+Input:  "The capital of France is"
+Model:  P("Paris") = 0.97, P("Lyon") = 0.01, P("a") = 0.005, ...
+Output: "Paris"
+```
+
+The model doesn't "know" that Paris is the capital of France the way you know it. It has learned, from billions of text examples, that the token "Paris" almost always follows "The capital of France is." Pattern matching at an incomprehensible scale.
+
+<KeyInsight>
+An LLM is a **next-token prediction engine**. It doesn't understand, remember, or reason the way humans do. It predicts which token comes next — and it's so good at it that the results look like understanding.
+</KeyInsight>
+
+### What It Is Not
+
+Getting this wrong leads to bad agent design:
+
+| LLM is NOT | Why people think it is | The reality |
+|---|---|---|
+| A **database** | It gives factual answers | It predicts plausible text — sometimes facts, sometimes fiction |
+| A **search engine** | It answers questions | It generates from patterns, not from live data |
+| A **reasoning engine** | It explains its logic | It produces text that looks like reasoning — not actual deduction |
+| **Conscious** | It says "I think" | It learned that "I think" is a common text pattern |
+
+<PresenterNote>
+**Ekranda:** Site (tablo)
+
+**Yapın:** Tabloyu gösterin. "Bu tabloyu sindirelim. LLM bir veritabanı DEĞİL — bazen doğru cevap verir çünkü eğitim verisinde görmüştür, bazen uydurur. Bu fark gün boyunca bizi takip edecek."
+
+**Sorun:** "LLM bir veritabanı değilse, şirketinizin iç dokümanlarını nasıl bilebilir?" Birkaç saniye bekleyin. Cevap: bilemez. Bu Gün 3-4'teki RAG konusunun tohumu.
+</PresenterNote>
+
+## See It Work: A Raw API Call
+
+No framework. No magic. Just an HTTP request and a JSON response.
+
+```python
+import requests
+
+response = requests.post(
+    "https://api.groq.com/openai/v1/chat/completions",
+    headers={
+        "Authorization": "Bearer YOUR_GROQ_API_KEY",
+        "Content-Type": "application/json"
+    },
+    json={
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "What is the IATA code for Istanbul Airport?"}
+        ],
+        "temperature": 0
+    }
+)
+
+data = response.json()
+print(data["choices"][0]["message"]["content"])
+# → "IST"
+print(f"Tokens used: {data['usage']['total_tokens']}")
+# → "Tokens used: 42"
+```
+
+That's all there is. You send JSON, you get JSON back. Everything else we build this week — LangChain, LangGraph, MCP — is **layers on top of this call.**
+
+<PresenterNote>
+**Ekranda:** Site (kod bloğu)
+
+**Yapın:** Kodu gösterin. "Bakın — requests.post. HTTP isteği. JSON gönderiyoruz, JSON dönüyor. Bu eğitimde öğreneceğimiz her framework, her araç, sonunda bu çağrıyı yapıyor. Büyünün altında bu var."
+
+**Vurgulayın:** `usage.total_tokens` satırı — "Bu sayıyı hatırlayın. Token kavramı her yerde karşımıza çıkacak."
+
+**Sorun:** "Bu kodda memory var mı? Yani ikinci bir soru sorsam, birincisini hatırlar mı?" Cevap: hayır. Her çağrı bağımsız. Bu kavram birazdan gelecek.
+</PresenterNote>
+
+<KeyInsight>
+Every LLM interaction is an HTTP request: JSON in, JSON out. All the frameworks and tools we'll learn are sophisticated wrappers around this fundamental call.
+</KeyInsight>
+
+## The Four Concepts
+
+Now that you know what an LLM is, four concepts explain 90% of its behavior. Every line of code you write this week involves at least one of them.
+
+### 1. Token — The Unit of Everything
+
+LLMs don't read characters or words. They read **tokens** — small chunks of text that the model treats as atomic units.
+
+```
+1 token  ≈  4 characters  ≈  ¾ of a word
+"Book a flight from Paris to Tokyo on March 15"  ≈  12 tokens
+```
+
+**Why you care**: Tokens drive three things:
+1. **Cost** — You pay per token. Input and output are billed separately.
+2. **Speed** — More tokens = more compute = slower response.
+3. **Limits** — Models have a maximum number of tokens per call.
+
+<PresenterNote>
+**Yapın:** "1 token ≈ 4 karakter" formülünü vurgulayın.
+
+**Sorun:** "100 sayfalık bir PDF kaç token sizce?" Tahminleri toplayın. (~50.000 token.)
+</PresenterNote>
+
+### 2. Context Window — The Model's Entire World
+
+Every LLM has a maximum number of tokens it can process in a single call. This is the **context window**.
+
+| Model | Context Window |
+|---|---|
+| GPT-4o | 128K tokens (~96K words) |
+| Claude Sonnet 4 | 200K tokens (~150K words) |
+| Llama 3.3 70B | 128K tokens (~96K words) |
+
+The critical insight: the context window includes **everything**:
+
+<FlowDiagram title="What Fills the Context Window">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📜</span>
+      <span class="node-label">System Prompt</span>
+      <span class="node-desc">Your instructions</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">💬</span>
+      <span class="node-label">Chat History</span>
+      <span class="node-desc">All previous messages</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📄</span>
+      <span class="node-label">Retrieved Docs</span>
+      <span class="node-desc">RAG, files, tool results</span>
+    </div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Current Input</span>
+      <span class="node-desc">The user's question</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node primary">
+      <span class="node-icon">🧠</span>
+      <span class="node-label">LLM</span>
+      <span class="node-desc">Sees ALL of it, every call</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+**Why you care**: The model has **no memory between calls.** Every API call is stateless. If you want it to "remember" a previous conversation, you have to send the entire conversation back every time. This is why we need memory management — you'll see it in Module 4.
+
+<PresenterNote>
+**Sorun:** "Eğer LLM'in hafızası yoksa, ChatGPT bir önceki mesajı nasıl 'hatırlıyor'?"
+
+**Cevap rehberi:** Hatırlamıyor — uygulama tüm geçmişi her seferinde tekrar gönderiyor. Bu, Module 4'te LangChain memory pattern'larını neden öğreneceğimizin cevabı.
+</PresenterNote>
+
+### 3. Temperature — The Predictability Dial
+
+Temperature controls how "creative" the model is when picking the next token. Technically: it controls the probability distribution over possible tokens.
+
+| Temperature | Behavior | When to Use |
+|---|---|---|
+| **0** | Always picks the most likely token. Deterministic. | Tool calls, JSON output, code, classification |
+| **0.3–0.5** | Slightly varied, mostly predictable | Customer support, summaries, Q&A |
+| **0.7–1.0** | Creative, varied outputs each time | Brainstorming, marketing copy |
+
+**Why you care**: In agent code, you'll almost always see `temperature=0`. When an agent decides which tool to call, you want **determinism** — the same input should produce the same decision. Creativity in a payment flow is a bug.
+
+<PresenterNote>
+**Yapın (canlı demo, ~2 dk):** Site'tan gösterin — iki `temperature` değerini karşılaştırın. "Aynı prompt, aynı model. temperature=0 hep aynı çıktı, temperature=1 her seferinde farklı."
+
+**Sorun:** "Hangisini bir agent'ın tool seçim adımında kullanırdınız?" Cevap: 0.
+</PresenterNote>
+
+### 4. Prompt — The Source Code of LLM Behavior
+
+A **prompt** is the exact text you send to the LLM. Small changes produce large changes in output.
+
+<Tabs>
+  <TabItem label="Vague">
+    ```text
+    Help me with flights.
+    ```
+    Model has no idea what you want. Generic output.
+  </TabItem>
+
+  <TabItem label="Specific">
+    ```text
+    I need to fly from Paris to Tokyo on March 15. 
+    Suggest 3 flight options sorted by price.
+    ```
+    Clear task, but model will invent flight data.
+  </TabItem>
+
+  <TabItem label="Agent-Grade">
+    ```text
+    You are a flight assistant. The user wants to fly 
+    from CDG to HND on 2025-03-15.
+    
+    Use the search_flights tool to find real options.
+    Return exactly 3 results sorted by price.
+    Format: numbered list with airline, price, duration.
+    ```
+    Role, task, tool instruction, format, constraints. This is what agents use.
+  </TabItem>
+</Tabs>
+
+**Why you care**: Every framework we'll learn — LangChain, LangGraph, MCP — is ultimately a **structured way to build prompts.** When something goes wrong with an agent, the first thing you do is print the prompt and read it. 90% of bugs live there.
+
+<KeyInsight>
+**Prompts are the source code of LLM behavior.** Treat them with the same care you'd treat a function signature: explicit inputs, outputs, constraints, and intent.
+</KeyInsight>
+
+## Putting It Together
+
+Every LLM call you'll see this week combines all four:
+
+```python
+response = requests.post(url, json={
+    "model": "llama-3.3-70b-versatile",  # ← model choice
+    "temperature": 0,                      # ← Concept 3: predictability
+    "messages": [                          # ← Concept 4: prompt
+        {"role": "system", "content": "You are a flight assistant."},
+        {"role": "user", "content": user_question}
+    ]                                      # ← all of this consumes tokens (1)
+})                                         # ← fits in context window (2)
+```
+
+Four concepts. One mental model. Everything we build stands on this foundation.
+
+<DeepDive title="Bonus: How Tokens Map to Cost">
+
+Every API has a price per million tokens, with different rates for input and output:
+
+| Item | Tokens | Rate | Cost |
+|---|---|---|---|
+| System prompt + history | 1,500 | $0.50/M | $0.00075 |
+| User message | 50 | $0.50/M | $0.000025 |
+| Generated response | 300 | $1.50/M | $0.00045 |
+| **Total per call** | 1,850 | — | **~$0.0012** |
+
+Looks tiny. Multiply by 10,000 requests/day → $12/day. Multiply by agent workflows making 5–10 LLM calls per request → $60–120/day → $1,800–3,600/month. That's why Module 6 has a "Cost Control" section.
+
+</DeepDive>
+
+<DeepDive title="Bonus: Streaming">
+
+Most LLM APIs support **streaming** — tokens arrive one at a time instead of all at once. Total cost is the same, but the user sees the first word in 100ms instead of waiting 5 seconds.
+
+```python
+# Non-streaming: wait for full answer
+response = llm.invoke("Explain RAG")  # 5 seconds of silence
+
+# Streaming: tokens flow as generated
+for chunk in llm.stream("Explain RAG"):
+    print(chunk.content, end="", flush=True)  # types out live
+```
+
+Streaming matters when a human is watching. For backend agent pipelines, batch responses are simpler.
+
+</DeepDive>
+
+## Next Up
+
+You know what an LLM is. You've seen it work through a raw API call. You understand the four concepts.
+
+Now let's discover **what it can't do** — and why those limitations create the need for everything we'll build this week. **Module 2: The Limits of a Bare LLM.**

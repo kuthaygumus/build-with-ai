@@ -1,0 +1,545 @@
+---
+title: "Module 7: The Knowledge Problem"
+description: "Why your smart agent fails on private data, what RAG solves, and the vocabulary you need for the rest of Session 2 — vector, similarity, embedding."
+---
+
+import DeepDive from '../../../components/DeepDive.astro';
+import ColabLink from '../../../components/ColabLink.astro';
+import ModuleHeader from '../../../components/ModuleHeader.astro';
+import PresenterNote from '../../../components/PresenterNote.astro';
+import KeyInsight from '../../../components/KeyInsight.astro';
+import FlowDiagram from '../../../components/FlowDiagram.astro';
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<ModuleHeader duration="40 min" day={3} goal="Understand why smart agents fail on private data, define RAG in 30 seconds, learn the three vocabulary words that power every RAG system, and see the indexing pipeline end to end." />
+
+## Welcome Back
+
+Session 1 gave you a capable agent: it reasons with an LLM, calls tools through MCP, manages memory with LangChain, and orchestrates complex workflows with LangGraph. Then, in the final demo, you asked it about your company's rebooking policy and it **confidently made something up**.
+
+Remember that moment. That failure is the starting point of Session 2.
+
+<PresenterNote>
+**Ekranda:** Site (bu sayfa)
+
+**Yapın:** "Hoş geldiniz. Session 1'de bir agent inşa ettiniz — akıllıydı, araç kullanıyordu, hafızası vardı, kararlar alabiliyordu. Sonra şirket politikası sorduk ve güvenle uydurdu. Bugün o problemi çözmeye başlıyoruz."
+
+**Sorun (kısa el kaldırma):** "Geçen oturumdan beri kendi başına LLM veya agent denemeleri yapan var mı? Private data problemiyle karşılaşan?" 5-10 saniye.
+
+**Not:** Bu modülde henüz notebook açılmıyor. Tamamen site üzerinden ilerlenecek. İlk notebook Module 8'de açılacak.
+</PresenterNote>
+
+<KeyInsight>
+Your agent from Session 1 was smart but **uninformed**. It could reason, use tools, and manage state — but it hallucinated the moment you asked about data it was never trained on. Session 2 fixes this.
+</KeyInsight>
+
+## Quick Refresher: Token & Context Window
+
+You learned these in Module 1. Two sentences is all you need:
+
+**Tokens** are the atomic chunks an LLM reads (~4 characters each) — they drive cost, speed, and limits. The **context window** is the total token budget for a single LLM call — system prompt, retrieved docs, chat history, and the user's question must all fit inside it.
+
+Everything in Session 2 is shaped by these two constraints. If a concept feels unfamiliar, revisit Module 1.
+
+## The Three Blind Spots
+
+Your agent has three fundamental knowledge gaps. No amount of prompt engineering, tool-calling, or graph orchestration can fix them. They are **architectural problems** that require an **architectural solution**.
+
+### 1. Hallucination
+
+The LLM doesn't "know" facts. It predicts the next token. When training data is sparse on a topic, it fills the gap with plausible fiction.
+
+```python
+# Ask about a specific internal API
+response = llm("What are the rate limits for Amadeus Flight Offers v4?")
+# → "The Amadeus Flight Offers v4 API allows 100 requests per minute
+#    per API key, with a burst limit of 20 concurrent requests..."
+#
+# Sounds authoritative. Entirely fabricated.
+# There is no v4. The real limits are different.
+# The model can't distinguish between what it knows and what it invents.
+```
+
+<PresenterNote>
+**Ekranda:** Site (hallucination kod bloğu)
+
+**Yapın:** Kodu gösterin. "Bu sizi rahatsız etmeli. Model 'bilmiyorum' demiyor — güvenle uyduruyor. Production'da bu, yanlış bilgi veren bir müşteri destek botu demek. Uyduruk API limiti veren bir geliştirici asistanı demek."
+
+**Sorun:** "Bunu production'a deploy eder misiniz?" Cevabın hayır olmasını bekleyin. "İşte bu yüzden buradayız."
+</PresenterNote>
+
+### 2. Stale Knowledge
+
+Every model has a training cutoff date. The world moves on. The model doesn't.
+
+Your flight disruption policy changed last Tuesday. A new GDS command was added yesterday. Q3 fare rules were published this morning. The model knows **none of this**. Retraining costs GPU-weeks and six-figure budgets — that's not a workflow, it's a crisis.
+
+### 3. Zero Access to Private Data
+
+LLMs are trained on the public internet. They have **zero knowledge** of:
+
+- Your GDS documentation and Cryptic commands
+- Internal wikis, architecture decisions, onboarding docs
+- Customer contracts and SLA terms
+- Incident post-mortems and runbooks
+- Yesterday's flight schedule changes
+
+This is not a model quality problem. GPT-5 won't fix it. Claude 5 won't fix it. Your private data was never in the training set and never will be.
+
+<FlowDiagram title="The Three Blind Spots">
+  <div class="flow-row">
+    <div class="flow-node danger">
+      <span class="node-icon">🎭</span>
+      <span class="node-label">Hallucination</span>
+      <span class="node-desc">Invents plausible fiction</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node danger">
+      <span class="node-icon">📅</span>
+      <span class="node-label">Stale Knowledge</span>
+      <span class="node-desc">Training cutoff is months old</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node danger">
+      <span class="node-icon">🔒</span>
+      <span class="node-label">No Private Data</span>
+      <span class="node-desc">Can't see your documents</span>
+    </div>
+  </div>
+  <div class="flow-row" style="justify-content: center; margin-top: 0.5rem;">
+    <div class="flow-arrow animated" style="font-size: 0.85rem; color: var(--sl-color-gray-4);">↓ RAG solves all three</div>
+  </div>
+  <div class="flow-row" style="justify-content: center;">
+    <div class="flow-node success">
+      <span class="node-icon">📚</span>
+      <span class="node-label">RAG</span>
+      <span class="node-desc">Ground answers in real documents</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<KeyInsight>
+These three problems are not model failures — they are **architectural gaps**. A smarter model won't solve them. You need a system that retrieves real documents and grounds the model's answers in evidence. That system is RAG.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (Three Blind Spots diyagramı)
+
+**Yapın:** Her bir kör noktayı sırayla geçin: "Hallucination — uyduruyor. Stale — eski bilgi. Private data — hiç görmedi. Üçü de aynı kök nedene gidiyor: modelin 'bildiği' sadece eğitim verisi. Biz eğitim verisini değiştirmek yerine, girdiyi değiştireceğiz."
+
+**Sorun:** "Sizin günlük işinizde bu üç problemden hangisi en sık karşınıza çıkıyor?"
+</PresenterNote>
+
+## RAG in 30 Seconds
+
+**Retrieval-Augmented Generation.** Three steps. One sentence each.
+
+1. **Retrieve** — Find the relevant documents from your knowledge base
+2. **Augment** — Inject those documents into the LLM's prompt
+3. **Generate** — The model answers grounded in your actual data
+
+The model doesn't change. The input does.
+
+<FlowDiagram title="The RAG Flow">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Question</span>
+      <span class="node-desc">"Rebooking policy for cancelled flights?"</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🔍</span>
+      <span class="node-label">Retrieve</span>
+      <span class="node-desc">Find relevant chunks</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">📄</span>
+      <span class="node-label">Augment</span>
+      <span class="node-desc">Inject docs into prompt</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">✅</span>
+      <span class="node-label">Generate</span>
+      <span class="node-desc">Grounded answer + citations</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+```python
+# RAG in 10 lines
+def rag_answer(question: str) -> str:
+    # 1. RETRIEVE — find relevant documents
+    relevant_docs = vector_store.similarity_search(question, k=5)
+
+    # 2. AUGMENT — inject into prompt
+    context = "\n\n".join([doc.page_content for doc in relevant_docs])
+    prompt = f"""Answer based ONLY on this context. If unsure, say so.
+
+Context:
+{context}
+
+Question: {question}"""
+
+    # 3. GENERATE — grounded answer
+    return llm.invoke(prompt)
+```
+
+That's the entire pattern. Everything else — embeddings, chunking, vector stores, re-ranking — is about making each of these three steps work better.
+
+<PresenterNote>
+**Ekranda:** Site (RAG Flow diyagramı + pseudocode)
+
+**Yapın:** Diyagramı gösterin, sonra kodu satır satır geçin. "Üç adım. Bul, enjekte et, üret. Sihir ikinci satırdaki similarity_search'te. Bu nasıl çalışıyor? Birazdan orada olacağız."
+
+**Sorun:** "similarity_search arka planda ne yapıyor sizce? Kelime eşleştirmesi mi? Başka bir şey mi?"
+
+**Cevap rehberi:** Kelime eşleştirmesi değil — anlam eşleştirmesi. "cancelled flight" ve "iptal edilen uçuş" aynı anlama geliyor, keyword search bunu yakalayamaz. Bunu birkaç dakika içinde "embedding" kavramında açacağız.
+</PresenterNote>
+
+<KeyInsight>
+RAG is not a smarter model — it's a **smarter architecture**. Same LLM, but now it reads your documents before answering. Retrieve, augment, generate. Three steps that turn a hallucinator into a grounded expert.
+</KeyInsight>
+
+## RAG vs Fine-Tuning
+
+The question everyone asks. Here's the decision matrix:
+
+| | RAG | Fine-Tuning |
+|---|---|---|
+| **Purpose** | Model needs to **know** something | Model needs to **behave** differently |
+| **Data freshness** | Real-time (re-index anytime) | Stale (requires retraining) |
+| **Source attribution** | Built-in (you know which doc) | Not possible |
+| **Cost** | Low (embedding + storage) | High (GPU hours) |
+| **Hallucination control** | Strong (grounded in sources) | Weak (still generates freely) |
+| **Setup time** | Hours | Days to weeks |
+| **Best for** | Knowledge retrieval, Q&A, search | Tone, format, domain language |
+| **Travel example** | "What's the rebooking policy?" | "Always respond in GDS Cryptic format" |
+
+<FlowDiagram title="When to Use What">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Need specific docs?</span>
+      <span class="node-desc">Policies, APIs, contracts</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">📚</span>
+      <span class="node-label">RAG</span>
+      <span class="node-desc">Retrieve and ground</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Need different tone?</span>
+      <span class="node-desc">Style, format, domain jargon</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node warning">
+      <span class="node-icon">🎯</span>
+      <span class="node-label">Fine-Tuning</span>
+      <span class="node-desc">Train behavior into model</span>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5rem;">
+    <div class="flow-node secondary">
+      <span class="node-icon">❓</span>
+      <span class="node-label">Both?</span>
+      <span class="node-desc">Know docs + speak in GDS format</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node primary">
+      <span class="node-icon">🔗</span>
+      <span class="node-label">RAG + Fine-Tuning</span>
+      <span class="node-desc">Production systems often combine both</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+<PresenterNote>
+**Ekranda:** Site (RAG vs Fine-Tuning tablosu + diyagram)
+
+**Yapın:** Tabloyu gösterin. İki satırı vurgulayın: (1) "Source attribution — RAG'da var, fine-tuning'de yok", (2) "Data freshness — RAG real-time, fine-tuning stale."
+
+**Sorun:** "GDS dokümantasyonunuzu sorgulanabilir yapmak istiyorsunuz. RAG mı fine-tuning mi?" Cevap: RAG — çünkü bilgi sık değişiyor ve kaynak göstermek lazım.
+
+**Ekleyin:** "Production'da ikisi rakip değil. RAG bilgi için, fine-tuning davranış için. Gelişmiş sistemlerde ikisi birlikte kullanılır."
+</PresenterNote>
+
+## New Vocabulary: Vector, Similarity, Embedding
+
+The RAG pseudocode above had a line you haven't seen before: `vector_store.similarity_search()`. To understand what that does, you need three new words. Just three. They power every RAG system.
+
+### Vector — A List of Numbers
+
+A **vector** is a list of numbers that represents meaning. That's the entire definition.
+
+```python
+vector = [0.12, -0.34, 0.87, 0.04, -0.56, 0.23, ...]
+# Usually 384, 768, or 1536 numbers (depending on the model)
+```
+
+Think of it as **coordinates in meaning-space**. Just like GPS coordinates place you on a map, a vector places a piece of text on a map of meaning. Texts about the same topic land near each other. Texts about different topics land far apart.
+
+```
+                    fare rules  ●
+                                          pricing  ●
+        hotel booking ●
+                                                   revenue  ●
+                    room types  ●
+                                flight delay ●
+                                          cancellation  ●
+```
+
+Hotel topics cluster together. Flight disruption topics cluster together. Pricing sits between them. **Vectors turn text into coordinates so we can measure "are these about the same thing?" with simple math.**
+
+<PresenterNote>
+**Ekranda:** Site (vektör örneği + 2D harita)
+
+**Yapın:** "Vector = sayı listesi. Bu kadar. Daha karmaşık bir şey değil." [0.12, -0.34, ...] örneğini gösterin. Sonra 2D haritayı gösterin: "Aynı konudaki metinler komşu, farklı konular uzak. Vektörler bunu yapıyor."
+
+**Sorun:** "Eğer iki paragraf neredeyse aynı anlamı taşıyorsa, vektörleri uzayda nasıl yerleşir?" Cevap: birbirine çok yakın. Bu bizi sıradaki kavrama götürüyor.
+</PresenterNote>
+
+### Similarity — How Close Are Two Vectors?
+
+Once you have two vectors, you measure how close they are. Close = similar meaning. Far = different meaning.
+
+The standard math is **cosine similarity** — a score between -1 and 1:
+
+| Cosine | Meaning | Travel Example |
+|---|---|---|
+| **1.0** | Identical | "flight cancelled" vs "flight cancelled" |
+| **0.9 -- 1.0** | Almost the same | "flight cancelled" vs "flight has been cancelled" |
+| **0.7 -- 0.9** | Related, same topic | "flight cancelled" vs "rebooking options for disrupted passengers" |
+| **0.4 -- 0.7** | Loosely related | "flight cancelled" vs "airline customer service hours" |
+| **0.0** | Unrelated | "flight cancelled" vs "pasta recipe" |
+| **< 0.0** | Opposite meaning | Rare in practice with modern embeddings |
+
+You don't need to remember the formula. Just: **higher cosine = more similar meaning**.
+
+When you call `vector_store.similarity_search(query, k=5)`, here's what happens:
+
+1. Your query gets converted to a vector
+2. The system computes cosine similarity against **every** vector in the store
+3. It returns the **5 with the highest scores**
+4. Those map back to text chunks, which get injected into the prompt
+
+That's the entire "magic" of semantic search. No keyword matching. No SQL. Just: which stored texts are closest in meaning to this question?
+
+<KeyInsight>
+**Similarity is the math behind "find me chunks that mean the same thing."** The vector store does the computation. You just need to know what the score means: higher = more relevant.
+</KeyInsight>
+
+### Embedding — How Text Becomes a Vector
+
+How does text turn into a list of numbers? Through an **embedding model** — a specialized model whose only job is "text in, vector out."
+
+```python
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+vec1 = model.encode("CDG flight delayed 3 hours")
+vec2 = model.encode("Paris airport departure postponed")
+vec3 = model.encode("Best hotel pools in Bali")
+
+# vec1 and vec2 will be very close (same meaning, different words)
+# vec1 and vec3 will be far apart (completely different topics)
+```
+
+The embedding model is trained so that texts with **similar meaning** produce **similar vectors**, regardless of the exact words used. "Cancelled flight" and "iptal edilen ucus" and "vol annule" can all land in the same neighborhood.
+
+**Embedding model vs LLM — two different jobs:**
+
+| | Embedding Model | LLM (Chat Model) |
+|---|---|---|
+| **Input** | Text | Text |
+| **Output** | A vector (list of numbers) | Text |
+| **Used for** | Search, similarity, clustering | Generation, reasoning, conversation |
+| **Examples** | `text-embedding-3-small`, `all-MiniLM-L6-v2` | GPT-4o, Claude Sonnet 4, Llama 3 |
+| **Cost** | Very cheap (~$0.02/M tokens) | Expensive (~$3-15/M tokens) |
+
+In a RAG system, **you use both**: the embedding model for the search step, the LLM for the generation step. They're complementary, not competitors.
+
+<KeyInsight>
+**An embedding is what you get when you pass text through an embedding model.** Text in, vector out. That vector is the text's address in meaning-space. Two texts with similar meaning get similar addresses.
+</KeyInsight>
+
+<PresenterNote>
+**Ekranda:** Site (embedding model vs LLM tablosu)
+
+**Yapın:** Tabloyu gösterin. "İki ayrı model. Embedding modeli = arama için, çok ucuz. LLM = cevaplama için, pahalı. RAG'da ikisini de kullanıyoruz — her biri kendi işini yapıyor."
+
+**Sorun:** "Embedding modeli neden bu kadar ucuz?" Cevap: çok daha küçük, tek bir iş yapıyor (text -> vector), büyük çıktı üretmiyor. 1 milyon doc'u embed etmek ~$1-2, aynı doc'lara GPT-4o ile soru sormak $100+.
+
+**Sonra:** "Üç kelime tamam. Şimdi bunları bir pipeline'da birleştirelim."
+</PresenterNote>
+
+## The Indexing Pipeline
+
+Before RAG can answer anything, you prepare your knowledge base. This happens offline, once (and then incrementally as documents change):
+
+<FlowDiagram title="Indexing Pipeline: Load → Chunk → Embed → Store">
+  <div class="flow-row">
+    <div class="flow-node secondary">
+      <span class="node-icon">📄</span>
+      <span class="node-label">Load</span>
+      <span class="node-desc">PDF, web, markdown, API docs</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">✂️</span>
+      <span class="node-label">Chunk</span>
+      <span class="node-desc">Split into focused passages</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node secondary">
+      <span class="node-icon">🧮</span>
+      <span class="node-label">Embed</span>
+      <span class="node-desc">Convert each chunk to a vector</span>
+    </div>
+    <div class="flow-arrow animated">→</div>
+    <div class="flow-node success">
+      <span class="node-icon">💾</span>
+      <span class="node-label">Store</span>
+      <span class="node-desc">Save vectors in a vector database</span>
+    </div>
+  </div>
+</FlowDiagram>
+
+Each step has a job:
+
+| Step | What It Does | Travel Example |
+|---|---|---|
+| **Load** | Read raw documents into memory | Load the 200-page GDS Integration Guide PDF |
+| **Chunk** | Split into small, focused passages | Break it into ~500-token passages with overlap |
+| **Embed** | Convert each chunk to a vector | Each passage becomes a 384-dimensional coordinate |
+| **Store** | Save vectors + text in a vector database | All 400+ chunks searchable in milliseconds |
+
+```python
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+
+# 1. LOAD — read documents
+docs = PyPDFLoader("gds-integration-guide.pdf").load()
+print(f"Loaded {len(docs)} pages")
+
+# 2. CHUNK — split into focused passages
+chunks = RecursiveCharacterTextSplitter(
+    chunk_size=1000,    # ~250 words per chunk
+    chunk_overlap=200   # overlap prevents cutting mid-sentence
+).split_documents(docs)
+print(f"Split into {len(chunks)} chunks")
+
+# 3. EMBED + STORE — convert to vectors and save
+vector_store = Chroma.from_documents(
+    documents=chunks,
+    embedding=HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2"),
+    persist_directory="./chroma_db"
+)
+print(f"Indexed {len(chunks)} chunks into vector store")
+```
+
+<PresenterNote>
+**Ekranda:** Site (pipeline diyagramı + kod)
+
+**Yapın:** Diyagramı gösterin, sonra kodu satır satır geçin. Her adımda durun: "Load — PDF'i okuyoruz. Chunk — küçük parçalara bölüyoruz çünkü embedding modelin token limiti var. Embed — her parçayı vektöre çeviriyoruz. Store — vektörleri veritabanına kaydediyoruz."
+
+**Sorun:** "chunk_size=1000 ile chunk_size=100 arasında ne fark olur sizce?"
+
+**Cevap rehberi:** Büyük chunk = daha fazla bağlam ama daha az hassasiyet. Küçük chunk = daha hassas arama ama bağlam kaybı. Bu trade-off'u Module 9'da derinlemesine işleyeceğiz. Şimdilik pipeline'ın akışını bilin.
+</PresenterNote>
+
+## Real Use Cases — Your World
+
+Think about the data a travel technology company already has:
+
+<CardGrid>
+  <Card title="GDS Documentation" icon="document">
+    Thousands of pages of Cryptic commands, API specs, and integration guides. Developers search through them daily. RAG makes them queryable in natural language — "How do I void a ticket issued yesterday?" instead of digging through PDF pages.
+  </Card>
+  <Card title="Customer Support" icon="comment">
+    Support agents get AI-suggested answers grounded in product docs, troubleshooting guides, and past ticket resolutions. Faster resolution, fewer escalations, and every answer cites its source.
+  </Card>
+  <Card title="Incident Post-Mortems" icon="warning">
+    Past outages, root causes, and remediation steps. When something breaks at 3 AM, the on-call engineer asks: "Has this happened before?" RAG finds the answer in seconds.
+  </Card>
+  <Card title="Fare Rules & Policies" icon="open-book">
+    Complex fare rules that change by airline, route, and season. Agents and support staff ask questions in plain language instead of memorizing rule tables.
+  </Card>
+</CardGrid>
+
+<PresenterNote>
+**Ekranda:** Site (use case kartları)
+
+**Yapın:** Kartları gösterin. "Bunlar gerçek use case'ler — hepsi RAG ile çözülebilir. Dört gün sonunda bu kartlardan birini end-to-end çalışır hale getirecek bilgiye sahip olacaksınız."
+
+**Sorun:** "Bu use case'lerden hangisi takımınıza en çok zaman kazandırır?"
+
+**Sonra:** 2-3 cevap alın. Bunlar eğitimin geri kalanı için zihinsel çapalar olacak.
+</PresenterNote>
+
+## Session 2 Roadmap
+
+You now know the **why**. The rest of Session 2 gives you the **how**:
+
+| Module | Topic | What You Build |
+|--------|-------|----------------|
+| **7** (this) | The Knowledge Problem | Understanding of RAG, vocabulary, pipeline overview |
+| **8** | Embeddings & Semantic Search | Embed text, search semantically, visualize meaning |
+| **9** | The RAG Pipeline | Complete end-to-end RAG system from scratch |
+| **10** | Advanced RAG | HyDE, re-ranking, multi-query, agentic RAG |
+| **11** | Production RAG | Evaluation, scaling, monitoring |
+| **12** | Agentic RAG — Grand Finale | Full knowledge-powered agent with citations |
+
+<DeepDive title="The Academic Origins of RAG">
+
+RAG was introduced in the 2020 paper **"Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks"** by Patrick Lewis et al. at Facebook AI Research.
+
+The key contribution: combine a pre-trained seq2seq model (BART) with a dense retriever (DPR), trained end-to-end. The retriever and generator jointly optimize what to retrieve and how to generate.
+
+Modern RAG has diverged significantly. Today's systems use frozen LLMs (no end-to-end training), vector databases instead of FAISS, and prompt engineering instead of fine-tuned generators. The term "RAG" has evolved from a specific architecture to a **design pattern** — any system that retrieves external knowledge to augment generation.
+
+**Key papers in the RAG lineage:**
+1. **DPR** (Karpukhin et al., 2020) — Dense Passage Retrieval
+2. **RAG** (Lewis et al., 2020) — The original paper
+3. **RETRO** (Borgeaud et al., 2022) — Retrieval-enhanced transformers at scale
+4. **Self-RAG** (Asai et al., 2023) — LLM decides when to retrieve
+5. **CRAG** (Yan et al., 2024) — Corrective RAG with retrieval evaluation
+
+</DeepDive>
+
+<DeepDive title="Why Not Just Use a Bigger Context Window?">
+
+Models like Gemini offer 1M+ token context windows. Why not dump all your documents in and skip RAG entirely?
+
+Three reasons:
+
+1. **Cost** — Sending 500K tokens per query is extremely expensive. RAG sends only the 5 most relevant chunks (~2-5K tokens). That's a 100x cost difference.
+2. **Lost in the middle** — Research shows LLMs struggle to find relevant information buried in very long contexts. They attend well to the beginning and end, but lose accuracy in the middle. RAG pre-filters so the model only sees what matters.
+3. **Scale** — Your knowledge base might be 50M tokens. No context window fits that. RAG's indexing pipeline handles any size.
+
+Big context windows are useful — but as a complement to RAG, not a replacement.
+
+</DeepDive>
+
+## Recap
+
+Three things to carry into the rest of Session 2:
+
+1. **LLMs have three blind spots** — hallucination, stale knowledge, no private data access. RAG fixes all three by changing the input, not the model.
+
+2. **RAG = Retrieve, Augment, Generate.** Find relevant docs, inject into prompt, generate a grounded answer. The model stays the same; the architecture changes everything.
+
+3. **Three new words** — a **vector** is a list of numbers representing meaning, **similarity** measures how close two vectors are, and an **embedding** is what you get when you pass text through an embedding model. These three concepts power every line of RAG code.
+
+## Next Up
+
+You have the vocabulary and the mental model. Time to get hands-on. In Module 8 you'll embed real text, compute similarity scores, visualize meaning in 2D, and build your first semantic search — all in a live notebook. **Module 8: Embeddings & Semantic Search.**
